@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -39,6 +39,21 @@ public class SaveAndQuitAction extends FreeColAction {
      */
     public SaveAndQuitAction(FreeColClient freeColClient) {
         super(freeColClient, id);
+    }
+
+
+    // Override FreeColAction
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected boolean shouldBeEnabled() {
+        if (freeColClient.isMapEditor()) return true;
+
+        // In game
+        if (!freeColClient.canSaveCurrentGame()) return false;
+        return !getGUI().isPanelShowing();
     }
 
 

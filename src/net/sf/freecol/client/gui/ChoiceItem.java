@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -32,6 +32,7 @@ import net.sf.freecol.common.util.Utils;
 /**
  * Can be used as a single choice for the
  * {@link FreeColChoiceDialog}.
+ * @param <T> The type of the contained item.
  */
 public class ChoiceItem<T> implements Comparable<ChoiceItem<T>> {
 

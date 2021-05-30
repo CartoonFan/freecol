@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -111,17 +111,6 @@ public abstract class SelectableAction extends MapboardAction {
 
 
     // Override FreeColAction
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    protected boolean shouldBeEnabled() {
-        final Player player = getFreeColClient().getMyPlayer();
-        return player != null && player.getNewModelMessages().isEmpty()
-            && getFreeColClient().getGame() != null
-            && super.shouldBeEnabled();
-    }
 
     /**
      * {@inheritDoc}

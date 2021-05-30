@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -106,7 +106,10 @@ public class GrayLayer extends Component {
             colour = Color.WHITE;
 
         } else {
-            coatOfArmsIcon = new ImageIcon(ImageLibrary.getNationImage(player.getNation(), 1f));
+            ImageLibrary lib = this.freeColClient.getGUI()
+                .getFixedImageLibrary();
+            coatOfArmsIcon
+                = new ImageIcon(lib.getNationImage(player.getNation(), 1f));
             message = Messages.message(player.getWaitingLabel());
             colour = player.getNationColor();
         }
@@ -125,7 +128,7 @@ public class GrayLayer extends Component {
 
         Dimension size = getSize();
         textBounds.x = (size.width - textBounds.width) / 2;
-        textBounds.y = size.height - InfoPanel.PANEL_HEIGHT
+        textBounds.y = size.height - (int)InfoPanel.PREFERRED_SIZE.getHeight()
             - 2 * textBounds.height;
 
         if (textBounds.intersects(clipArea)) {

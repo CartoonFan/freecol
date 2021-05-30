@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -148,16 +148,24 @@ public final class EuropePanel extends PortPanel {
          * {@inheritDoc}
          */
         @Override
-        public boolean accepts(Unit unit) {
-            return unit.isNaval() && !unit.isDamaged();
+        public boolean accepts(Goods goods) {
+            return false;
         }
 
         /**
          * {@inheritDoc}
          */
         @Override
-        public boolean accepts(Goods goods) {
+        public boolean accepts(GoodsType goodsType) {
             return false;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public boolean accepts(Unit unit) {
+            return unit.isNaval() && !unit.isDamaged();
         }
 
         /**
@@ -259,13 +267,6 @@ public final class EuropePanel extends PortPanel {
         /**
          * {@inheritDoc}
          */
-        public boolean accepts(Unit unit) {
-            return !unit.isNaval();
-        }
-
-        /**
-         * {@inheritDoc}
-         */
         public void selectLabel() {
             // do nothing
         }
@@ -278,6 +279,20 @@ public final class EuropePanel extends PortPanel {
         @Override
         public boolean accepts(Goods goods) {
             return false;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public boolean accepts(GoodsType goodsType) {
+            return false;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public boolean accepts(Unit unit) {
+            return !unit.isNaval();
         }
 
         /**
@@ -390,10 +405,10 @@ public final class EuropePanel extends PortPanel {
         public void initialize() {
             removeAll();
 
+            final FreeColClient fcc = getFreeColClient();
             final Market market = getMyPlayer().getMarket();
-            ImageLibrary lib = getImageLibrary();
             for (GoodsType goodsType : getSpecification().getStorableGoodsTypeList()) {
-                MarketLabel label = new MarketLabel(lib, goodsType, market);
+                MarketLabel label = new MarketLabel(fcc, goodsType, market);
                 label.setTransferHandler(defaultTransferHandler);
                 label.addMouseListener(pressListener);
                 MarketData md = market.getMarketData(goodsType);
@@ -414,7 +429,15 @@ public final class EuropePanel extends PortPanel {
          * {@inheritDoc}
          */
         @Override
-        public boolean accepts(Unit unit) {
+        public boolean accepts(Goods goods) {
+            return true;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public boolean accepts(GoodsType goodsType) {
             return false;
         }
 
@@ -422,8 +445,8 @@ public final class EuropePanel extends PortPanel {
          * {@inheritDoc}
          */
         @Override
-        public boolean accepts(Goods goods) {
-            return true;
+        public boolean accepts(Unit unit) {
+            return false;
         }
 
         /**
@@ -464,14 +487,6 @@ public final class EuropePanel extends PortPanel {
             }
             EuropePanel.this.refresh();
             return comp;
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
-        public int suggested(GoodsType type) {
-            return -1; // No good choice
         }
 
 
@@ -720,7 +735,8 @@ public final class EuropePanel extends PortPanel {
         initialize(europe);
 
         if(header) {
-            add(Utility.localizedHeader(europe.getNameKey(), false),
+            add(Utility.localizedHeader(europe.getNameKey(),
+                                        Utility.FONTSPEC_TITLE),
                 "span, top, center");
         }
         add(toAmericaScroll, "sg, height 15%:, grow");
@@ -742,9 +758,7 @@ public final class EuropePanel extends PortPanel {
         Unit u = europe.getLastUnit();
         if (u == null) setSelectedUnitLabel(null); else setSelectedUnit(u);
 
-        float scale = getImageLibrary().getScaleFactor();
-        getGUI().restoreSavedSize(this,
-            new Dimension(200 + (int)(scale*850), 200 + (int)(scale*525)));
+        getGUI().restoreSavedSize(this, new Dimension(1050, 725));
     }
 
     /**

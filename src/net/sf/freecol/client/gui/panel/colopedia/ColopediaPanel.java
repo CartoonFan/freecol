@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -73,7 +73,7 @@ public final class ColopediaPanel extends FreeColPanel
               new MigLayout("fill", "[200:]unrelated[550:, grow, fill]",
                             "[][grow, fill][]"));
 
-        add(Utility.localizedHeader("colopedia", false),
+        add(Utility.localizedHeader("colopedia", Utility.FONTSPEC_TITLE),
             "span, align center");
 
         listPanel = new MigPanel("ColopediaPanelUI");
@@ -96,9 +96,7 @@ public final class ColopediaPanel extends FreeColPanel
 
         add(okButton, "newline 20, span, tag ok");
 
-        float scale = getImageLibrary().getScaleFactor();
-        getGUI().restoreSavedSize(this,
-            new Dimension(200 + (int)(scale*850), 200 + (int)(scale*525)));
+        getGUI().restoreSavedSize(this, new Dimension(1050, 725));
         tree = buildTree();
 
         select(id);
@@ -142,9 +140,7 @@ public final class ColopediaPanel extends FreeColPanel
         tree = new JTree(treeModel) {
                 @Override
                 public Dimension getPreferredSize() {
-                    return new Dimension(
-                        (int)(200 * getImageLibrary().getScaleFactor()),
-                        super.getPreferredSize().height);
+                    return new Dimension(200, super.getPreferredSize().height);
                 }
             };
         tree.setRootVisible(false);

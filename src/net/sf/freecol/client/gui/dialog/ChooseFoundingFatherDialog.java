@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -87,7 +87,8 @@ public final class ChooseFoundingFatherDialog
         tb.setSelectedIndex(0);
 
         JPanel panel = new MigPanel(new MigLayout("wrap 1", "align center"));
-        panel.add(Utility.localizedHeader("chooseFoundingFatherDialog.title", false));
+        panel.add(Utility.localizedHeader("chooseFoundingFatherDialog.title",
+                                          Utility.FONTSPEC_TITLE));
         panel.add(helpButton, "tag help");
         panel.add(tb, "width 100%");
 

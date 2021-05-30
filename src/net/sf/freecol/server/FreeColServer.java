@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -295,7 +295,7 @@ public final class FreeColServer {
 
         this.setPublicServer(publicServer);
         this.singlePlayer = singlePlayer;
-        this.random = new Random(FreeColSeed.getFreeColSeed(true));
+        this.random = new Random(FreeColSeed.getFreeColSeed());
         this.serverGame = new ServerGame(specification, random);
         this.inGameController.setRandom(this.random);
         this.mapGenerator = new SimpleMapGenerator(this.random);
@@ -326,13 +326,13 @@ public final class FreeColServer {
         // NationOptions will be read from the saved game.
         Session.clearAll();
 
-        // Replace the PRNG in the game if it is missing or a command line
-        // option was present.
-        long seed = FreeColSeed.getFreeColSeed(this.random == null);
-        if (seed != FreeColSeed.DEFAULT_SEED) {
-            this.random = new Random(seed);
+        if (FreeColSeed.hasFreeColSeed()) {
+            // A seed has been specified on the command line, so override
+            // the PRNG from savegame.            
+            this.random = new Random(FreeColSeed.getFreeColSeed());
         }
-        this.inGameController.setRandom(random);
+        this.inGameController.setRandom(this.random);
+            
         this.mapGenerator = null;
         registerWithMetaServer();
     }

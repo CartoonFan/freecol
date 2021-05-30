@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -26,6 +26,7 @@ import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.Player;
+import net.sf.freecol.common.model.Map;
 import net.sf.freecol.common.model.Specification;
 import net.sf.freecol.common.networking.ServerAPI;
 import net.sf.freecol.server.FreeColServer;
@@ -115,6 +116,16 @@ public class FreeColClientHolder {
     }
 
     /**
+     * Get the Map.
+     *
+     * @return The game {@code Map}.
+     */
+    protected Map getMap() {
+        Game game = getGame();
+        return (game == null) ? null : game.getMap();
+    }
+
+    /**
      * Get the GUI.
      *
      * @return The {@code GUI} held by the client.
@@ -130,15 +141,6 @@ public class FreeColClientHolder {
      */
     protected Player getMyPlayer() {
         return this.freeColClient.getMyPlayer();
-    }
-
-    /**
-     * Gets the controller for the sound.
-     *
-     * @return The sound controller, if any.
-     */
-    public SoundController getSoundController() {
-        return this.freeColClient.getSoundController();
     }
 
     /**

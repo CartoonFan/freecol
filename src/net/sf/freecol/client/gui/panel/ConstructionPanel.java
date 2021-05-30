@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -35,6 +35,7 @@ import net.miginfocom.swing.MigLayout;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.FontLibrary;
 import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.client.gui.Size;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.AbstractGoods;
 import net.sf.freecol.common.model.BuildableType;
@@ -148,10 +149,9 @@ public class ConstructionPanel extends MigPanel
      */
     public void update(BuildableType buildable) {
         removeAll();
-        final ImageLibrary lib = freeColClient.getGUI()
-            .getTileImageLibrary();
-        final Font font = FontLibrary.createFont(FontLibrary.FontType.NORMAL,
-            FontLibrary.FontSize.SMALLER, lib.getScaleFactor());
+        final ImageLibrary lib = this.freeColClient.getGUI()
+            .getFixedImageLibrary();
+        final Font font = FontLibrary.getUnscaledFont("normal-plain-smaller");
 
         if (buildable == null) {
             String clickToBuild = Messages.message(getDefaultLabel());
@@ -187,7 +187,7 @@ public class ConstructionPanel extends MigPanel
                 int amountNeeded = ag.getAmount();
                 int amountAvailable = colony.getGoodsCount(ag.getType());
                 int amountProduced = colony.getAdjustedNetProductionOf(ag.getType());
-                add(new FreeColProgressBar(ag.getType(), 0,
+                add(new FreeColProgressBar(this.freeColClient, ag.getType(), 0,
                                            amountNeeded, amountAvailable, amountProduced),
                     "height 20:");
             }

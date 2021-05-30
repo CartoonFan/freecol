@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -199,9 +199,9 @@ public final class Server extends Thread {
      *
      * @param log If true, enable logging.
      */
-    public void setLogging(boolean log) {
+    public void setCommsLogging(boolean log) {
         for (Connection conn : connections.values()) {
-            conn.setLogging(log);
+            conn.setCommsLogging(log);
         }
     }
 

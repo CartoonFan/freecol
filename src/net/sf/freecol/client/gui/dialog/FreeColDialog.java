@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -100,8 +100,8 @@ public class FreeColDialog<T> extends JDialog implements PropertyChangeListener 
     }
 
     /**
-     * Full constructor for canvas to build a dialog in one hit (supplying
-     * the getResponse() implementation).
+     * Full constructor to build a dialog in one hit (supplying the
+     * getResponse() implementation).
      *
      * Much of this was extracted from the source for
      * JOptionPane.createDialog.  We needed a way to control modality.
@@ -178,7 +178,7 @@ public class FreeColDialog<T> extends JDialog implements PropertyChangeListener 
         ChoiceItem<T> ci = (def >= 0) ? options.get(def) : null;
         this.pane = new JOptionPane(jc, paneType, JOptionPane.DEFAULT_OPTION,
                                     icon, selectOptions(), ci);
-        this.pane.setBorder(Utility.DIALOG_BORDER);
+        this.pane.setBorder(Utility.getDialogBorder());
         this.pane.setOpaque(false);
         this.pane.setName("FreeColDialog");
         this.pane.setValue(JOptionPane.UNINITIALIZED_VALUE);
@@ -324,7 +324,7 @@ public class FreeColDialog<T> extends JDialog implements PropertyChangeListener 
      * @return The {@code ImageLibrary}.
      */
     protected ImageLibrary getImageLibrary() {
-        return getGUI().getImageLibrary();
+        return getGUI().getFixedImageLibrary();
     }
 
     /**

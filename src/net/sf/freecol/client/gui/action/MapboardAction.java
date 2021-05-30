@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -48,7 +48,7 @@ public abstract class MapboardAction extends FreeColAction {
     @Override
     protected boolean shouldBeEnabled() { 
         return super.shouldBeEnabled()  
-            && !getGUI().isShowingSubPanel()
+            && !getGUI().isPanelShowing()
             && (getGame() == null
                 || freeColClient.isMapEditor()
                 || freeColClient.currentPlayerIsMyPlayer());

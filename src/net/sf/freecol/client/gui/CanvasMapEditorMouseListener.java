@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -57,24 +57,11 @@ public final class CanvasMapEditorMouseListener extends AbstractCanvasListener
      * The constructor to use.
      *
      * @param freeColClient The enclosing {@code FreeColClient}.
-     * @param canvas The component this object gets created for.
      */
-    public CanvasMapEditorMouseListener(FreeColClient freeColClient,
-                                        Canvas canvas) {
-        super(freeColClient, canvas);
+    public CanvasMapEditorMouseListener(FreeColClient freeColClient) {
+        super(freeColClient);
     }
 
-
-    /**
-     * This method can be called to make sure the map is loaded.
-     *
-     * There is no point executing mouse events if the map is not loaded.
-     *
-     * @return The associated game {@code Map}.
-     */
-    private Map getMap() {
-        return (getGame() == null) ? null : getGame().getMap();
-    }
 
     /**
      * Draw a box on screen.
@@ -111,10 +98,10 @@ public final class CanvasMapEditorMouseListener extends AbstractCanvasListener
 
         try {
             if (e.getClickCount() > 1) {
-                Tile t = canvas.convertToMapTile(e.getX(), e.getY());
+                Tile t = getGUI().tileAt(e.getX(), e.getY());
                 if (t != null) getGUI().showTilePanel(t);
-            } else {
-                canvas.requestFocus();
+            //} else { Disabled:  TODO, is this necessary?
+                //canvas.requestFocus();
             }
         } catch (Exception ex) {
             logger.log(Level.WARNING, "Error in mouseClicked!", ex);
@@ -130,7 +117,7 @@ public final class CanvasMapEditorMouseListener extends AbstractCanvasListener
 
         try {
             if (e.getButton() == MouseEvent.BUTTON1) {
-                Tile tile = canvas.convertToMapTile(e.getX(), e.getY());
+                Tile tile = getGUI().tileAt(e.getX(), e.getY());
                 if (tile != null) getGUI().changeView(tile);
                 startPoint = endPoint = null;
 
@@ -142,10 +129,10 @@ public final class CanvasMapEditorMouseListener extends AbstractCanvasListener
             } else if (e.getButton() == MouseEvent.BUTTON3
                 || e.isPopupTrigger()) {
                 startPoint = endPoint = e.getPoint();
-                Tile tile = canvas.convertToMapTile(e.getX(), e.getY());
+                Tile tile = getGUI().tileAt(e.getX(), e.getY());
                 if (tile != null) {
                     if (tile.getIndianSettlement() != null) {
-                        canvas.showEditSettlementDialog(tile.getIndianSettlement());
+                        getGUI().showEditSettlementDialog(tile.getIndianSettlement());
                     }
                 }
             }
@@ -159,9 +146,7 @@ public final class CanvasMapEditorMouseListener extends AbstractCanvasListener
      */
     @Override
     public void mouseReleased(MouseEvent e) {
-        if (getMap() == null
-            || e.getButton() == MouseEvent.BUTTON1
-            || getGUI().getFocus() == null) return;
+        if (getMap() == null || e.getButton() == MouseEvent.BUTTON1) return;
         final JComponent component = (JComponent)e.getSource();
         final MapEditorController controller
             = getFreeColClient().getMapEditorController();
@@ -170,16 +155,12 @@ public final class CanvasMapEditorMouseListener extends AbstractCanvasListener
         endPoint = e.getPoint();
         if (startPoint == null) startPoint = endPoint;
         drawBox(component, startPoint, endPoint);
-        Tile start = canvas.convertToMapTile(startPoint.x, startPoint.y);
+        Tile start = getGUI().tileAt(startPoint.x, startPoint.y);
         Tile end = (startPoint == endPoint) ? start
-            : canvas.convertToMapTile(endPoint.x, endPoint.y);
+            : getGUI().tileAt(endPoint.x, endPoint.y);
 
-        // edit 2 more conditions in if statement.  we need to
-        // check for coordinator of X and Y if (x,y) outside of
-        // map then dont focus to that else setfocus to that
-        // position no option selected, just center map
-        if (!isTransformActive && end.getX() >= 0 && end.getY() >= 0) {
-            getGUI().setFocus(end);
+        if (!isTransformActive) {
+            if (end.getX() >= 0 && end.getY() >= 0) getGUI().setFocus(end);
             return;
         }
 
@@ -221,7 +202,7 @@ public final class CanvasMapEditorMouseListener extends AbstractCanvasListener
             }
         }
         getGUI().refresh();
-        canvas.requestFocus();
+        // Disabled: Is this needed? canvas.requestFocus();
     }
 
     /**

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -46,10 +46,9 @@ public class MenuMouseMotionListener extends AbstractCanvasListener
      * Trivial constructor.
      *
      * @param freeColClient The enclosing {@code FreeColClient}.
-     * @param canvas The {@code Canvas} to operate on.
      */
-    public MenuMouseMotionListener(FreeColClient freeColClient, Canvas canvas) {
-        super(freeColClient, canvas);
+    public MenuMouseMotionListener(FreeColClient freeColClient) {
+        super(freeColClient);
     }
 
 

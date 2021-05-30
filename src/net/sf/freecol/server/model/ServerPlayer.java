@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -1134,6 +1134,13 @@ public class ServerPlayer extends Player implements TurnTaker {
             } else {
                 leftOver.add(unit);
             }
+        }
+        if (leftOver.isEmpty()) {
+            lb.add("no leftovers.");
+        } else {
+            lb.add("leftover");
+            for (Unit u: leftOver) lb.add(" ", u);
+            lb.add(".");
         }
         lb.log(logger, Level.FINEST);
         return leftOver;
@@ -2806,7 +2813,8 @@ outer:  for (Effect effect : effects) {
         // tiles, and process possible increase in line of sight.
         // No need to display the colony tile or the attacker tile to
         // the attacking player as the unit is yet to move
-        colony.csChangeOwner(attackerPlayer, true, cs);//-til,-vis(attackerPlayer,colonyPlayer)
+        colony.csChangeOwner(attackerPlayer, true, UnitChangeType.CAPTURE,
+                             cs);//-til,-vis(attackerPlayer,colonyPlayer)
         cs.addAttribute(See.only(attackerPlayer), "sound",
                         "sound.event.captureColony");
 
@@ -2833,8 +2841,7 @@ outer:  for (Effect effect : effects) {
         ServerUnit convert = (ServerUnit)getRandomMember(logger,
             "Choose convert", is.getAllUnitsList(), random);
         if (((ServerPlayer)nativePlayer).csChangeOwner(convert, attackerPlayer,
-                UnitChangeType.CONVERSION,
-                attacker.getTile(),
+                UnitChangeType.CONVERSION, attacker.getTile(),
                 cs)) { //-vis(attackerPlayer)
             convert.changeRole(spec.getDefaultRole(), 0);
             for (Goods g : convert.getCompactGoodsList()) convert.removeGoods(g);
@@ -2938,10 +2945,8 @@ outer:  for (Effect effect : effects) {
         // as it might be destroyed on capture.
         final Tile oldTile = loser.getTile();
         String key;
-        String change = (winnerPlayer.isUndead()) ? UnitChangeType.UNDEAD
-            : UnitChangeType.CAPTURE;
         if (((ServerPlayer)loserPlayer).csChangeOwner(loser, winnerPlayer,
-                change, winner.getTile(), cs)) {//-vis(both)
+                UnitChangeType.CAPTURE, winner.getTile(), cs)) {//-vis(both)
             loser.setMovesLeft(0);
             loser.setState(Unit.UnitState.ACTIVE);
             cs.add(See.perhaps().always(loserPlayer), oldTile);
@@ -4243,6 +4248,8 @@ outer:  for (Effect effect : effects) {
         if (newOwner == this) return true; // No transfer needed
 
         final Tile oldTile = unit.getTile();
+        // Undead can not avoid a change override!
+        if (newOwner.isUndead()) change = UnitChangeType.UNDEAD;
         if (change != null) {
             UnitType mainType = unit.getType();
             UnitTypeChange uc;

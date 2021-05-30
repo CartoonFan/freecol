@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -628,7 +628,7 @@ public final class NativeAIPlayer extends MissionAIPlayer {
                 int defence = c.getUnitCount() + ((c.getStockade() == null) ? 1
                     : (c.getStockade().getLevel() * 10));
                 int weight = 1 + alarm * (1000000 / defence
-                                                  / path.getTotalTurns());
+                    / (1 + path.getTotalTurns()));
                 nearbyColonies.add(new RandomChoice<>(c, weight));
             }
             // If there are any suitable colonies, pick one to demand from.

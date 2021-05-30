@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -273,7 +273,7 @@ public class DebugMenu extends JMenu {
 
         final JMenuItem errorMessage = Utility.localizedMenuItem("menuBar.debug.displayErrorMessage");
         errorMessage.addActionListener((ActionEvent ae) -> {
-                gui.showErrorMessage(StringTemplate.name(ERROR_MESSAGE));
+                gui.showErrorPanel(StringTemplate.name(ERROR_MESSAGE));
             });
         panelMenu.add(errorMessage);
 
@@ -321,9 +321,15 @@ public class DebugMenu extends JMenu {
         final JMenuItem compareMaps = Utility.localizedMenuItem("menuBar.debug.compareMaps");
         compareMaps.setOpaque(false);
         //compareMaps.setMnemonic(KeyEvent.VK_C);
+
         compareMaps.setAccelerator(KeyStroke.getKeyStroke('C',
-            Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()
-                | InputEvent.ALT_MASK));
+                // FIXME: In Java 7 we used
+                // Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()
+                // instead of CTRL_DOWN_MASK, but this is now deprecated
+                // and the replacement getMenuShortcutKeyMaskEx() is not
+                // present in Java 7.
+                InputEvent.CTRL_DOWN_MASK
+                | InputEvent.ALT_DOWN_MASK));
         this.add(compareMaps);
         compareMaps.addActionListener((ActionEvent ae) -> {
                 DebugUtils.checkDesyncAction(freeColClient);

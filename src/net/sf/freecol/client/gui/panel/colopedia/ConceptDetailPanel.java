@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -40,6 +40,7 @@ import net.sf.freecol.client.gui.FontLibrary;
 import net.sf.freecol.client.gui.action.ColopediaAction.PanelType;
 import net.sf.freecol.client.gui.panel.*;
 import net.sf.freecol.client.gui.panel.colopedia.*;
+import net.sf.freecol.client.gui.Size;
 import net.sf.freecol.common.i18n.Messages;
 
 
@@ -159,7 +160,7 @@ public class ConceptDetailPanel extends FreeColPanel
         panel.setLayout(new MigLayout("wrap 1, center"));
 
         JLabel header = Utility.localizedHeaderLabel(Messages.nameKey(id),
-            SwingConstants.LEADING, FontLibrary.FontSize.SMALL);
+            SwingConstants.LEADING, Utility.FONTSPEC_SUBTITLE);
         panel.add(header, "align center, wrap 20");
 
         JEditorPane editorPane

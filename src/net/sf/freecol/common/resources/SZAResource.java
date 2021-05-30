@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -38,10 +38,10 @@ public class SZAResource extends Resource {
     
     private static final Logger logger = Logger.getLogger(SZAResource.class.getName());
 
-    private final HashMap<Float, SimpleZippedAnimation> scaledSzAnimations
+    private static final Float DEFAULT_SCALE = 1f;
+    
+    private final HashMap<Float, SimpleZippedAnimation> cache
         = new HashMap<>();
-    private volatile SimpleZippedAnimation szAnimation = null;
-    private final Object loadingLock = new Object();
 
 
     /**
@@ -54,22 +54,21 @@ public class SZAResource extends Resource {
         super(resourceLocator);
     }
 
-
     /**
      * Preloading the animation.
      */
     @Override
     public void preload() {
-        synchronized (loadingLock) {
-            if (szAnimation == null) {
-                try {
-                    szAnimation = new SimpleZippedAnimation(
-                        getResourceLocator().toURL());
-                } catch (IOException e) {
-                    logger.log(Level.WARNING,
-                        "Could not load SimpleZippedAnimation: "
-                        + getResourceLocator(), e);
-                }
+        synchronized (this) {
+            if (!this.cache.isEmpty()) return;
+            try {
+                SimpleZippedAnimation sza
+                    = new SimpleZippedAnimation(getResourceLocator().toURL());
+                this.cache.put(DEFAULT_SCALE, sza);
+            } catch (IOException e) {
+                logger.log(Level.WARNING,
+                    "Could not load SimpleZippedAnimation: "
+                    + getResourceLocator(), e);
             }
         }
     }
@@ -81,35 +80,21 @@ public class SZAResource extends Resource {
      * @return The {@code SimpleZippedAnimation} in it's original size.
      */
     public SimpleZippedAnimation getSimpleZippedAnimation() {
-        if (szAnimation == null) {
-            logger.finest("Preload not ready for " + getResourceLocator());
-            preload();
-        }
-        return szAnimation;
+        return getSimpleZippedAnimation(DEFAULT_SCALE);
     }
 
     /**
-     * Get the {@code SimpleZippedAnimation} using the specified
-     * scale.
+     * Get the {@code SimpleZippedAnimation} using the specified scale.
      * 
-     * @param scale The size of the requested animation (with 1 being normal
-     *      size, 2 twice the size, 0.5 half the size etc). Rescaling
-     *      will be performed unless using 1.
+     * @param scale The scale of the requested animation.
      * @return The {@code SimpleZippedAnimation}.
      */
-    public SimpleZippedAnimation getSimpleZippedAnimation(float scale) {
-        final SimpleZippedAnimation sza = getSimpleZippedAnimation();
-        if (scale == 1.0f) {
-            return sza;
-        }
-        final SimpleZippedAnimation cachedScaledVersion
-            = scaledSzAnimations.get(scale);
-        if (cachedScaledVersion != null) {
-            return cachedScaledVersion;
-        }
-        final SimpleZippedAnimation scaledVersion
-            = sza.createScaledVersion(scale);
-        scaledSzAnimations.put(scale, scaledVersion);
-        return scaledVersion;
+    public synchronized SimpleZippedAnimation getSimpleZippedAnimation(float scale) {
+        final SimpleZippedAnimation cached = this.cache.get(scale);
+        if (cached != null) return cached;
+        SimpleZippedAnimation sza
+            = this.cache.get(DEFAULT_SCALE).createScaledVersion(scale);
+        this.cache.put(scale, sza);
+        return sza;
     }
 }

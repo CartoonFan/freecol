@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -608,6 +608,7 @@ public class ChangeSet {
          */
         @Override
         public boolean isNotifiable(Player player) {
+            if (player.isAI()) return false;
             switch (check(player)) {
             case VISIBLE: return true;
             case INVISIBLE: return false;

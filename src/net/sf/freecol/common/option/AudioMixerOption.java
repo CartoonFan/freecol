@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -253,4 +253,18 @@ public class AudioMixerOption extends AbstractOption<AudioMixerOption.MixerWrapp
      */
     @Override
     public String getXMLTagName() { return TAG; }
+
+
+    // Override Object
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder(16);
+        sb.append('[').append(getId())
+            .append(' ').append(getValue()).append(']');
+        return sb.toString();
+    }
 }

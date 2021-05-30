@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -116,7 +116,7 @@ public class Connection implements Closeable {
 
         // Make a (pretty printing) transformer, but only make the log
         // writer in COMMS-debug mode.
-        setLogging(FreeColDebugger.isInDebugMode(FreeColDebugger.DebugMode.COMMS));
+        setCommsLogging(FreeColDebugger.isInDebugMode(FreeColDebugger.DebugMode.COMMS));
         this.connected = false;
     }
 
@@ -331,7 +331,7 @@ public class Connection implements Closeable {
      * @param log If true, enable logging.
      * @return This {@code Connection}.
      */
-    public final Connection setLogging(boolean log) {
+    public final Connection setCommsLogging(boolean log) {
         FreeColXMLWriter lw = null;
         if (log) {
             try {

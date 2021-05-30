@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -172,7 +172,7 @@ public final class TradeRoutePanel extends FreeColPanel {
 
         JButton cancelButton = Utility.localizedButton("cancel");
         cancelButton.addActionListener((ae) ->
-            getGUI().getCanvas().removeTradeRoutePanel(this));
+            getGUI().removeTradeRoutePanel(this));
         setCancelComponent(cancelButton);
 
         updateButtons();
@@ -180,7 +180,8 @@ public final class TradeRoutePanel extends FreeColPanel {
                 || this.unit.getTradeRoute() == null) ? null
             : unit.getTradeRoute());
 
-        add(Utility.localizedHeader(Messages.nameKey("tradeRoutePanel"), false),
+        add(Utility.localizedHeader(Messages.nameKey("tradeRoutePanel"),
+                                    Utility.FONTSPEC_TITLE),
             "span, align center");
         if (this.unit != null && this.unit.getLocation() != null) {
             JLabel unitLabel = new JLabel(this.unit.getDescription(Unit.UnitLabelType.NATIONAL));

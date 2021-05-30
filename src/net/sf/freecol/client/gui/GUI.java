@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,16 +19,14 @@
 
 package net.sf.freecol.client.gui;
 
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.event.ActionListener;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
-import java.awt.Point;
-import java.awt.Rectangle;
 import java.io.File;
 import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -37,34 +35,30 @@ import java.util.logging.Logger;
 import java.util.Map;
 
 import javax.swing.ImageIcon;
-import javax.swing.SwingUtilities;
+import javax.swing.JPopupMenu;
 
 import net.sf.freecol.FreeCol;
 import net.sf.freecol.client.ClientOptions;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.control.FreeColClientHolder;
 import net.sf.freecol.client.control.MapTransform;
-import net.sf.freecol.client.gui.panel.BuildQueuePanel;
 import net.sf.freecol.client.gui.panel.ColonyPanel;
 import net.sf.freecol.client.gui.panel.ColorChooserPanel;
 import net.sf.freecol.client.gui.panel.FreeColPanel;
 import net.sf.freecol.client.gui.panel.InformationPanel;
-import net.sf.freecol.client.gui.panel.MiniMap;
 import net.sf.freecol.client.gui.panel.report.LabourData.UnitData;
-import net.sf.freecol.client.gui.panel.TradeRouteInputPanel;
 import net.sf.freecol.client.gui.dialog.FreeColDialog;
 import net.sf.freecol.client.gui.dialog.Parameters;
 import net.sf.freecol.common.FreeColException;
-import net.sf.freecol.common.debug.DebugUtils;
 import net.sf.freecol.common.debug.FreeColDebugger;
 import net.sf.freecol.common.i18n.Messages;
-import net.sf.freecol.common.io.FreeColDirectories;
 import net.sf.freecol.common.metaserver.ServerInfo;
 import net.sf.freecol.common.model.Ability;
 import net.sf.freecol.common.model.Building;
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.Constants.*; // Imports all ENUMS.
 import net.sf.freecol.common.model.DiplomaticTrade;
+import net.sf.freecol.common.model.Direction;
 import net.sf.freecol.common.model.Europe;
 import net.sf.freecol.common.model.FoundingFather;
 import net.sf.freecol.common.model.FreeColGameObject;
@@ -95,7 +89,6 @@ import net.sf.freecol.common.model.Unit;
 import net.sf.freecol.common.model.UnitType;
 import net.sf.freecol.common.option.Option;
 import net.sf.freecol.common.option.OptionGroup;
-import net.sf.freecol.common.resources.ResourceManager;
 
 
 /**
@@ -113,66 +106,8 @@ public class GUI extends FreeColClientHolder {
         END_TURN
     };
 
-    /**
-     * Error handler class to display a message with this GUI.
-     */
-    public class ErrorJob implements Runnable {
-
-        private final StringTemplate template;
-        private Runnable runnable;
-
-        
-        public ErrorJob(Exception ex, String key) {
-            this.template = FreeCol.errorFromException(ex, key);
-            this.runnable = null;
-        }
-
-        public ErrorJob(Exception ex, StringTemplate tmpl) {
-            this.template = FreeCol.errorFromException(ex, tmpl);
-            this.runnable = null;
-        }
-
-        public ErrorJob(String key) {
-            this.template = StringTemplate.template(key);
-            this.runnable = null;
-        }
-
-        public ErrorJob(StringTemplate template) {
-            this.template = template;
-            this.runnable = null;
-        }
-
-        public ErrorJob setRunnable(Runnable runnable) {
-            this.runnable = runnable;
-            return this;
-        }
-
-        public void invokeLater() {
-            SwingUtilities.invokeLater(this);
-        }
-
-        @Override
-        public void run() {
-            GUI.this.closeMenus();
-            GUI.this.showErrorMessage(this.template, null, this.runnable);
-        }
-
-        @Override
-        public String toString() {
-            return Messages.message(this.template);
-        }
-    }
-
-    /** Map height in MapGeneratorOptionsDialog. */
-    public static final int MINI_MAP_THUMBNAIL_FINAL_HEIGHT = 64;
-
-    /** Warning levels. */
-    private static final String levels[] = {
-        "low", "normal", "high"
-    };
-
-    /** An image library to use. */
-    protected final ImageLibrary imageLibrary;
+    /** Levels (danger, finance) for confirmEuropeanTribute(). */
+    private static final String levels[] = { "low", "normal", "high" };
 
 
     /**
@@ -183,125 +118,24 @@ public class GUI extends FreeColClientHolder {
      */
     public GUI(FreeColClient freeColClient, float scaleFactor) {
         super(freeColClient);
-
-        this.imageLibrary = new ImageLibrary(scaleFactor);
     }
 
 
-    // Useful utilities provided in addition to the implementable interface
-
-    // Miscellaneous
+    // Implementations of high level dialogs, using the dialog primitives
 
     /**
-     * Get the image library.
+     * Simple modal confirmation dialog.
      *
-     * @return The base image library at the current scale.
+     * @param textKey A string to use as the message key.
+     * @param okKey A key for the message on the "ok" button.
+     * @param cancelKey A key for the message on the "cancel" button.
+     * @return True if the "ok" button was selected.
      */
-    public ImageLibrary getImageLibrary() {
-        return this.imageLibrary;
+    public final boolean confirm(String textKey,
+                                 String okKey, String cancelKey) {
+        return confirm(null, StringTemplate.key(textKey), (ImageIcon)null,
+                       okKey, cancelKey);
     }
-
-    /**
-     * Toggle the current view mode.
-     *
-     * Only really toggles between terrain and units modes.
-     */
-    public void toggleViewMode() {
-        ViewMode vm = getViewMode();
-        switch (vm) {
-        case MOVE_UNITS:
-            changeView(getSelectedTile());
-            break;
-        case TERRAIN:
-            changeView(getActiveUnit());
-            break;
-        default:
-            break;
-        }
-    }
-
-    
-    // Error handling
-
-    /**
-     * Create a new error job from a given exception and message key.
-     *
-     * @param ex The {@code Exception} to use.
-     * @param key The message key.
-     * @return An {@code ErrorJob} to display the error using this GUI.
-     */
-    public ErrorJob errorJob(Exception ex, String key) {
-        return new ErrorJob(ex, key);
-    }
-
-    /**
-     * Create a new error job from a given exception and template.
-     *
-     * @param ex The {@code Exception} to use.
-     * @param template The {@code StringTemplate}.
-     * @return An {@code ErrorJob} to display the error using this GUI.
-     */
-    public ErrorJob errorJob(Exception ex, StringTemplate template) {
-        return new ErrorJob(ex, template);
-    }
-    
-    /**
-     * Create a new error job from a given message key.
-     *
-     * @param key The message key.
-     * @return An {@code ErrorJob} to display the error using this GUI.
-     */
-    public ErrorJob errorJob(String key) {
-        return new ErrorJob(key);
-    }
-
-    /**
-     * Create a new error job from a given template.
-     *
-     * @param template The {@code StringTemplate}.
-     * @return An {@code ErrorJob} to display the error using this GUI.
-     */
-    public ErrorJob errorJob(StringTemplate template) {
-        return new ErrorJob(template);
-    }
-    
-    
-    // Invocation methods
-
-    /**
-     * Wrapper for SwingUtilities.invokeLater that handles the case
-     * where we are already in the EDT.
-     *
-     * @param runnable A {@code Runnable} to run.
-     */
-    public void invokeNowOrLater(Runnable runnable) {
-        if (SwingUtilities.isEventDispatchThread()) {
-            runnable.run();
-        } else {
-            SwingUtilities.invokeLater(runnable);
-        }
-    }
-
-    /**
-     * Wrapper for SwingUtilities.invokeAndWait that handles the case
-     * where we are already in the EDT.
-     *
-     * @param runnable A {@code Runnable} to run.
-     */
-    public void invokeNowOrWait(Runnable runnable) {
-        if (SwingUtilities.isEventDispatchThread()) {
-            runnable.run();
-        } else {
-            try {
-                SwingUtilities.invokeAndWait(runnable);
-            } catch (InterruptedException | InvocationTargetException ex) {
-                logger.log(Level.WARNING, "Client GUI interaction", ex);
-            }
-        }
-    }
-
-
-    // High level dialogs, usually using the dialog primitives
 
     /**
      * Primitive modal confirmation dialog.
@@ -330,9 +164,9 @@ public class GUI extends FreeColClientHolder {
     public final boolean confirm(Tile tile, StringTemplate template,
                                  GoodsType goodsType,
                                  String okKey, String cancelKey) {
-        return confirm(tile, template,
-            new ImageIcon(imageLibrary.getScaledGoodsTypeImage(goodsType)),
-            okKey, cancelKey);
+        ImageIcon icon = new ImageIcon(getFixedImageLibrary()
+            .getScaledGoodsTypeImage(goodsType));
+        return confirm(tile, template, icon, okKey, cancelKey);
     }
 
     /**
@@ -348,9 +182,9 @@ public class GUI extends FreeColClientHolder {
     public final boolean confirm(Tile tile, StringTemplate template,
                                  Settlement settlement,
                                  String okKey, String cancelKey) {
-        return confirm(tile, template,
-            new ImageIcon(imageLibrary.getScaledSettlementImage(settlement)),
-            okKey, cancelKey);
+        ImageIcon icon = new ImageIcon(getFixedImageLibrary()
+            .getScaledSettlementImage(settlement));
+        return confirm(tile, template, icon, okKey, cancelKey);
     }
 
     /**
@@ -365,9 +199,9 @@ public class GUI extends FreeColClientHolder {
      */
     public final boolean confirm(Tile tile, StringTemplate template, Unit unit,
                                  String okKey, String cancelKey) {
-        return confirm(tile, template,
-            new ImageIcon(imageLibrary.getScaledUnitImage(unit)),
-            okKey, cancelKey);
+        ImageIcon icon = new ImageIcon(getFixedImageLibrary()
+            .getScaledUnitImage(unit));
+        return confirm(tile, template, icon, okKey, cancelKey);
     }
 
     /**
@@ -512,10 +346,10 @@ public class GUI extends FreeColClientHolder {
             messageId = "confirmHostile.peace";
             break;
         }
-        return confirm(attacker.getTile(), StringTemplate
-            .template(messageId)
-            .addStringTemplate("%nation%", enemy.getNationLabel()),
-            attacker, "confirmHostile.yes", "cancel");
+        StringTemplate t = StringTemplate.template(messageId)
+            .addStringTemplate("%nation%", enemy.getNationLabel());
+        return confirm(attacker.getTile(), t, attacker,
+                       "confirmHostile.yes", "cancel");
     }
 
     /**
@@ -556,11 +390,11 @@ public class GUI extends FreeColClientHolder {
             : (is.getAlarm(player).getLevel() == Tension.Level.HAPPY)
             ? "confirmTribute.happy"
             : "confirmTribute.normal";
-        return (confirm(is.getTile(), StringTemplate.template(messageId)
-                .addStringTemplate("%settlement%", is.getLocationLabelFor(player))
-                .addStringTemplate("%nation%", other.getNationLabel()),
-                attacker, "confirmTribute.yes", "confirmTribute.no"))
-            ? 1 : -1;
+        StringTemplate t = StringTemplate.template(messageId)
+            .addStringTemplate("%settlement%", is.getLocationLabelFor(player))
+            .addStringTemplate("%nation%", other.getNationLabel());
+        return (confirm(is.getTile(), t, attacker,
+                        "confirmTribute.yes", "confirmTribute.no")) ? 1 : -1;
     }
 
     /**
@@ -599,18 +433,21 @@ public class GUI extends FreeColClientHolder {
      * @param settlement The {@code Settlement} to consider.
      * @return The chosen action, tribute, attack or cancel.
      */
-    public ArmedUnitSettlementAction getArmedUnitSettlementChoice(Settlement settlement) {
+    public ArmedUnitSettlementAction
+        getArmedUnitSettlementChoice(Settlement settlement) {
         final Player player = getMyPlayer();
 
         List<ChoiceItem<ArmedUnitSettlementAction>> choices = new ArrayList<>();
-        choices.add(new ChoiceItem<>(Messages.message("armedUnitSettlement.tribute"),
+        String msg = Messages.message("armedUnitSettlement.tribute");
+        choices.add(new ChoiceItem<>(msg,
                 ArmedUnitSettlementAction.SETTLEMENT_TRIBUTE));
-        choices.add(new ChoiceItem<>(Messages.message("armedUnitSettlement.attack"),
+        msg = Messages.message("armedUnitSettlement.attack");
+        choices.add(new ChoiceItem<>(msg,
                 ArmedUnitSettlementAction.SETTLEMENT_ATTACK));
 
         return getChoice(settlement.getTile(),
-            settlement.getAlarmLevelLabel(player),
-            settlement, "cancel", choices);
+                         settlement.getAlarmLevelLabel(player),
+                         settlement, "cancel", choices);
     }
 
     /**
@@ -618,8 +455,7 @@ public class GUI extends FreeColClientHolder {
      * goods or to dump them instead.
      *
      * @param goods The {@code Goods} to possibly dump.
-     * @param europe The player {@code Europe} where the boycott
-     *     is in force.
+     * @param europe The player {@code Europe} where the boycott is in force.
      * @return The chosen {@code BoycottAction}.
      */
     public BoycottAction getBoycottChoice(Goods goods, Europe europe) {
@@ -652,11 +488,12 @@ public class GUI extends FreeColClientHolder {
      */
     public TradeBuyAction getBuyChoice(Unit unit, Settlement settlement,
                                        Goods goods, int gold, boolean canBuy) {
-        //Get Buy price on Europe Market for comparison
+        // Get Buy price on Europe Market for comparison
         int euroPrice = unit.getOwner().getMarket()
             .getBidPrice(goods.getType(), goods.getAmount());
+        StringTemplate nation = settlement.getOwner().getNationLabel();
         StringTemplate template = StringTemplate.template("buy.text")
-            .addStringTemplate("%nation%", settlement.getOwner().getNationLabel())
+            .addStringTemplate("%nation%", nation)
             .addStringTemplate("%goods%", goods.getLabel(true))
             .addAmount("%gold%", gold)
             .addAmount("%euprice%", euroPrice);
@@ -683,9 +520,9 @@ public class GUI extends FreeColClientHolder {
      */
     public final <T> T getChoice(StringTemplate explain, String cancelKey,
                                  List<ChoiceItem<T>> choices) {
-        return getChoice(null, explain,
-            new ImageIcon(ImageLibrary.getPlaceholderImage()),
-            cancelKey, choices);
+        ImageIcon icon = new ImageIcon(getFixedImageLibrary()
+            .getPlaceholderImage());
+        return getChoice(null, explain, icon, cancelKey, choices);
     }
 
     /**
@@ -703,9 +540,9 @@ public class GUI extends FreeColClientHolder {
     private final <T> T getChoice(Tile tile, StringTemplate template,
                                   GoodsType goodsType, String cancelKey,
                                   List<ChoiceItem<T>> choices) {
-        return getChoice(tile, template,
-            new ImageIcon(imageLibrary.getScaledGoodsTypeImage(goodsType)),
-            cancelKey, choices);
+        ImageIcon icon = new ImageIcon(getFixedImageLibrary()
+            .getScaledGoodsTypeImage(goodsType));
+        return getChoice(tile, template, icon, cancelKey, choices);
     }
 
     /**
@@ -723,9 +560,9 @@ public class GUI extends FreeColClientHolder {
     private final <T> T getChoice(Tile tile, StringTemplate template,
                                   Nation nation, String cancelKey,
                                   List<ChoiceItem<T>> choices) {
-        return getChoice(tile, template,
-            new ImageIcon(imageLibrary.getScaledNationImage(nation)),
-            cancelKey, choices);
+        ImageIcon icon = new ImageIcon(getFixedImageLibrary()
+            .getScaledNationImage(nation));
+        return getChoice(tile, template, icon, cancelKey, choices);
     }
 
     /**
@@ -743,9 +580,9 @@ public class GUI extends FreeColClientHolder {
     public final <T> T getChoice(Tile tile, StringTemplate template,
                                  Settlement settlement, String cancelKey,
                                  List<ChoiceItem<T>> choices) {
-        return getChoice(tile, template,
-            new ImageIcon(imageLibrary.getScaledSettlementImage(settlement)),
-            cancelKey, choices);
+        ImageIcon icon = new ImageIcon(getFixedImageLibrary()
+            .getScaledSettlementImage(settlement));
+        return getChoice(tile, template, icon, cancelKey, choices);
     }
 
     /**
@@ -763,9 +600,9 @@ public class GUI extends FreeColClientHolder {
     public final <T> T getChoice(Tile tile, StringTemplate template,
                                  Unit unit, String cancelKey,
                                  List<ChoiceItem<T>> choices) {
-        return getChoice(tile, template,
-            new ImageIcon(imageLibrary.getScaledUnitImage(unit)),
-            cancelKey, choices);
+        ImageIcon icon = new ImageIcon(getFixedImageLibrary()
+            .getScaledUnitImage(unit));
+        return getChoice(tile, template, icon, cancelKey, choices);
     }
 
     /**
@@ -792,12 +629,11 @@ public class GUI extends FreeColClientHolder {
         } else {
             template = StringTemplate.template("indianLand.unknown");
         }
-
         choices.add(new ChoiceItem<>(Messages.message("indianLand.take"),
                                      ClaimAction.CLAIM_STEAL));
 
-        return getChoice(tile, template,
-                         owner.getNation(), "indianLand.cancel", choices);
+        return getChoice(tile, template, owner.getNation(),
+                         "indianLand.cancel", choices);
     }
 
     /**
@@ -816,19 +652,19 @@ public class GUI extends FreeColClientHolder {
                                                       boolean canBuy,
                                                       boolean canSell,
                                                       boolean canGift) {
-
+        String msg;
         ArrayList<ChoiceItem<TradeAction>> choices = new ArrayList<>();
         if (canBuy) {
-            choices.add(new ChoiceItem<>(Messages.message("tradeProposition.toBuy"),
-                                         TradeAction.BUY, canBuy));
+            msg = Messages.message("tradeProposition.toBuy");
+            choices.add(new ChoiceItem<>(msg, TradeAction.BUY, canBuy));
         }
         if (canSell) {
-            choices.add(new ChoiceItem<>(Messages.message("tradeProposition.toSell"),
-                                         TradeAction.SELL, canSell));
+            msg = Messages.message("tradeProposition.toSell");
+            choices.add(new ChoiceItem<>(msg, TradeAction.SELL, canSell));
         }
         if (canGift) {
-            choices.add(new ChoiceItem<>(Messages.message("tradeProposition.toGift"),
-                                         TradeAction.GIFT, canGift));
+            msg = Messages.message("tradeProposition.toGift");
+            choices.add(new ChoiceItem<>(msg, TradeAction.GIFT, canGift));
         }
         if (choices.isEmpty()) return null;
 
@@ -853,25 +689,33 @@ public class GUI extends FreeColClientHolder {
                                                 boolean canDenounce) {
         StringTemplate template;
         if (is.hasContacted(unit.getOwner())) {
+            StringTemplate q = StringTemplate
+                .template("missionarySettlement.question")
+                .addStringTemplate("%settlement%",
+                    is.getLocationLabelFor(unit.getOwner()));
             template = StringTemplate.label("\n\n")
                 .addStringTemplate(is.getAlarmLevelLabel(unit.getOwner()))
-                .addStringTemplate(StringTemplate.template("missionarySettlement.question")
-                    .addStringTemplate("%settlement%", is.getLocationLabelFor(unit.getOwner())));
+                .addStringTemplate(q);
         } else {
-            template = StringTemplate.template("missionarySettlement.questionUncontacted");
+            template = StringTemplate
+                .template("missionarySettlement.questionUncontacted");
         }
         List<ChoiceItem<MissionaryAction>> choices = new ArrayList<>();
+        String msg;
         if (canEstablish) {
-            choices.add(new ChoiceItem<>(Messages.message("missionarySettlement.establish"),
+            msg = Messages.message("missionarySettlement.establish");
+            choices.add(new ChoiceItem<>(msg,
                     MissionaryAction.MISSIONARY_ESTABLISH_MISSION,
                     canEstablish));
         }
         if (canDenounce) {
-            choices.add(new ChoiceItem<>(Messages.message("missionarySettlement.heresy"),
+            msg = Messages.message("missionarySettlement.heresy");
+            choices.add(new ChoiceItem<>(msg,
                     MissionaryAction.MISSIONARY_DENOUNCE_HERESY,
                     canDenounce));
         }
-        choices.add(new ChoiceItem<>(Messages.message("missionarySettlement.incite"),
+        msg = Messages.message("missionarySettlement.incite");
+        choices.add(new ChoiceItem<>(msg,
                 MissionaryAction.MISSIONARY_INCITE_INDIANS));
 
         return getChoice(unit.getTile(), template,
@@ -887,18 +731,17 @@ public class GUI extends FreeColClientHolder {
      */
     public String getNewColonyName(Player player, Tile tile) {
         String suggested = player.getSettlementName(null);
-        String name = getInput(tile, StringTemplate
-            .template("nameColony.text"), suggested,
-            "accept", "cancel");
+        StringTemplate t = StringTemplate.template("nameColony.text");
+        String name = getInput(tile, t, suggested, "accept", "cancel");
         if (name == null) {
             // Cancelled
         } else if (name.isEmpty()) {
             showInformationPanel("enterSomeText"); // 0-length is invalid
         } else if (player.getSettlementByName(name) != null) {
             // Must be unique
-            showInformationPanel(tile, StringTemplate
-                .template("nameColony.notUnique")
-                .addName("%name%", name));
+            showInformationPanel(tile,
+                StringTemplate.template("nameColony.notUnique")
+                    .addName("%name%", name));
         } else {
             return name;
         }
@@ -917,8 +760,9 @@ public class GUI extends FreeColClientHolder {
     public ScoutColonyAction getScoutForeignColonyChoice(Colony colony,
                                                          Unit unit,
                                                          boolean neg) {
+        StringTemplate u = unit.getLabel(Unit.UnitLabelType.NATIONAL);
         StringTemplate template = StringTemplate.template("scoutColony.text")
-            .addStringTemplate("%unit%", unit.getLabel(Unit.UnitLabelType.NATIONAL))
+            .addStringTemplate("%unit%", u)
             .addName("%colony%", colony.getName());
 
         List<ChoiceItem<ScoutColonyAction>> choices = new ArrayList<>();
@@ -942,8 +786,9 @@ public class GUI extends FreeColClientHolder {
      *     owner nation.
      * @return The chosen action, speak, tribute, attack or cancel.
      */
-    public ScoutIndianSettlementAction getScoutIndianSettlementChoice(IndianSettlement is,
-        String numberString) {
+    public ScoutIndianSettlementAction
+        getScoutIndianSettlementChoice(IndianSettlement is,
+                                       String numberString) {
         final Player player = getMyPlayer();
         final Player owner = is.getOwner();
 
@@ -965,17 +810,19 @@ public class GUI extends FreeColClientHolder {
             } else {
                 goodsPart = StringTemplate.name(" ");
             }
+            IndianNationType nt = (IndianNationType)owner.getNationType();
+            StringTemplate l = is.getLocationLabelFor(player);
             template = StringTemplate.template("scoutSettlement.greetings")
                 .addStringTemplate("%alarmPart%", is.getAlarmLevelLabel(player))
                 .addStringTemplate("%nation%", owner.getNationLabel())
-                .addStringTemplate("%settlement%", is.getLocationLabelFor(player))
+                .addStringTemplate("%settlement%", l)
                 .addName("%number%", numberString)
-                .add("%settlementType%",
-                    ((IndianNationType)owner.getNationType()).getSettlementTypeKey(true))
+                .add("%settlementType%", nt.getSettlementTypeKey(true))
                 .addStringTemplate("%skillPart%", skillPart)
                 .addStringTemplate("%goodsPart%", goodsPart);
         } else {
-            template = StringTemplate.template("scoutSettlement.greetUncontacted")
+            template = StringTemplate
+                .template("scoutSettlement.greetUncontacted")
                 .addStringTemplate("%nation%", owner.getNationLabel());
         }
         List<ChoiceItem<ScoutIndianSettlementAction>> choices
@@ -1002,10 +849,12 @@ public class GUI extends FreeColClientHolder {
     public TradeSellAction getSellChoice(Unit unit, Settlement settlement,
                                          Goods goods, int gold) {
         //Get Sale price on Europe Market for comparison
-        int euroPrice = unit.getOwner().getMarket().getSalePrice(goods.getType(), goods.getAmount());
+        int euroPrice = unit.getOwner().getMarket()
+            .getSalePrice(goods.getType(), goods.getAmount());
         StringTemplate goodsTemplate = goods.getLabel(true);
+        StringTemplate nation = settlement.getOwner().getNationLabel();
         StringTemplate template = StringTemplate.template("sell.text")
-            .addStringTemplate("%nation%", settlement.getOwner().getNationLabel())
+            .addStringTemplate("%nation%", nation)
             .addStringTemplate("%goods%", goodsTemplate)
             .addAmount("%gold%", gold)
             .addAmount("%euprice%", euroPrice);
@@ -1024,6 +873,11 @@ public class GUI extends FreeColClientHolder {
                          goods.getType(), "cancel", choices);
     }
 
+    /**
+     * Get the option group that defines a difficulty level.
+     *
+     * @return The {@code OptionGroup} selected.
+     */
     public final OptionGroup showDifficultyDialog() {
         final Specification spec = getSpecification();
         return showDifficultyDialog(spec, spec.getDifficultyOptionGroup(),
@@ -1034,9 +888,10 @@ public class GUI extends FreeColClientHolder {
      * Show an i18n compliant error message derived from a template.
      *
      * @param template The {@code StringTemplate} containing the message.
+     * @return The panel shown.
      */
-    public final void showErrorMessage(StringTemplate template) {
-        showErrorMessage(template, null);
+    public final FreeColPanel showErrorPanel(StringTemplate template) {
+        return showErrorPanel(template, null);
     }
 
     /**
@@ -1045,10 +900,11 @@ public class GUI extends FreeColClientHolder {
      *
      * @param template The {@code StringTemplate} containing the message.
      * @param message Optional extra debug information.
+     * @return The panel shown.
      */
-    public final void showErrorMessage(StringTemplate template,
-                                       String message) {
-        showErrorMessage(template, message, null);
+    public final FreeColPanel showErrorPanel(StringTemplate template,
+                                             String message) {
+        return showErrorPanel(template, message, null);
     }
     
     /**
@@ -1058,23 +914,42 @@ public class GUI extends FreeColClientHolder {
      * @param template The {@code StringTemplate} containing the message.
      * @param message Optional extra debug information.
      * @param callback Optional routine to run when the error panel is closed.
+     * @return The panel shown.
      */
-    public final void showErrorMessage(StringTemplate template, String message,
-                                       Runnable callback) {
+    public final FreeColPanel showErrorPanel(StringTemplate template,
+                                             String message,
+                                             Runnable callback) {
         String display = Messages.message(template);
         if (message != null && FreeColDebugger.isInDebugMode()) {
             display += "/" + message + "/";
         }
-        showErrorMessage(display, callback);
+        return showErrorPanel(display, callback);
     }
 
+    /**
+     * Show a serious error message with an exception and return
+     * to the main panel when done.  This time, do not return the panel
+     * as we have already defined a callback.
+     *
+     * @param ex An optional {@code Exception} to display.
+     * @param template A {@code StringTemplate} for the message.
+     */
+    public final void showErrorPanel(Exception ex, StringTemplate template) {
+        final StringTemplate t = (ex == null) ? template
+            : FreeCol.errorFromException(ex, template);
+        invokeNowOrLater(() -> showErrorPanel(t, null, () -> {
+                    closeMenus();
+                    showMainPanel(null);
+                }));
+    }
+                
     /**
      * Show an information message.
      *
      * @param messageId The message key.
-     * @return The {@code InformationPanel} that is displayed.
+     * @return The panel shown.
      */
-    public final InformationPanel showInformationPanel(String messageId) {
+    public final FreeColPanel showInformationPanel(String messageId) {
         return showInformationPanel(StringTemplate.key(messageId));
     }
 
@@ -1082,9 +957,9 @@ public class GUI extends FreeColClientHolder {
      * Show an information message.
      *
      * @param template The message template.
-     * @return The {@code InformationPanel} that is displayed.
+     * @return The panel shown.
      */
-    public final InformationPanel showInformationPanel(StringTemplate template) {
+    public final FreeColPanel showInformationPanel(StringTemplate template) {
         return showInformationPanel(null, template);
     }
 
@@ -1093,11 +968,12 @@ public class GUI extends FreeColClientHolder {
      *
      * @param displayObject An optional object to display as an icon.
      * @param messageId The message key.
-     * @return The {@code InformationPanel} that is displayed.
+     * @return The panel shown.
      */
-    public final InformationPanel showInformationPanel(FreeColObject displayObject,
-                                                       String messageId) {
-        return showInformationPanel(displayObject, StringTemplate.key(messageId));
+    public final FreeColPanel showInformationPanel(FreeColObject displayObject,
+                                                   String messageId) {
+        return showInformationPanel(displayObject,
+                                    StringTemplate.key(messageId));
     }
 
     /**
@@ -1110,7 +986,7 @@ public class GUI extends FreeColClientHolder {
     public final File showLoadSaveFileDialog(File root, String extension) {
         File file = showLoadDialog(root, extension);
         if (file != null && !file.isFile()) {
-            showErrorMessage(FreeCol.badFile("error.noSuchFile", file));
+            showErrorPanel(FreeCol.badFile("error.noSuchFile", file));
             file = null;
         }
         return file;
@@ -1123,37 +999,6 @@ public class GUI extends FreeColClientHolder {
         showNewPanel(null);
     }
 
-    /**
-     * Show a settlement.
-     *
-     * @param settlement The {@code Settlement} to display.
-     */
-    private final void showSettlement(Settlement settlement) {
-        if (settlement instanceof Colony) {
-            if (getMyPlayer().owns(settlement)) {
-                showColonyPanel((Colony)settlement, null);
-            } else {
-                DebugUtils.showForeignColony(getFreeColClient(),
-                                             (Colony)settlement);
-            }
-        } else if (settlement instanceof IndianSettlement) {
-            showIndianSettlement((IndianSettlement)settlement);
-        }
-    }
-        
-    /**
-     * Display the appropriate panel for any settlement on a tile, as visible
-     * to a given player.
-     *
-     * @param tile The {@code Tile} to check for settlements.
-     */
-    public final void showTileSettlement(Tile tile) {
-        if (tile == null) return;
-        Settlement settlement = tile.getSettlement();
-        if (settlement == null) return;
-        showSettlement(settlement);
-    }
-
 
     // Sound routines, delegated to the SoundController, only useful
     // for GUI classes in need of sound
@@ -1164,64 +1009,18 @@ public class GUI extends FreeColClientHolder {
      * @param sound The sound resource to play, or if null stop playing.
      */
     public void playSound(String sound) {
-        getSoundController().playSound(sound);
-    }
-
-    /**
-     * Plays an alert sound for an information message if the
-     * option for it is turned on.
-     */
-    private void alertSound() {
-        if (getClientOptions().getBoolean(ClientOptions.AUDIO_ALERTS)) {
-            playSound("sound.event.alertSound");
-        }
+        getFreeColClient().getSoundController().playSound(sound);
     }
 
     /**
      * Get the label text for the sound player mixer.
      *
-     * Needed by the audio mixer option UI.
+     * Used by: AudioMixerOptionUI
      *
      * @return The text.
      */
     public String getSoundMixerLabelText() {
-        return getSoundController().getSoundMixerLabelText();
-    }
-
-
-    // Miscellaneous higher level utilities
-
-    /**
-     * Create a thumbnail for the minimap.
-     * 
-     * FIXME: Delete all code inside this method and replace it with
-     *        sensible code directly drawing in necessary size,
-     *        without creating a throwaway GUI panel, drawing in wrong
-     *        size and immediately resizing.
-     * @return The created {@code BufferedImage}.
-     */
-    public BufferedImage createMiniMapThumbNail() {
-        MiniMap miniMap = new MiniMap(getFreeColClient());
-        miniMap.setTileSize(MiniMap.MAX_TILE_SIZE);
-        Game game = getGame();
-        int width = game.getMap().getWidth() * MiniMap.MAX_TILE_SIZE
-            + MiniMap.MAX_TILE_SIZE / 2;
-        int height = game.getMap().getHeight() * MiniMap.MAX_TILE_SIZE / 4;
-        miniMap.setSize(width, height);
-        BufferedImage image = new BufferedImage(
-            width, height, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g1 = image.createGraphics();
-        miniMap.paintMap(g1);
-        g1.dispose();
-
-        int scaledWidth = Math.min((int)((64 * width) / (float)height), 128);
-        BufferedImage scaledImage = new BufferedImage(scaledWidth,
-            MINI_MAP_THUMBNAIL_FINAL_HEIGHT, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2 = scaledImage.createGraphics();
-        g2.drawImage(image, 0, 0, scaledWidth, MINI_MAP_THUMBNAIL_FINAL_HEIGHT,
-                     null);
-        g2.dispose();
-        return scaledImage;
+        return getFreeColClient().getSoundController().getSoundMixerLabelText();
     }
 
 
@@ -1232,42 +1031,61 @@ public class GUI extends FreeColClientHolder {
     // Simple accessors
 
     /**
-     * Get the canvas.
+     * Get the fixed image library for use on panels.
+     *
+     * Used by: ColonyPanel, ConstructionPanel, InfoPanel, certain UnitLabels.
      *
      * @return Null here, real implementations will override.
      */
-    public Canvas getCanvas() {
-        return null;
-    }
+    public ImageLibrary getFixedImageLibrary() { return null; }
 
     /**
-     * Get the tile image library.
+     * Get the scaled image library for use on the map.
      *
      * @return Null here, real implementations will override.
      */
-    public ImageLibrary getTileImageLibrary() {
-        return null;
-    }
+    public ImageLibrary getScaledImageLibrary() { return null; }
 
     /**
      * Is this GUI in windowed mode?
      *
+     * Used by: DragListener for a nasty workaround that should go away
+     *
      * @return True by default, real implementations will override.
      */
-    public boolean isWindowed() {
-        return true;
-    }
+    public boolean isWindowed() { return true; }
+
+
+    // Invocation
+
+    /**
+     * Run in the EDT, either immediately if in it or later when it wakes up.
+     *
+     * @param runnable A {@code Runnable} to run.
+     */
+    public void invokeNowOrLater(Runnable runnable) {}
+    
+    /**
+     * Run in the EDT, either immediately or wait for it.
+     *
+     * @param runnable A {@code Runnable} to run.
+     */
+    public void invokeNowOrWait(Runnable runnable) {}
 
 
     // Initialization and teardown
 
     /**
-     * Change the windowed mode.
+     * Change the windowed mode (really a toggle).
+     *
+     * Used by: ChangeWindowedModeAction
      */
     public void changeWindowedMode() {}
 
     /**
      * Display the splash screen.
+     *
+     * Used by: FreeColClient
      *
      * @param splashStream A stream to find the image in.
      */
@@ -1275,11 +1093,15 @@ public class GUI extends FreeColClientHolder {
 
     /**
      * Hide the splash screen.
+     *
+     * Used by: FreeColClient
      */
     public void hideSplashScreen() {}
 
     /** 
      * Swing system and look-and-feel initialization.
+     * 
+     * Used by: FreeColClient
      * 
      * @param fontName An optional font name to be used.
      * @exception FreeColException if the LAF is incompatible with the GUI.
@@ -1288,33 +1110,45 @@ public class GUI extends FreeColClientHolder {
 
     /**
      * Quit the GUI.  All that is required is to exit the full screen.
+     * 
+     * Used by: FreeColClient.quit
      */
-    public void quit() {}
+    public void quitGUI() {}
 
     /**
      * Reset the GUI on reconnect.
      *
+     * Used by: FreeColClient.restoreGUI
+     * 
      * @param active An optional active {@code Unit}.
      * @param tile An optional {@code Tile} to focus on if there is no
      *     active unit.
      */
-    public void reconnect(Unit active, Tile tile) {}
+    public void reconnectGUI(Unit active, Tile tile) {}
 
     /**
      * Remove all in-game components (i.e. all the Listeners).
+     *
+     * Used by: ContinueAction, ConnectController.{mainTitle,newGame}
+     *     InGameController.loadGame, MapEditorController.newMap, StartMapAction
      */    
     public void removeInGameComponents() {}
 
     /**
      * Shows the {@code VideoPanel}.
      *
+     * Used by: FreeColClient
+     * 
      * @param userMsg An optional user message.
+     * @param callback A {@code Runnable} to run when the video completes.
      */
-    public void showOpeningVideo(final String userMsg) {}
+    public void showOpeningVideo(final String userMsg, Runnable callback) {}
 
     /**
      * Starts the GUI by creating and displaying the GUI-objects.
      *
+     * Used by: FreeColClient
+     * 
      * @param desiredWindowSize The desired size of the GUI window.
      */
     public void startGUI(final Dimension desiredWindowSize) {
@@ -1323,6 +1157,8 @@ public class GUI extends FreeColClientHolder {
 
     /**
      * Start the GUI for the map editor.
+     *
+     * Used by: NewPanel
      */
     public void startMapEditorGUI() {}
 
@@ -1331,6 +1167,8 @@ public class GUI extends FreeColClientHolder {
 
     /**
      * Animate a unit attack.
+     *
+     * Used by: client InGameController
      *
      * @param attacker The attacking {@code Unit}.
      * @param defender The defending {@code Unit}.
@@ -1345,79 +1183,16 @@ public class GUI extends FreeColClientHolder {
     /**
      * Animate a unit move.
      *
+     * Used by: client InGameController
+     *
      * @param unit The {@code Unit} that is moving.
      * @param srcTile The {@code Tile} the unit starts at.
      * @param dstTile The {@code Tile} the unit moves to.
      */
     public void animateUnitMove(Unit unit, Tile srcTile, Tile dstTile) {}
 
-    /**
-     * Update the GUI to warn that a unit is executing an animation and
-     * should be ignored for its duration.
-     *
-     * @param unit The {@code} Unit that is animating.
-     * @param sourceTile A {@code Tile} where the animation is occuring.
-     * @param r A callback for the end of animation.
-     */
-    public void executeWithUnitOutForAnimation(Unit unit, Tile sourceTile,
-                                               OutForAnimationCallback r) {}
-
-    /**
-     * Get the animation position.
-     *
-     * @param labelWidth The width of the label.
-     * @param labelHeight The height of the label.
-     * @param tileP The position of the {@code Tile} on the screen.
-     * @return A point on the map to place a unit for movement.
-     */
-    public Point getAnimationPosition(int labelWidth, int labelHeight,
-                                      Point tileP) {
-        return tileP;
-    }
-
-    /**
-     * Get the scale for animations.
-     *
-     * @return A scale factor for animations.
-     */
-    public float getAnimationScale() {
-        return 1.0f;
-    }
-
-    /**
-     * Get the bounds for a tile.
-     *
-     * @param tile The {@code Tile} to check.
-     * @return The tile bounds.
-     */
-    public Rectangle getAnimationTileBounds(Tile tile) {
-        return null;
-    }
-
-    /**
-     * Get the map position for a tile.
-     *
-     * @param tile The {@code Tile} to check.
-     * @return The tile position.
-     */
-    public Point getAnimationTilePosition(Tile tile) {
-        return null;
-    }
-
 
     // Dialog primitives
-
-    /**
-     * Simple modal confirmation dialog.
-     *
-     * @param textKey A string to use as the message key.
-     * @param okKey A key for the message on the "ok" button.
-     * @param cancelKey A key for the message on the "cancel" button.
-     * @return True if the "ok" button was selected.
-     */
-    public boolean confirm(String textKey, String okKey, String cancelKey) {
-        return false;
-    }
 
     /**
      * General modal confirmation dialog.
@@ -1475,6 +1250,8 @@ public class GUI extends FreeColClientHolder {
     /**
      * Get the current focus tile.
      *
+     * Used by: MiniMap.paintMap
+     *
      * @return The focus {@code Tile}.
      */
     public Tile getFocus() {
@@ -1482,83 +1259,23 @@ public class GUI extends FreeColClientHolder {
     }
 
     /**
-     * Request the Java-level focus go to the current subpanel.
-     *
-     * @return False if the focus request can not succeed.
-     */
-    public boolean requestFocusForSubPanel() {
-        return false;
-    }
-
-    /**
-     * Request the Java-level focus to the main window.
-     *
-     * @return False if the focus request can not succeed.
-     */
-    public boolean requestFocusInWindow() {
-        return false;
-    }
-
-    /**
-     * Require the given tile to be in the onScreen()-area.
-     *
-     * @param tile The {@code Tile} to check.
-     * @return True if the focus was set.
-     */
-    public boolean requireFocus(Tile tile) {
-        return false;
-    }
-
-    /**
      * Set the current focus tile.
      *
-     * @param tileToFocus The new focus {@code Tile}.
-     */
-    public void setFocus(Tile tileToFocus) {}
-
-    /**
-     * Focus on the active unit.
-     */
-    public void focusActiveUnit() {
-        final Unit active = getActiveUnit();
-        if (active == null) return;
-        Tile tile = active.getTile();
-        if (tile == null) return;
-        setFocus(tile);
-    }
-
-
-    // General GUI manipulation
-
-    /**
-     * Repaint the canvas now.
-     */
-    public void paintImmediately() {}
-
-    /**
-     * Repaint a part of the canvas now.
+     * Used by: CanvasMapEditorMouseListener, CenterAction,
+     *   FindSettlementPanel, InfoPanel, MiniMap.focus, MapEditorController,
+     *   SelectDestinationDialog.recenter
      *
-     * @param rectangle The area to repaint.
+     * @param tile The new focus {@code Tile}.
      */
-    public void paintImmediately(Rectangle rectangle) {}
-    
-    /**
-     * Refresh the whole GUI.
-     */
-    public void refresh() {}
+    public void setFocus(Tile tile) {}
 
-    /**
-     * Refresh a particular tile.
-     *
-     * @param tile The {@code Tile} to refresh.
-     */
-    public void refreshTile(Tile tile) {}
-    
 
     // Path handling
 
     /**
      * Set the path for the active unit.
+     *
+     * Used by: TilePopup
      *
      * @param path The new unit path.
      */
@@ -1566,27 +1283,22 @@ public class GUI extends FreeColClientHolder {
 
     /**
      * Start/stop the goto path display.
+     *
+     * Used by: GotoTileAction
      */
     public void activateGotoPath() {}
 
     /**
      * Stop the goto path display.
+     *
+     * Used by: client InGameController.askClearGotoOrders
      */
     public void clearGotoPath() {}
 
     /**
-     * Perform an immediate goto to a tile with the active unit.
-     *
-     * Called from {@link TilePopup}.
-     *
-     * @param tile The {@code Tile} to go to.
-     */
-    public void performGoto(Tile tile) {}
-
-    /**
      * Check if the user has  GoTo mode enabled.
      *
-     * Called from {@link CanvasMouseListener}.
+     * Used by: CanvasMouseListener
      *
      * @return True if the user has toggled GoTo mode.
      */
@@ -1595,9 +1307,18 @@ public class GUI extends FreeColClientHolder {
     }
 
     /**
+     * Perform an immediate goto to a tile with the active unit.
+     *
+     * Used by: TilePopup
+     *
+     * @param tile The {@code Tile} to go to.
+     */
+    public void performGoto(Tile tile) {}
+
+    /**
      * Perform an immediate goto to a point on the map.
      *
-     * Called from {@link CanvasMouseListener}.
+     * Used by: CanvasMouseListener
      *
      * @param x The x coordinate of the goto destination (pixels).
      * @param y The x coordinate of the goto destination (pixels).
@@ -1606,11 +1327,15 @@ public class GUI extends FreeColClientHolder {
     
     /**
      * Send the active unit along the current goto path as far as possible.
+     *
+     * Used by: CanvasMouseListener
      */
     public void traverseGotoPath() {}
 
     /**
      * Update the goto path to a new position on the map.
+     *
+     * Used by: CanvasMouseMotionListener
      *
      * @param x The x coordinate for the new goto path destination (pixels).
      * @param y The y coordinate for the new goto path destination (pixels).
@@ -1621,6 +1346,8 @@ public class GUI extends FreeColClientHolder {
     /**
      * Prepare a drag from the given coordinates.  This may turn into
      * a goto if further drag motion is detected.
+     *
+     * Used by: CanvasMouseListener
      *
      * @param x Drag x coordinate (pixels).
      * @param y Drag x coordinate (pixels).
@@ -1633,6 +1360,8 @@ public class GUI extends FreeColClientHolder {
     /**
      * Is the map able to zoom in further?
      *
+     * Used by: MiniMapZoomInAction
+     *
      * @return True if the map can zoom in.
      */
     public boolean canZoomInMapControls() {
@@ -1641,6 +1370,8 @@ public class GUI extends FreeColClientHolder {
 
     /**
      * Is the map able to zoom out further?
+     *
+     * Used by: MiniMapZoomOutAction
      *
      * @return True if the map can zoom out.
      */
@@ -1651,7 +1382,7 @@ public class GUI extends FreeColClientHolder {
     /**
      * Enable the map controls.
      *
-     * Called from the MapControlsAction.
+     * Used by: MapControlsAction.
      *
      * @param enable If true then enable.
      */
@@ -1659,33 +1390,37 @@ public class GUI extends FreeColClientHolder {
 
     /**
      * Toggle the fog of war control.
+     *
+     * Used by: MiniMapToggleFogOfWarAction
      */
     public void miniMapToggleFogOfWarControls() {}
 
     /**
      * Toggle the view control.
+     *
+     * Used by: MiniMapToggleFogOfWarAction
      */
     public void miniMapToggleViewControls() {}
 
     /**
      * Update the map controls, including the InfoPanel according to
      * the view mode.
+     *
+     * Used by: client InGameController.updateGUI, MapEditorController
      */
     public void updateMapControls() {}
 
     /**
-     * Map control update by removing and re-adding.
-     * TODO: does this overlap with the preceding?
-     */
-    public void updateMapControlsInCanvas() {}
-
-    /**
      * Zoom in the map controls.
+     *
+     * Used by: MiniMapZoomInAction
      */
     public void zoomInMapControls() {}
 
     /**
      * Zoom out the map controls.
+     *
+     * Used by: MiniMapZoomOutAction
      */
     public void zoomOutMapControls() {}
 
@@ -1694,41 +1429,79 @@ public class GUI extends FreeColClientHolder {
 
     /**
      * Close any open menus.
+     *
+     * Used by: FreeColClient.skipTurns,
+     *   client InGameController.{endTurn,setCurrentPlayer}
+     *   MapEditorController, PreGameController
      */
     public void closeMenus() {}
 
     /**
-     * Reset the menu bar.
-     */
-    public void resetMenuBar() {}
-
-    /**
      * Update the menu bar.
+     *
+     * Used by: InGameController.updateGUI, MapEditorController,
+     *   NewEmptyMapAction
      */
     public void updateMenuBar() {}
+
+    /**
+     * Display a popup menu.
+     *
+     * Used by: ColonyPanel, DragListener
+     *
+     * @param menu The {@code JPopupMenu} to display.
+     * @param x The menu x coordinate.
+     * @param y The menu y coordinate.
+     */
+    public void showPopupMenu(JPopupMenu menu, int x, int y) {}
+
+
+    // Scrolling
+
+    /**
+     * Work out what direction to scroll the map if a coordinate is close
+     * to an edge.
+     *
+     * @param x The x coordinate.
+     * @param y The y coordinate.
+     * @param scrollSpace The clearance from the relevant edge
+     * @param ignoreTop If the top should be ignored
+     * @return The {@code Direction} to scroll, or null if not.
+     */
+    public Direction getScrollDirection(int x, int y, int scrollSpace,
+                                        boolean ignoreTop) { return null; }
+
+    /**
+     * Scroll the map in a given direction.
+     *
+     * @param direction The {@code Direction} to scroll.
+     * @return True if scrolling can continue.
+     */
+    public boolean scrollMap(Direction direction) { return false; }
 
 
     // Tile image manipulation
 
-    public BufferedImage createTileImageWithOverlayAndForest(TileType type,
-                                                             Dimension size) {
-        return null;
-    }
+    // Used by: InfoPanel
+    public BufferedImage createTileImageWithBeachBorderAndItems(Tile tile) { return null; }
 
-    public BufferedImage createTileImageWithBeachBorderAndItems(Tile tile) {
-        return null;
-    }
+    // Used by: TilePanel
+    public BufferedImage createTileImage(Tile tile, Player player) { return null; }
 
-    public BufferedImage createTileImage(Tile tile, Player player) {
-        return null;
-    }
+    // Used by: WorkProductionPanel
+    public BufferedImage createColonyTileImage(Tile tile, Colony colony) { return null; }
 
-    public BufferedImage createColonyTileImage(Tile tile, Colony colony) {
-        return null;
-    }
-
-    public void displayColonyTiles(Graphics2D g, Tile[][] tiles, Colony colony) {
-    }
+    /**
+     * Display the ColonyTiles of a Colony.
+     *
+     * Used by: ColonyPanel.TilesPanel
+     *
+     * @param g2d A {@code Graphics2D} to draw to.
+     * @param tiles The {@code Tile}s to display.
+     * @param colony The enclosing {@code Colony}.
+     */
+    public void displayColonyTiles(Graphics2D g2d, Tile[][] tiles,
+                                   Colony colony) {}
 
 
     // View mode handling, including accessors for the active unit for
@@ -1739,6 +1512,8 @@ public class GUI extends FreeColClientHolder {
     /**
      * Get the current view mode.
      *
+     * Used by: MoveAction, ToggleViewModeAction
+     *
      * @return One of the view mode constants, or negative on error.
      */
     public ViewMode getViewMode() {
@@ -1747,6 +1522,8 @@ public class GUI extends FreeColClientHolder {
 
     /**
      * Get the active unit.
+     *
+     * Used by: many
      *
      * @return The current active {@code Unit}.
      */
@@ -1757,6 +1534,8 @@ public class GUI extends FreeColClientHolder {
     /**
      * Get the selected tile.
      *
+     * Used by: MoveAction, TilePopupAction, ToggleViewModeAction
+     *
      * @return The selected {@code Tile}.
      */
     public Tile getSelectedTile() {
@@ -1766,6 +1545,9 @@ public class GUI extends FreeColClientHolder {
     /**
      * Change to terrain mode and select a tile.
      *
+     * Used by: CanvasMapEditorMouseListener,
+     *   client InGameController.{updateActiveUnit,moveTileCursor}
+     *
      * @param tile The {@code Tile} to select.
      */
     public void changeView(Tile tile) {}
@@ -1773,12 +1555,20 @@ public class GUI extends FreeColClientHolder {
     /**
      * Change to move units mode, and select a unit.
      *
+     * Used by: ChangeAction, DebugUtils, EndTurnDialog,
+     *   client InGameController (several)
+     *   MapEditorController, TilePopup, QuickActionMenu, UnitLabel
+     *
      * @param unit The {@code Unit} to select.
+     * @param force Set true if the unit is the same, but *has*
+     *     changed in some way (e.g. moves left).
      */
-    public void changeView(Unit unit) {}
+    public void changeView(Unit unit, boolean force) {}
 
     /**
      * Change to map transform mode, and select a transform.
+     *
+     * Used by: MapEditorController
      *
      * @param transform The {@code MapTransform} to select.
      */
@@ -1786,37 +1576,57 @@ public class GUI extends FreeColClientHolder {
     
     /**
      * Change to end turn mode.
+     *
+     * Used by: client InGameController.updateActiveUnit
      */
     public void changeView() {}
 
 
     // Zoom controls
 
+    /**
+     * Can the map be zoomed in?
+     *
+     * Used by: ZoomInAction
+     *
+     * @return True if the map can zoom in.
+     */
     public boolean canZoomInMap() {
         return false;
     }
 
+    /**
+     * Can the map be zoomed out?
+     *
+     * Used by: ZoomOutAction
+     *
+     * @return True if the map can zoom out.
+     */
     public boolean canZoomOutMap() {
         return false;
     }
 
-    protected void resetMapZoom() {
-        ResourceManager.clearImageCache();
-    }
+    /**
+     * Zoom the map in.
+     *
+     * Used by: ZoomInAction
+     */
+    public void zoomInMap() {}
 
-    public void zoomInMap() {
-        ResourceManager.clearImageCache();
-    }
+    /**
+     * Zoom the map out.
+     *
+     * Used by: ZoomOutAction
+     */
+    public void zoomOutMap() {}
 
-    public void zoomOutMap() {
-        ResourceManager.clearImageCache();
-    }
 
-
-    // High level panel manipulation
+    // Miscellaneous gui manipulation
 
     /**
      * Handle a click on the canvas.
+     *
+     * Used by: CanvasMouseListener
      *
      * @param count The click count.
      * @param x The x coordinate of the click.
@@ -1827,37 +1637,38 @@ public class GUI extends FreeColClientHolder {
     /**
      * Close a panel.
      *
+     * Used by: client InGameController.closehandler
+     *
      * @param panel The identifier for the panel to close.
      */
     public void closePanel(String panel) {}
 
     /**
      * Close the main panel if present.
+     *
+     * Used by: MapEditorController, PreGameController
      */
     public void closeMainPanel() {}
 
     /**
      * Close the status panel if present.
+     *
+     * Used by: FreeColClient, MapEditorController, client InGameController, 
+     *   PreGameController
      */
     public void closeStatusPanel() {}
 
     /**
-     * Confirm declaration of independence.
-     *
-     * @return A list of new nation and country names.
-     */
-    public List<String> confirmDeclaration() {
-        return Collections.<String>emptyList();
-    }
-
-    /**
      * Update with a new chat message.
      *
-     * @param player The player who sent the chat message.
+     * Used by: client InGameController.{chat,chatHandler}
+     *
+     * @param sender The message sender.
      * @param message The chat message.
+     * @param color The message color.
      * @param privateChat True if the message is private.
      */
-    public void displayChat(Player player, String message,
+    public void displayChat(String sender, String message, Color color,
                             boolean privateChat) {}
 
     /**
@@ -1870,15 +1681,20 @@ public class GUI extends FreeColClientHolder {
     /**
      * A chat message was received during the pre-game setup.
      *
-     * @param player The player who sent the chat message.
+     * Used by: PreGameController.chatHandler
+     *
+     * @param sender The player who sent the chat message.
      * @param message The chat message.
      * @param privateChat True if the message is private.
      */
-    public void displayStartChat(Player player, String message,
+    public void displayStartChat(String sender, String message,
                                  boolean privateChat) {}
+
 
     /**
      * Checks if a client options dialog is present.
+     *
+     * Used by: FreeColAction.shouldBeEnabled
      *
      * @return True if the client options are showing.
      */
@@ -1889,29 +1705,36 @@ public class GUI extends FreeColClientHolder {
     /**
      * Is another panel being displayed.
      *
+     * Used by: many Actions
+     *
      * @return True if there is another panel present.
      */
-    public boolean isShowingSubPanel() {
+    public boolean isPanelShowing() {
         return false;
     }
 
     /**
-     * Attach a closing callback to any current error panel.
+     * Refresh the whole GUI.
      *
-     * @param callback The {@code Runnable} to attach.
-     * @return True if an error panel was present.
+     * Used by: CanvasMapEditorMouseListener,
+     *   DebugUtils.addUnitToTil,changeOwnership,resetMoves,buildDebugMenu}
+     *   Display{Borders,Grid,TileTest}Action, {NewEmptyMap,ScaleMap}Action
+     *   DebugMenu, MapEditorController, TilePopup
+     *   InGameController.removeHandler
      */
-    public boolean onClosingErrorPanel(Runnable callback) {
-        return false;
-    }
+    public void refresh() {}
 
     /**
      * Refresh the players table in the StartGamePanel.
+     *
+     * Used by: SetNationMessage.clientHandler
      */
     public void refreshPlayersTable() {}
 
     /**
      * Remove a component from the GUI.
+     *
+     * Used by: Many panels to close themselves. TODO: is this right?
      *
      * @param component The {@code Component} to remove.
      */
@@ -1920,10 +1743,22 @@ public class GUI extends FreeColClientHolder {
     /**
      * Remove a dialog from the GUI.
      *
+     * Used by: FreeColDialog.removeNotify
+     *
      * @param fcd The {@code FreeColDialog} to remove.
      */
     public void removeDialog(FreeColDialog<?> fcd) {}
 
+    /**
+     * Remove a trade route panel and associated input on an associated
+     * TradeRouteInputPanel.
+     *
+     * Used by: TradeRoutePanel
+     *
+     * @param panel The {@code FreeColPanel} to remove.
+     */
+    public void removeTradeRoutePanel(FreeColPanel panel) {}
+            
     /**
      * Set dialog preferred size to saved size or to the given
      * {@code Dimension} if no saved size was found.
@@ -1931,25 +1766,53 @@ public class GUI extends FreeColClientHolder {
      * Call this method in the constructor of a FreeColPanel in order
      * to remember its size and position.
      *
+     * Used by: *Panel
+     *
      * @param comp The {@code Component} to use.
      * @param d The {@code Dimension} to use as default.
      */
     public void restoreSavedSize(Component comp, Dimension d) {}
 
     /**
-     * Show the AboutPanel.
+     * Shows a tile popup for a given tile.
+     *
+     * @param tile The {@code Tile} where the popup occurred.
      */
-    public void showAboutPanel() {}
+    public void showTilePopup(Tile tile) {}
+
+    /**
+     * Get the tile at given coordinate.
+     *
+     * @param x The x coordinate.
+     * @param y The y coordinate.
+     * @return The {@code Tile} found.
+     */
+    public Tile tileAt(int x, int y) { return null; }
+
+    /**
+     * Update all panels derived from the EuropePanel.
+     *
+     * Used by: NewUnitPanel, RecruitUnitPanel
+     */
+    public void updateEuropeanSubpanels() {}
+
+
+    // Panel display, usually used just by the associated action
+
+    /**
+     * Show the AboutPanel.
+     *
+     * @return The panel shown.
+     */
+    public FreeColPanel showAboutPanel() { return null; }
 
     /**
      * Show the build queue for a colony.
      *
      * @param colony The {@code Colony} to show a panel for.
-     * @return The {@code BuildQueuePanel} showing.
+     * @return The build queue panel.
      */
-    public BuildQueuePanel showBuildQueuePanel(Colony colony) {
-        return null;
-    }
+    public FreeColPanel showBuildQueuePanel(Colony colony) { return null; }
 
     /**
      * Show the dialog to select captured goods.
@@ -1963,8 +1826,10 @@ public class GUI extends FreeColClientHolder {
 
     /**
      * Show the chat panel.
+     *
+     * @return The panel shown.
      */
-    public void showChatPanel() {}
+    public FreeColPanel showChatPanel() { return null; }
 
     /**
      * Show the founding father choice panel.
@@ -1973,8 +1838,7 @@ public class GUI extends FreeColClientHolder {
      * @param handler The callback to pass the choice to.
      */
     public void showChooseFoundingFatherDialog(final List<FoundingFather> ffs,
-            DialogHandler<FoundingFather> handler) {
-    }
+                                               DialogHandler<FoundingFather> handler) {}
 
     /**
      * Show the client options dialog.
@@ -1986,46 +1850,55 @@ public class GUI extends FreeColClientHolder {
      *
      * @param colony The {@code Colony} to display.
      * @param unit An optional {@code Unit} to select within the panel.
-     * @return The {@code ColonyPanel} that is showing.
+     * @return The panel shown.
      */
-    public ColonyPanel showColonyPanel(Colony colony, Unit unit) {
-        return null;
-    }
+    public FreeColPanel showColonyPanel(Colony colony, Unit unit) { return null; }
 
     /**
      * Show a colopedia panel.
      *
      * @param nodeId The identifier for the colopedia node to show.
+     * @return The panel shown.
      */
-    public void showColopediaPanel(String nodeId) {}
+    public FreeColPanel showColopediaPanel(String nodeId) { return null; }
 
     /**
      * Show a color chooser panel.
      *
      * @param al An {@code ActionListener} to handle panel button presses.
-     * @return The {@code ColorChooserPanel} created.
+     * @return The panel shown.
      */
-    public ColorChooserPanel showColorChooserPanel(ActionListener al) {
-        return null;
-    }
+    public FreeColPanel showColorChooserPanel(ActionListener al) { return null; }
 
     /**
      * Show the compact labour report panel.
+     *
+     * @return The panel shown.
      */
-    public void showCompactLabourReport() {}
+    public FreeColPanel showCompactLabourReport() { return null; }
 
     /**
      * Show the compact labour report for the specified unit data.
      *
      * @param unitData The {@code UnitData} to display.
+     * @return The panel shown.
      */
-    public void showCompactLabourReport(UnitData unitData) {}
+    public FreeColPanel showCompactLabourReport(UnitData unitData) { return null; }
     
     /**
-     * Show the declaration panel with the declaration of independence and
-     * an animated signature.
+     * Confirm declaration of independence.
+     *
+     * @return A list of new nation and country names.
      */
-    public void showDeclarationPanel() {}
+    public List<String> showConfirmDeclarationDialog() { return Collections.<String>emptyList(); }
+
+    /**
+     * Show the declaration panel with the declaration of independence and
+     * an animated signature. * * @return The panel shown.
+     *
+     * @return The panel shown.
+     */
+    public FreeColPanel showDeclarationPanel() { return null; }
 
     /**
      * Show a dialog for a difficulty option group.
@@ -2037,9 +1910,7 @@ public class GUI extends FreeColClientHolder {
      */
     public OptionGroup showDifficultyDialog(Specification spec,
                                             OptionGroup group,
-                                            boolean editable) {
-        return null;
-    }
+                                            boolean editable) { return null; }
 
     /**
      * Show a dialog to choose what goods to dump.
@@ -2056,9 +1927,15 @@ public class GUI extends FreeColClientHolder {
      * @param option The {@code Option} to edit.
      * @return True if the option edit was accepted.
      */
-    public boolean showEditOptionDialog(Option option) {
-        return false;
-    }
+    public boolean showEditOptionDialog(Option option) { return false; }
+
+    /**
+     * Show a dialog for editing a settlmeent.
+     *
+     * @param is The {@code IndianSettlement} to edit.
+     * @return The settlement post-edit.
+     */
+    public IndianSettlement showEditSettlementDialog(IndianSettlement is) { return null; }
 
     /**
      * Show a dialog to handle emigration.
@@ -2081,18 +1958,20 @@ public class GUI extends FreeColClientHolder {
                                   DialogHandler<Boolean> handler) {}
 
     /**
-     * Show an error message.  The error message should be fully formatted
-     * by now.
+     * Show an error panel.
      *
-     * @param message The actual final error message.
-     * @param callback Optional routine to run when the error panel is closed.
+     * @param message The error message to display.
+     * @param callback An optional {@code Runnable} to run on close.
+     * @return The panel shown.
      */
-    protected void showErrorMessage(String message, Runnable callback) {}
+    public FreeColPanel showErrorPanel(String message, Runnable callback) { return null; }
 
     /**
      * Show the Europe panel.
+     *
+     * @return The panel shown.
      */
-    public void showEuropePanel() {}
+    public FreeColPanel showEuropePanel() { return null; }
 
     /**
      * Show an event panel.
@@ -2100,13 +1979,17 @@ public class GUI extends FreeColClientHolder {
      * @param header The title.
      * @param image A resource key for the image to display.
      * @param footer Optional footer text.
+     * @return The panel shown.
      */
-    public void showEventPanel(String header, String image, String footer) {}
+    public FreeColPanel showEventPanel(String header, String image,
+                                       String footer) { return null; }
 
     /**
      * Show the FindSettlement panel.
+     *
+     * @return The panel shown.
      */
-    public void showFindSettlementPanel() {}
+    public FreeColPanel showFindSettlementPanel() { return null; }
 
     /**
      * Show a first contact dialog.
@@ -2128,38 +2011,35 @@ public class GUI extends FreeColClientHolder {
      * @param editable True if the options can be edited.
      * @return The game options {@code OptionGroup}.
      */
-    public OptionGroup showGameOptionsDialog(boolean editable) {
-        return null;
-    }
+    public OptionGroup showGameOptionsDialog(boolean editable) { return null; }
 
     /**
      * Show the high scores panel.
      *
      * @param messageId The message identifier.
      * @param scores The {@code HighScore}s to display.
+     * @return The panel shown.
      */
-    public void showHighScoresPanel(String messageId,
-                                    List<HighScore> scores) {}
+    public FreeColPanel showHighScoresPanel(String messageId,
+                                            List<HighScore> scores) { return null; }
 
     /**
      * Show a panel for a native settlement.
      *
-     * @param indianSettlement The {@code IndianSettlement} to display.
+     * @param is The {@code IndianSettlement} to display.
+     * @return The panel shown.
      */
-    public void showIndianSettlement(IndianSettlement indianSettlement) {}
+    public FreeColPanel showIndianSettlementPanel(IndianSettlement is) { return null; }
 
     /**
      * Show an information message.
      *
      * @param displayObject Optional object for displaying as an icon.
      * @param template The {@code StringTemplate} to display.
-     * @return The {@code InformationPanel} that is displayed.
+     * @return The panel shown.
      */
-    public InformationPanel showInformationPanel(FreeColObject displayObject,
-                                                 StringTemplate template) {
-        alertSound();
-        return null;
-    }
+    public FreeColPanel showInformationPanel(FreeColObject displayObject,
+                                             StringTemplate template) { return null; }
 
     /**
      * Show a dialog where the user may choose a file.
@@ -2168,9 +2048,7 @@ public class GUI extends FreeColClientHolder {
      * @param extension An extension to select with.
      * @return The selected {@code File}.
      */
-    public File showLoadDialog(File directory, String extension) {
-        return null;
-    }
+    public File showLoadDialog(File directory, String extension) { return null; }
 
     /**
      * Show the LoadingSavegameDialog.
@@ -2180,21 +2058,22 @@ public class GUI extends FreeColClientHolder {
      * @return The {@code LoadingSavegameInfo} from the dialog.
      */
     public LoadingSavegameInfo showLoadingSavegameDialog(boolean publicServer,
-                                                         boolean singlePlayer) {
-        return null;
-    }
+                                                         boolean singlePlayer) { return null; }
 
     /**
      * Show the log file panel.
+     *
+     * @return The panel shown.
      */
-    public void showLogFilePanel() {}
+    public FreeColPanel showLogFilePanel() { return null; }
 
     /**
      * Show the main panel.
      *
      * @param userMsg An optional user message to display.
+     * @return The panel shown.
      */
-    public void showMainPanel(String userMsg) {}
+    public FreeColPanel showMainPanel(String userMsg) { return null; }
 
     /**
      * Complete reset back to the main panel.
@@ -2207,25 +2086,22 @@ public class GUI extends FreeColClientHolder {
      * @param editable If true, allow edits.
      * @return The map generator {@code OptionGroup}.
      */
-    public OptionGroup showMapGeneratorOptionsDialog(boolean editable) {
-        return null;
-    }
+    public OptionGroup showMapGeneratorOptionsDialog(boolean editable) { return null; }
 
     /**
      * Show the map size dialog.
      *
      * @return The selected map size as a {@code Dimension}.
      */
-    public Dimension showMapSizeDialog() {
-        return null;
-    }
+    public Dimension showMapSizeDialog() { return null; }
 
     /**
      * Show model messages.
      *
      * @param modelMessages A list of {@code ModelMessage}s to display.
+     * @return The panel shown.
      */
-    public void showModelMessages(List<ModelMessage> modelMessages) {}
+    public FreeColPanel showModelMessages(List<ModelMessage> modelMessages) { return null; }
 
     /**
      * Show the monarch dialog.
@@ -2279,25 +2155,22 @@ public class GUI extends FreeColClientHolder {
     public DiplomaticTrade showNegotiationDialog(FreeColGameObject our,
                                                  FreeColGameObject other,
                                                  DiplomaticTrade agreement,
-                                                 StringTemplate comment) {
-        return null;
-    }
+                                                 StringTemplate comment) { return null; }
 
     /**
      * Show the NewPanel.
      *
      * @param spec The {@code Specification} to use.
+     * @return The panel shown.
      */
-    public void showNewPanel(Specification spec) {}
+    public FreeColPanel showNewPanel(Specification spec) { return null; }
 
     /**
      * Show the parameter choice dialog.
      *
      * @return The chosen parameters.
      */
-    public Parameters showParametersDialog() {
-        return null;
-    }
+    public Parameters showParametersDialog() { return null; }
 
     /**
      * Show the pre-combat dialog.
@@ -2308,64 +2181,85 @@ public class GUI extends FreeColClientHolder {
      * @return True if the player decided to attack.
      */
     public boolean showPreCombatDialog(Unit attacker,
-                                       FreeColGameObject defender, Tile tile) {
-        return false;
-    }
+                                       FreeColGameObject defender,
+                                       Tile tile) { return false; }
 
     /**
      * Displays the purchase panel.
+     *
+     * @return The panel shown.
      */
-    public void showPurchasePanel() {}
+    public FreeColPanel showPurchasePanel() { return null; }
 
     /**
      * Displays the recruit panel.
+     *
+     * @return The panel shown.
      */
-    public void showRecruitPanel() {}
+    public FreeColPanel showRecruitPanel() { return null; }
 
     /**
      * Show the Cargo Report.
+     *
+     * @return The panel shown.
      */
-    public void showReportCargoPanel() {}
+    public FreeColPanel showReportCargoPanel() { return null; }
 
     /**
      * Show the Colony Report.
+     *
+     * @return The panel shown.
      */
-    public void showReportColonyPanel() {}
+    public FreeColPanel showReportColonyPanel() { return null; }
 
     /**
      * Show the Continental Congress Report.
+     *
+     * @return The panel shown.
      */
-    public void showReportContinentalCongressPanel() {}
+    public FreeColPanel showReportContinentalCongressPanel() { return null; }
 
     /**
      * Show the Education Report.
+     *
+     * @return The panel shown.
      */
-    public void showReportEducationPanel() {}
+    public FreeColPanel showReportEducationPanel() { return null; }
 
     /**
      * Show the Exploration Report.
+     *
+     * @return The panel shown.
      */
-    public void showReportExplorationPanel() {}
+    public FreeColPanel showReportExplorationPanel() { return null; }
 
     /**
      * Show the Foreign Affairs Report.
+     *
+     * @return The panel shown.
      */
-    public void showReportForeignAffairPanel() {}
+    public FreeColPanel showReportForeignAffairPanel() { return null; }
 
     /**
      * Show the History Report.
+     *
+     * @return The panel shown.
      */
-    public void showReportHistoryPanel() {}
+    public FreeColPanel showReportHistoryPanel() { return null; }
 
     /**
      * Show the Native Affairs Report.
+     *
+     * @return The panel shown.
      */
-    public void showReportIndianPanel() {}
+    public FreeColPanel showReportIndianPanel() { return null; }
 
     /**
      * Show the Labour Report.
+     *
+     * @return The panel shown.
      */
-    public void showReportLabourPanel() {}
+    public FreeColPanel showReportLabourPanel() { return null; }
 
     /**
      * Display the labour detail panel.
@@ -2374,47 +2268,61 @@ public class GUI extends FreeColClientHolder {
      * @param data The labour data.
      * @param unitCount A map of unit distribution.
      * @param colonies The list of player {@code Colony}s.
+     * @return The panel shown.
      */
-    public void showReportLabourDetailPanel(UnitType unitType,
+    public FreeColPanel showReportLabourDetailPanel(UnitType unitType,
         Map<UnitType, Map<Location, Integer>> data,
-        TypeCountMap<UnitType> unitCount, List<Colony> colonies) {}
+        TypeCountMap<UnitType> unitCount, List<Colony> colonies) { return null; }
 
     /**
      * Show the Military Report.
+     *
+     * @return The panel shown.
      */
-    public void showReportMilitaryPanel() {}
+    public FreeColPanel showReportMilitaryPanel() { return null; }
 
     /**
      * Show the Naval Report.
+     *
+     * @return The panel shown.
      */
-    public void showReportNavalPanel() {}
+    public FreeColPanel showReportNavalPanel() { return null; }
 
     /**
      * Show the Production Report.
+     *
+     * @return The panel shown.
      */
-    public void showReportProductionPanel() {}
+    public FreeColPanel showReportProductionPanel() { return null; }
 
     /**
      * Show the Religion Report.
+     *
+     * @return The panel shown.
      */
-    public void showReportReligiousPanel() {}
+    public FreeColPanel showReportReligiousPanel() { return null; }
 
     /**
      * Show the Requirements Report.
+     *
+     * @return The panel shown.
      */
-    public void showReportRequirementsPanel() {}
+    public FreeColPanel showReportRequirementsPanel() { return null; }
 
     /**
      * Show the Trade Report.
+     *
+     * @return The panel shown.
      */
-    public void showReportTradePanel() {}
+    public FreeColPanel showReportTradePanel() { return null; }
 
     /**
      * Show the Turn Report.
      *
      * @param messages The {@code ModelMessage}s that make up the report.
+     * @return The panel shown.
      */
-    public void showReportTurnPanel(List<ModelMessage> messages) {}
+    public FreeColPanel showReportTurnPanel(List<ModelMessage> messages) { return null; }
 
     /**
      * Show the river style dialog.
@@ -2422,9 +2330,7 @@ public class GUI extends FreeColClientHolder {
      * @param styles The river styles a choice is made from.
      * @return The response returned by the dialog.
      */
-    public String showRiverStyleDialog(List<String> styles) {
-        return null;
-    }
+    public String showRiverStyleDialog(List<String> styles) { return null; }
 
     /**
      * Show the save dialog.
@@ -2433,18 +2339,14 @@ public class GUI extends FreeColClientHolder {
      * @param defaultName The default game to save.
      * @return The selected file.
      */
-    public File showSaveDialog(File directory, String defaultName) {
-        return null;
-    }
+    public File showSaveDialog(File directory, String defaultName) { return null; }
 
     /**
      * Show the map scale dialog.
      *
      * @return The map scale as a {@code Dimension}.
      */
-    public Dimension showScaleMapSizeDialog() {
-        return null;
-    }
+    public Dimension showScaleMapSizeDialog() { return null; }
 
     /**
      * Show a dialog allowing selecting an amount of goods.
@@ -2456,9 +2358,8 @@ public class GUI extends FreeColClientHolder {
      * @return The amount selected.
      */
     public int showSelectAmountDialog(GoodsType goodsType, int available,
-                                      int defaultAmount, boolean needToPay) {
-        return -1;
-    }
+                                      int defaultAmount,
+                                      boolean needToPay) { return -1; }
 
     /**
      * Show a dialog allowing the user to select a destination for
@@ -2467,9 +2368,7 @@ public class GUI extends FreeColClientHolder {
      * @param unit The {@code Unit} to select a destination for.
      * @return A destination for the unit, or null.
      */
-    public Location showSelectDestinationDialog(Unit unit) {
-        return null;
-    }
+    public Location showSelectDestinationDialog(Unit unit) { return null; }
 
     /**
      * Show the select-tribute-amount dialog.
@@ -2480,17 +2379,16 @@ public class GUI extends FreeColClientHolder {
      * @return The amount selected.
      */
     public int showSelectTributeAmountDialog(StringTemplate question,
-                                             int maximum) {
-        return -1;
-    }
+                                             int maximum) { return -1; }
 
     /**
      * Show the {@code ServerListPanel}.
      *
      * @param serverList The list containing the servers retrieved from the
      *     metaserver.
+     * @return The panel shown.
      */
-    public void showServerListPanel(List<ServerInfo> serverList) {}
+    public FreeColPanel showServerListPanel(List<ServerInfo> serverList) { return null; }
 
     /**
      * Show the StartGamePanel.
@@ -2498,76 +2396,59 @@ public class GUI extends FreeColClientHolder {
      * @param game The {@code Game} that is about to start.
      * @param player The {@code Player} using this client.
      * @param singlePlayerMode True to start a single player game.
+     * @return The panel shown.
      */
-    public void showStartGamePanel(Game game, Player player,
-                                   boolean singlePlayerMode) {}
+    public FreeColPanel showStartGamePanel(Game game, Player player,
+                                           boolean singlePlayerMode) { return null; }
 
     /**
      * Show the statistics panel.
      *
      * @param serverStats A map of server statistics key,value pairs.
      * @param clientStats A map of client statistics key,value pairs.
+     * @return The panel shown.
      */
-    public void showStatisticsPanel(Map<String, String> serverStats,
-                                    Map<String, String> clientStats) {}
+    public FreeColPanel showStatisticsPanel(Map<String, String> serverStats,
+                                            Map<String, String> clientStats) { return null; }
 
     /**
      * Shows a status message which goes away when a new component is added.
      *
      * @param message The text message to display on the status panel.
+     * @return The panel shown.
      */
-    public void showStatusPanel(String message) {}
+    public FreeColPanel showStatusPanel(String message) { return null; }
 
     /**
      * Show the tile panel for a given tile.
      *
      * @param tile The {@code Tile} to display.
+     * @return The panel shown.
      */
-    public void showTilePanel(Tile tile) {}
-
-    /**
-     * Show the tile popup for the current selected tile.
-     */
-    public void showTilePopup() {
-        showTilePopup(getSelectedTile());
-    }
-
-    /**
-     * Shows a tile popup for a given tile.
-     *
-     * @param tile The {@code Tile} where the popup occurred.
-     */
-    public void showTilePopup(Tile tile) {}
-
-    /**
-     * Shows a tile popup at a given coordinate.
-     *
-     * @param x The x coordinate.
-     * @param y The y coordinate.
-     */
-    public void showTilePopup(int x, int y) {}
+    public FreeColPanel showTilePanel(Tile tile) { return null; }
 
     /**
      * Show the trade route input panel for a given trade route.
      *
      * @param tr The {@code TradeRoute} to display.
-     * @return The {@code TradeRouteInputPanel}.
+     * @return The panel shown.
      */
-    public TradeRouteInputPanel showTradeRouteInputPanel(TradeRoute tr) {
-        return null;
-    }
+    public FreeColPanel showTradeRouteInputPanel(TradeRoute tr) { return null; }
 
     /**
      * Show a panel to select a trade route for a unit.
      *
      * @param unit An optional {@code Unit} to select a trade route for.
+     * @return The panel shown.
      */
-    public void showTradeRoutePanel(Unit unit) {}
+    public FreeColPanel showTradeRoutePanel(Unit unit) { return null; }
 
     /**
      * Show the training panel.
+     *
+     * @return The panel shown.
      */
-    public void showTrainPanel() {}
+    public FreeColPanel showTrainPanel() { return null; }
 
     /**
      * Show the victory dialog.
@@ -2584,19 +2465,13 @@ public class GUI extends FreeColClientHolder {
      * @param colony The {@code Colony} to display.
      * @return The response returned by the dialog.
      */
-    public boolean showWarehouseDialog(Colony colony) {
-        return false;
-    }
+    public boolean showWarehouseDialog(Colony colony) { return false; }
 
     /**
      * Show the production of a unit.
      *
      * @param unit The {@code Unit} to display.
+     * @return The panel shown.
      */
-    public void showWorkProductionPanel(Unit unit) {}
-
-    /**
-     * Update all panels derived from the EuropePanel.
-     */
-    public void updateEuropeanSubpanels() {}
+    public FreeColPanel showWorkProductionPanel(Unit unit) { return null; }
 }

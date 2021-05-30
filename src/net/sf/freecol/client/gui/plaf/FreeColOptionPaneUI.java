@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -45,6 +45,7 @@ import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.client.gui.ChoiceItem;
 import net.sf.freecol.client.gui.panel.MigPanel;
 import net.sf.freecol.common.i18n.Messages;
+import net.sf.freecol.common.util.ImageUtils;
 
 
 /**
@@ -97,7 +98,7 @@ public class FreeColOptionPaneUI extends BasicOptionPaneUI {
                 ChoiceItem ci = (ChoiceItem)buttons[i];
                 String label = ci.toString();
                 Icon icon = ci.getIcon();
-                b = (label.isEmpty()) ? new JButton(icon)
+                b = (label == null || label.isEmpty()) ? new JButton(icon)
                     : new JButton(label, icon);
                 b.setName("OptionPane.button." + label);
                 if (ci.isOK()) this.okIndex = i;
@@ -247,8 +248,8 @@ public class FreeColOptionPaneUI extends BasicOptionPaneUI {
     @Override
     public void paint(Graphics g, JComponent c) {
         if (c.isOpaque()) {
-            ImageLibrary.drawTiledImage("image.background.FreeColOptionPane",
-                                        g, c, null);
+            ImageUtils.drawTiledImage(ImageLibrary.getOptionPaneBackground(),
+                                      g, c, null);
         }
     }
 }

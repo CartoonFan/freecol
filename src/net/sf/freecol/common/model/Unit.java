@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -586,9 +586,16 @@ public class Unit extends GoodsLocation
             setMovesLeft(getInitialMovesLeft());
         }
         this.hitPoints = unitType.getHitPoints();
-        if (getTeacher() != null && !canBeStudent(getTeacher())) {
-            getTeacher().setStudent(null);
-            setTeacher(null);
+        if (getTeacher() != null) {
+            if (!canBeStudent(getTeacher())) {
+                getTeacher().setStudent(null);
+                setTeacher(null);
+            }
+        } else if (getStudent() != null) {
+            if (!getStudent().canBeStudent(this)) {
+                getStudent().setTeacher(null);
+                setStudent(null);
+            }
         }
         return true;
     }
@@ -2634,16 +2641,26 @@ public class Unit extends GoodsLocation
      */
     public Location resolveDestination() {
         if (!isAtSea()) throw new RuntimeException("Not at sea: " + this);
+        Tile ret = null;
+        // Is there a destination, either explicit or by trade route?
         TradeRouteStop stop = getStop();
         Location dst = (TradeRoute.isStopValid(this, stop))
             ? stop.getLocation()
             : getDestination();
-        Tile best;
-        return (dst == null) ? getFullEntryLocation()
-            : (dst instanceof Europe) ? dst
-            : (dst.getTile() != null
-                && (best = getBestEntryTile(dst.getTile())) != null) ? best
+        // If the destination is Europe, we are done
+        if (dst instanceof Europe) return dst;
+        // If there is a destination with an associated tile, get a
+        // nearby best entry tile.  Otherwise use the fallback entry
+        // location for the owner player.
+        ret = (dst != null && dst.getTile() != null)
+            ? getBestEntryTile(dst.getTile())
             : getFullEntryLocation();
+        // Apparently this can still be null!?!  At least log such cases
+        if (ret == null) {
+            logger.warning("resolveDestination(" + dst
+                + ") is null for: " + this);
+        }
+        return ret;
     }
 
     /**
@@ -4739,7 +4756,6 @@ public class Unit extends GoodsLocation
         Player oldOwner = owner;
         owner = xr.findFreeColGameObject(game, OWNER_TAG,
                                          Player.class, (Player)null, true);
-        if (xr.shouldIntern()) game.checkOwners(this, oldOwner);
 
         this.type = xr.getType(spec, UNIT_TYPE_TAG,
                                UnitType.class, (UnitType)null);
@@ -4801,6 +4817,9 @@ public class Unit extends GoodsLocation
         // Fix changes to production
         WorkLocation wl = getWorkLocation();
         if (wl != null && wl != oldWorkLocation) wl.updateProductionType();
+
+        // Check ownership as late as possible
+        if (xr.shouldIntern()) game.checkOwners(this, oldOwner);
     }
 
     /**
@@ -4869,7 +4888,11 @@ public class Unit extends GoodsLocation
             sb.append(" uninitialized");
         } else if (isDisposed()) {
             sb.append(" disposed");
-        } else {
+        } else if (owner == null) {
+            sb.append(" unowned");
+        } else if (getType() == null) {
+            sb.append(" untyped");
+        } else {            
             sb.append(' ').append(lastPart(owner.getNationId(), "."))
                 .append(' ').append(getType().getSuffix());
             if (!hasDefaultRole()) {

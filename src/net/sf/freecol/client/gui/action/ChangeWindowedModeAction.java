@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -42,32 +42,6 @@ public final class ChangeWindowedModeAction extends SelectableAction {
         super(freeColClient, id, null);
     }
 
-
-    // Override SelectableAction
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean shouldBeSelected() {
-        final GUI gui = getGUI();
-        return !(gui == null || gui.isWindowed())
-            && super.shouldBeSelected();
-    }
-
-
-    // Override FreeColAction
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean shouldBeEnabled() {
-        final GUI gui = getGUI();
-        return !(gui == null || gui.isShowingSubPanel())
-            && super.shouldBeEnabled();
-    }
-    
 
     // Interface ActionListener
 

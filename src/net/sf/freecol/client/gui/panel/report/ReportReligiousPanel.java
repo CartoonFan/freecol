@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -29,6 +29,7 @@ import net.sf.freecol.client.gui.FontLibrary;
 import net.sf.freecol.client.gui.panel.BuildingPanel;
 import net.sf.freecol.client.gui.panel.FreeColProgressBar;
 import net.sf.freecol.client.gui.panel.Utility;
+import net.sf.freecol.client.gui.Size;
 import net.sf.freecol.common.model.Building;
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.GoodsType;
@@ -51,9 +52,7 @@ public final class ReportReligiousPanel extends ReportPanel {
     public ReportReligiousPanel(FreeColClient freeColClient) {
         super(freeColClient, "reportReligionAction");
 
-        final Font font = FontLibrary.createFont(FontLibrary.FontType.NORMAL,
-            FontLibrary.FontSize.SMALLER, Font.BOLD,
-            freeColClient.getGUI().getImageLibrary().getScaleFactor());
+        final Font font = FontLibrary.getUnscaledFont("normal-bold-smaller");
         final Player player = getMyPlayer();
         final Specification spec = getSpecification();
 
@@ -63,9 +62,10 @@ public final class ReportReligiousPanel extends ReportPanel {
             JLabel crosses = Utility.localizedLabel(gt);
             crosses.setFont(font);
             reportPanel.add(crosses, SPAN_SPLIT_2);
-            FreeColProgressBar progressBar = new FreeColProgressBar(gt, 0,
-                player.getImmigrationRequired(), player.getImmigration(),
-                player.getTotalImmigrationProduction());
+            FreeColProgressBar progressBar
+                = new FreeColProgressBar(freeColClient, gt, 0,
+                    player.getImmigrationRequired(), player.getImmigration(),
+                    player.getTotalImmigrationProduction());
             reportPanel.add(progressBar, "span");
 
             for (Colony colony : player.getColonyList()) {

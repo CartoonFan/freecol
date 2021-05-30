@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -286,7 +286,7 @@ public final class InGameController extends Controller {
                                  ServerPlayer serverPlayer) {
         ChangeSet cs = new ChangeSet();
         final Player owner = colony.getOwner();
-        colony.csChangeOwner(serverPlayer, false, cs);//-vis(serverPlayer,owner)
+        colony.csChangeOwner(serverPlayer, false, null, cs);//-vis(serverPlayer,owner)
         serverPlayer.invalidateCanSeeTiles();//+vis(serverPlayer)
         owner.invalidateCanSeeTiles();//+vis(owner)
         getGame().sendToAll(cs);
@@ -303,7 +303,7 @@ public final class InGameController extends Controller {
 
         ChangeSet cs = new ChangeSet();
         ((ServerPlayer)owner).csChangeOwner(unit, serverPlayer, null, null,
-            cs);//-vis(serverPlayer,owner)
+                                            cs);//-vis(serverPlayer,owner)
         cs.add(See.perhaps().always(owner), unit.getTile());
         serverPlayer.invalidateCanSeeTiles();//+vis(serverPlayer)
         owner.invalidateCanSeeTiles();//+vis(owner)
@@ -373,7 +373,7 @@ public final class InGameController extends Controller {
 
         // Instantiate the REF in Europe
         Force exf = monarch.getExpeditionaryForce();
-        if (!exf.prepareToBoard()) {
+        if (exf.prepareToBoard(monarch.getNavalREFUnitType()) < 0) {
             logger.warning("Unable to ensure space for the REF land units.");
             // For now, do not fail completely
         }
@@ -3624,7 +3624,7 @@ public final class InGameController extends Controller {
         colony.setBuildQueue(queue);
         if (getGame().getSpecification()
             .getBoolean(GameOptions.CLEAR_HAMMERS_ON_CONSTRUCTION_SWITCH)
-            && current != colony.getCurrentlyBuilding()) {
+            && current != null && current != colony.getCurrentlyBuilding()) {
             for (AbstractGoods ag : transform(current.getRequiredGoods(),
                     g -> !g.getType().isStorable())) {
                 colony.removeGoods(ag.getType());

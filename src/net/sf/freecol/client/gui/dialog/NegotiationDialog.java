@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,6 +21,7 @@ package net.sf.freecol.client.gui.dialog;
 
 import java.awt.Component;
 import java.awt.Cursor;
+import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -38,9 +39,11 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
 import javax.swing.JTextArea;
 import javax.swing.ListCellRenderer;
+import javax.swing.ScrollPaneConstants;
 import javax.swing.SpinnerNumberModel;
 
 import net.miginfocom.swing.MigLayout;
@@ -49,6 +52,7 @@ import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.ChoiceItem;
 import net.sf.freecol.client.gui.FontLibrary;
 import net.sf.freecol.client.gui.panel.*;
+import net.sf.freecol.client.gui.Size;
 import net.sf.freecol.common.debug.FreeColDebugger;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Colony;
@@ -167,7 +171,7 @@ public final class NegotiationDialog extends FreeColDialog<DiplomaticTrade> {
             this.label = Utility.localizedLabel(Messages.getName("model.tradeItem.colony"));
             this.allColonies = source.getColonyList();
 
-            setBorder(Utility.SIMPLE_LINE_BORDER);
+            setBorder(Utility.getSimpleLineBorder());
 
             add(this.label);
             add(this.colonyBox);
@@ -270,7 +274,7 @@ public final class NegotiationDialog extends FreeColDialog<DiplomaticTrade> {
                                                  .getTextField()
                                                  .setColumns(5);
 
-            setBorder(Utility.SIMPLE_LINE_BORDER);
+            setBorder(Utility.getSimpleLineBorder());
 
             add(Utility.localizedLabel(Messages.getName("model.tradeItem.gold")));
             add(Utility.localizedLabel(StringTemplate
@@ -371,7 +375,7 @@ public final class NegotiationDialog extends FreeColDialog<DiplomaticTrade> {
             this.label = Utility.localizedLabel(Messages.nameKey("model.tradeItem.goods"));
             this.allGoods = allGoods;
 
-            setBorder(Utility.SIMPLE_LINE_BORDER);
+            setBorder(Utility.getSimpleLineBorder());
 
             add(this.label);
             add(this.goodsBox);
@@ -499,7 +503,7 @@ public final class NegotiationDialog extends FreeColDialog<DiplomaticTrade> {
             this.addButton.setActionCommand(ADD);
             this.label = Utility.localizedLabel(Messages.nameKey("model.tradeItem.incite"));
 
-            setBorder(Utility.SIMPLE_LINE_BORDER);
+            setBorder(Utility.getSimpleLineBorder());
 
             available.clear();
             final Predicate<Player> incitablePred = p ->
@@ -619,7 +623,7 @@ public final class NegotiationDialog extends FreeColDialog<DiplomaticTrade> {
             this.addButton.addActionListener(this);
             this.addButton.setActionCommand(ADD);
 
-            setBorder(Utility.SIMPLE_LINE_BORDER);
+            setBorder(Utility.getSimpleLineBorder());
 
             add(Utility.localizedLabel(Messages.nameKey("model.tradeItem.stance")));
             add(this.stanceBox);
@@ -739,7 +743,7 @@ public final class NegotiationDialog extends FreeColDialog<DiplomaticTrade> {
             this.label = Utility.localizedLabel(Messages.nameKey("model.tradeItem.unit"));
             this.allUnits = allUnits;
 
-            setBorder(Utility.SIMPLE_LINE_BORDER);
+            setBorder(Utility.getSimpleLineBorder());
 
             add(this.label);
             add(this.unitBox);
@@ -946,7 +950,6 @@ public final class NegotiationDialog extends FreeColDialog<DiplomaticTrade> {
         this.summary = new MigPanel(new MigLayout("wrap 2", "[20px:n:n][]"));
         this.summary.setOpaque(false);
         this.summary.add(Utility.localizedTextArea(comment), "center, span 2");
-
         /**
          * Build Layout of Diplomatic Trade Dialog
          */
@@ -954,14 +957,13 @@ public final class NegotiationDialog extends FreeColDialog<DiplomaticTrade> {
                                                   "[30%|40%|30%]", ""));
         // Main Panel Header
         panel.add(Utility.localizedHeader("negotiationDialog.title."
-                        + agreement.getContext().getKey(), false),
+                                          + agreement.getContext().getKey(),
+                                          Utility.FONTSPEC_TITLE),
                 "span 3, center");
 
         // Panel contents Header row
         JTextArea labelDemandMessage = Utility.localizedTextArea(this.demand);
-        Font font = FontLibrary.createFont(FontLibrary.FontType.NORMAL,
-                FontLibrary.FontSize.TINY, Font.BOLD,
-                getImageLibrary().getScaleFactor());
+        Font font = FontLibrary.getUnscaledFont("normal-bold-tiny");
         labelDemandMessage.setFont(font);
         panel.add(labelDemandMessage);
         JTextArea blank = new JTextArea(" ");
@@ -975,13 +977,19 @@ public final class NegotiationDialog extends FreeColDialog<DiplomaticTrade> {
         // TODO: Expand center panel so that contents fill cell horizontally. 
         panel.add(this.goldDemandPanel); // Left pane
         JPanel centerPanel = new MigPanel(new MigLayout("wrap 1"));
+        centerPanel.setMinimumSize(new Dimension(250, 50));
         if (tutorial != null) {
             // Display only if tutorial variable contents overriden
             //      Can only occur if: First Contact with a forgeign Nation
             JTextArea tutArea = Utility.localizedTextArea(tutorial, 30);
             centerPanel.add(tutArea, "center");
         }
-        centerPanel.add(this.summary, "top");
+        JScrollPane scroll = new JScrollPane(this.summary,
+            ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
+            ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.getViewport().setOpaque(false);
+        scroll.setBorder(null);
+        centerPanel.add(scroll, "top, width 100%");
         panel.add(centerPanel, "spany, top"); // Center pane
         panel.add(this.goldOfferPanel); // Right pane
 
@@ -1154,7 +1162,7 @@ public final class NegotiationDialog extends FreeColDialog<DiplomaticTrade> {
         
         button.setMargin(Utility.EMPTY_MARGIN);
         button.setOpaque(false);
-        button.setForeground(Utility.LINK_COLOR);
+        button.setForeground(Utility.getLinkColor());
         button.setBorder(Utility.blankBorder(0, 0, 0, 0));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return button;

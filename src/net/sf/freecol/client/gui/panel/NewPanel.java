@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -293,7 +293,8 @@ public final class NewPanel extends FreeColPanel implements ItemListener {
         setCancelComponent(cancel);
 
         // Add all the components
-        add(Utility.localizedHeader("newPanel.newGamePanel", false),
+        add(Utility.localizedHeader("newPanel.newGamePanel",
+                                    Utility.FONTSPEC_TITLE),
             "span 6, center");
         add(single, "newline, span 3");
         add(new JSeparator(JSeparator.VERTICAL), "spany 7, grow");

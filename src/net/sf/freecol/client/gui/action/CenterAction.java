@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -22,6 +22,9 @@ package net.sf.freecol.client.gui.action;
 import java.awt.event.ActionEvent;
 
 import net.sf.freecol.client.FreeColClient;
+import net.sf.freecol.client.gui.GUI;
+import net.sf.freecol.common.model.Tile;
+import net.sf.freecol.common.model.Unit;
 
 
 /**
@@ -49,6 +52,11 @@ public class CenterAction extends UnitAction {
      */
     @Override
     public void actionPerformed(ActionEvent ae) {
-        getGUI().focusActiveUnit();
+        final GUI gui = getGUI();
+        final Unit active = gui.getActiveUnit();
+        if (active != null) {
+            final Tile tile = active.getTile();
+            if (tile != null) gui.setFocus(tile);
+        }
     }
 }

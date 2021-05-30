@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -271,14 +271,14 @@ public class Map extends FreeColGameObject implements Location {
     /**
      * The latitude of the northern edge of the map. A negative value
      * indicates northern latitude, a positive value southern
-     * latitude. Thus, -30 equals 30°N, and 40 equals 40°S.
+     * latitude. Thus, -30 equals 30 degrees N, and 40 equals 40 degrees S.
      */
     private int minimumLatitude = -90;
 
     /**
      * The latitude of the southern edge of the map. A negative value
      * indicates northern latitude, a positive value southern
-     * latitude. Thus, -30 equals 30°N, and 40 equals 40°S.
+     * latitude. Thus, -30 equals 30 degrees N, and 40 equals 40 degrees S.
      */
     private int maximumLatitude = 90;
 
@@ -1802,8 +1802,8 @@ ok:     while (!openMap.isEmpty()) {
                 if (lb != null) lb.add(" ***goal(",
                     currentNode.getCost(), ")***");
                 best = goalDecider.getGoal();
+                if (best == null || !goalDecider.hasSubGoals()) break ok;
                 bestScore = best.getCost();
-                if (!goalDecider.hasSubGoals()) break ok;
                 continue;
             }
 
@@ -2630,8 +2630,8 @@ ok:     while (!openMap.isEmpty()) {
      * {@inheritDoc}
      */
     @Override
-    public ImageIcon getLocationImage(int cellHeight, ImageLibrary library) {
-        return new ImageIcon(library.getScaledImage(ImageLibrary.LOST_CITY_RUMOUR));
+    public String getLocationImageKey() {
+        return ImageLibrary.LOST_CITY_RUMOUR;
     }
 
 

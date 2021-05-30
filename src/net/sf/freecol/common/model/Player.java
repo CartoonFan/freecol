@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -464,7 +464,7 @@ public class Player extends FreeColGameObject implements Nameable {
      * @return A name key, or null if Europe is null.
      */
     public String getEuropeNameKey() {
-        return (europe == null) ? null : nationId + ".europe";
+        return (europe == null) ? null : this.nationId + ".europe";
     }
 
     /**
@@ -473,7 +473,7 @@ public class Player extends FreeColGameObject implements Nameable {
      * @return A nation resource key.
      */
     public String getNationResourceKey() {
-        return lastPart(nationId, ".");
+        return lastPart(this.nationId, ".");
     }
 
     /**
@@ -536,7 +536,7 @@ public class Player extends FreeColGameObject implements Nameable {
      * @return The ruler name key.
      */
     public final String getRulerNameKey() {
-        return Messages.rulerKey(nationId);
+        return Messages.rulerKey(this.nationId);
     }
 
     /**
@@ -872,7 +872,7 @@ public class Player extends FreeColGameObject implements Nameable {
      * @return The nation identifier.
      */
     public String getNationId() {
-        return nationId;
+        return this.nationId;
     }
 
     /**
@@ -881,7 +881,7 @@ public class Player extends FreeColGameObject implements Nameable {
      * @return The player {@code Nation}.
      */
     public Nation getNation() {
-        return getSpecification().getNation(nationId);
+        return getSpecification().getNation(this.nationId);
     }
 
     /**
@@ -891,7 +891,7 @@ public class Player extends FreeColGameObject implements Nameable {
      */
     public void setNation(Nation newNation) {
         Nation oldNation = getNation();
-        nationId = newNation.getId();
+        this.nationId = newNation.getId();
         java.util.Map<Nation, NationOptions.NationState> nations
             = getGame().getNationOptions().getNations();
         nations.put(oldNation, NationOptions.NationState.AVAILABLE);
@@ -4109,7 +4109,7 @@ public class Player extends FreeColGameObject implements Nameable {
         this.tax = o.getTax();
         // Usually no map yet for the user
         this.entryTile = game.update(o.getEntryTile(), true);
-        this.market = game.update(o.getMarket(), false);
+        this.market = game.update(o.getMarket(), true); // new market on declare
         this.europe = game.update(o.getEurope(), false);
         this.monarch = game.update(o.getMonarch(), false);
         this.highSeas = game.update(o.getHighSeas(), false);
@@ -4242,7 +4242,6 @@ public class Player extends FreeColGameObject implements Nameable {
     @Override
     protected void writeChildren(FreeColXMLWriter xw) throws XMLStreamException {
         super.writeChildren(xw);
-
 
         if (xw.validFor(this)) {
 
@@ -4538,6 +4537,6 @@ public class Player extends FreeColGameObject implements Nameable {
      */
     @Override
     public String toString() {
-        return nationId;
+        return this.nationId;
     }
 }

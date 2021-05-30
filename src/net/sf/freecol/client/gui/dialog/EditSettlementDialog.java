@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -262,7 +262,6 @@ public final class EditSettlementDialog extends FreeColDialog<IndianSettlement>
             for (Unit unit : tile.getUnitList()) unit.dispose();
             is.exciseSettlement();
         }
-        for (Tile t : tiles) gui.refreshTile(t);
         return ret;
     }
 }

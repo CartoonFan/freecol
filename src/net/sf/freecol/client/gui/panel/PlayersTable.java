@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -328,7 +328,7 @@ public final class PlayersTable extends JTable {
             Nation nation = (Nation) value;
             setText(Messages.message(StringTemplate.template("countryName")
                     .add("%nation%", Messages.nameKey(nation.getId()))));
-            setIcon(new ImageIcon(gui.getImageLibrary()
+            setIcon(new ImageIcon(gui.getFixedImageLibrary()
                     .getSmallerNationImage(nation)));
             return this;
         }
@@ -606,6 +606,7 @@ public final class PlayersTable extends JTable {
                 switch (column) {
                 case ADVANTAGE_COLUMN:
                     preGameController.setNationType((NationType)value);
+                    update();
                     break;
                 case AVAILABILITY_COLUMN:
                     preGameController.setAvailable(nations.get(row),
@@ -614,6 +615,7 @@ public final class PlayersTable extends JTable {
                     break;
                 case COLOR_COLUMN:
                     preGameController.setColor(nation, (Color)value);
+                    update();
                     break;
                 case PLAYER_COLUMN:
                     if (nationOptions.getNationState(nation)

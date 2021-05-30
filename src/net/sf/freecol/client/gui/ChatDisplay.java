@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -25,7 +25,9 @@ import java.awt.Graphics2D;
 import java.awt.Image;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
+import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.ImageLibrary;
 
 
@@ -37,13 +39,40 @@ public class ChatDisplay {
     /** The number of messages getting remembered. */
     private static final int MESSAGE_COUNT = 3;
 
+    /** Left margin for the text. */
+    private static final int LEFT_MARGIN = 40;
+
+    /** Top margin for the text. */
+    private static final int TOP_MARGIN = 300;
+
     /** The amount of time before a message gets deleted (in milliseconds). */
     private static final int MESSAGE_AGE = 30000;
 
-    private final ArrayList<GUIMessage> messages;
+    /** The image library to use to draw with. */
+    private final ImageLibrary lib;
 
-    ChatDisplay() {
-        messages = new ArrayList<>(MESSAGE_COUNT);
+    /** The font to write with. */
+    private final Font font;
+    
+    /** The messages to display. */
+    private final List<GUIMessage> messages;
+
+    /** Cache the decoration images. */
+    private final Image decorationS, decorationSW, decorationSE;
+
+
+    /**
+     * Create the chat display/ container.
+     *
+     * @param freeColClient The enclosing {@code FreeColClient}.
+     */
+    public ChatDisplay(FreeColClient freeColClient) {
+        this.lib = freeColClient.getGUI().getFixedImageLibrary();
+        this.font = FontLibrary.getUnscaledFont("normal-plain-tiny");
+        this.messages = new ArrayList<>(MESSAGE_COUNT);
+        this.decorationS = ImageLibrary.getUnscaledImage("image.menuborder.shadow.s");
+        this.decorationSW = ImageLibrary.getUnscaledImage("image.menuborder.shadow.sw");
+        this.decorationSE = ImageLibrary.getUnscaledImage("image.menuborder.shadow.se");
     }
 
     /**
@@ -53,100 +82,65 @@ public class ChatDisplay {
      * @param message The message to add.
      */
     public synchronized void addMessage(GUIMessage message) {
-        if (getMessageCount() == MESSAGE_COUNT) {
-            messages.remove(0);
+        if (this.messages.size() >= MESSAGE_COUNT) {
+            this.messages.remove(0);
         }
-        messages.add(message);
+        this.messages.add(message);
     }
 
     /**
-     * Gets the message at position 'index'. The message at position 0
-     * is the oldest message and is most likely to be removed during
-     * the next call of removeOldMessages().  The higher the index of
-     * a message, the more recently it was added.
+     * Collect all messages to display, removing all older than MESSAGE_AGE.
      *
-     * @param index The index of the message to return.
-     * @return The message at position 'index'.
+     * @return A copy of any messages found.
      */
-    private GUIMessage getMessage(int index) {
-        return messages.get(index);
-    }
-
-    /**
-     * Gets the amount of message that are currently being displayed
-     * on this GUI.
-     *
-     * @return The amount of message that are currently being
-     *     displayed on this GUI.
-     */
-    private int getMessageCount() {
-        return messages.size();
+    private synchronized List<GUIMessage> prepareMessages() {
+        long currentTime = new Date().getTime();
+        boolean result = false;
+        List<GUIMessage> ret = new ArrayList<>();
+        
+        int i = 0;
+        while (i < this.messages.size()) {
+            GUIMessage m = this.messages.get(i);
+            long creationTime = m.getCreationTime();
+            if ((currentTime - creationTime) >= MESSAGE_AGE) {
+                this.messages.remove(i);
+            } else {
+                ret.add(m);
+                i++;
+            }
+        }
+        return ret;
     }
 
     /**
      * Displays the list of messages.
      * 
      * @param g The Graphics2D the messages should be displayed on.
-     * @param lib The imageLibrary to use.
      * @param size The size of the space for displaying in.
      */
-    public synchronized void display(Graphics2D g, ImageLibrary lib, Dimension size) {
-        if (getMessageCount() > 0) {
-            // Don't edit the list of messages while I'm drawing them.
-            Font font = FontLibrary.createFont(FontLibrary.FontType.NORMAL,
-                FontLibrary.FontSize.TINY, lib.getScaleFactor());
-            GUIMessage message = getMessage(0);
-            Image si = lib.getStringImage(g, message.getMessage(),
-                                          message.getColor(), font);
-            int yy = size.height - 300 - getMessageCount() * si.getHeight(null);
-            int xx = 40;
-
-            for (int i = 0; i < getMessageCount(); i++) {
-                message = getMessage(i);
-                g.drawImage(lib.getStringImage(g, message.getMessage(),
-                                               message.getColor(), font),
-                    xx, yy, null);
-                yy += si.getHeight(null);
+    public void display(Graphics2D g, Dimension size) {
+        // Return quickly if there are no messages, which is always
+        // true in single player games.
+        List<GUIMessage> msgs = prepareMessages();
+        if (msgs.isEmpty()) return;
+        
+        int yy = -1;
+        final int xx = LEFT_MARGIN;
+        for (GUIMessage m : msgs) {
+            Image si = this.lib.getStringImage(g, m.getMessage(),
+                                               m.getColor(), this.font);
+            if (yy < 0) {
+                yy = size.height - TOP_MARGIN - msgs.size() * si.getHeight(null);
             }
-            Image decoration = ImageLibrary
-                .getUnscaledImage("image.menuborder.shadow.s");
-            int width = decoration.getWidth(null);
-            for (int index = 0; index < size.width; index += width) {
-                g.drawImage(decoration, index, 0, null);
-            }
-            decoration = ImageLibrary
-                .getUnscaledImage("image.menuborder.shadow.sw");
-            g.drawImage(decoration, 0, 0, null);
-            decoration = ImageLibrary
-                .getUnscaledImage("image.menuborder.shadow.se");
-            g.drawImage(decoration, size.width - decoration.getWidth(null),
-                        0, null);
+            g.drawImage(si, xx, yy, null);
+            yy += si.getHeight(null);
         }
-    }
-
-    /**
-     * Removes all the message that are older than MESSAGE_AGE.
-     *
-     * This can be useful to see if it is necessary to refresh the
-     * screen.
-     *
-     * @return True if at least one message has been removed,
-     */
-    public synchronized boolean removeOldMessages() {
-        long currentTime = new Date().getTime();
-        boolean result = false;
-
-        int i = 0;
-        while (i < getMessageCount()) {
-            long creationTime = getMessage(i).getCreationTime();
-            if ((currentTime - creationTime) >= MESSAGE_AGE) {
-                result = true;
-                messages.remove(i);
-            } else {
-                i++;
-            }
+        int width = this.decorationS.getWidth(null);
+        for (int index = 0; index < size.width; index += width) {
+            g.drawImage(this.decorationS, index, 0, null);
         }
-        return result;
+        g.drawImage(this.decorationSW, 0, 0, null);
+        g.drawImage(this.decorationSE,
+                    size.width - this.decorationSE.getWidth(null), 0, null);
     }
-
 }

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -42,7 +42,7 @@ public class ColorCellRenderer extends JLabel implements TableCellRenderer {
      * @param useBorder Indicated whether or not a border should be drawn.
      */
     public ColorCellRenderer(boolean useBorder) {
-        if (useBorder) setBorder(Utility.COLOR_CELL_BORDER);
+        if (useBorder) setBorder(Utility.getColorCellBorder());
         // This must be done because the background displays the actual color:
         setOpaque(true);
     }

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -20,7 +20,6 @@
 package net.sf.freecol.common;
 
 import java.security.SecureRandom;
-import java.util.logging.Logger;
 
 
 /**
@@ -28,43 +27,52 @@ import java.util.logging.Logger;
  */
 public class FreeColSeed {
 
-    private static final Logger logger = Logger.getLogger(FreeColSeed.class.getName());
-
     public static final long DEFAULT_SEED = 0L;
 
+    /** The seed to use for pseudo-random number generators. */
     private static long freeColSeed = DEFAULT_SEED;
-    
+
+    /** Has a seed been set? */
+    private static boolean seeded = false;
+
 
     /**
      * Gets the seed for the PRNG.
      *
-     * @param generate Force generation of a new seed.
      * @return The seed.
      */
-    public static long getFreeColSeed(boolean generate) {
-        if (generate) {
-            freeColSeed = new SecureRandom().nextLong();
-            logger.config("Using seed: " + freeColSeed);
-        }
-        return freeColSeed;
+    public static long getFreeColSeed() {
+        return FreeColSeed.freeColSeed;
+    }
+
+    /**
+     * Has the game been seeded?
+     *
+     * @return True if a seed has been set.
+     */
+    public static boolean hasFreeColSeed() {
+        return FreeColSeed.seeded;
+    }
+    
+    /**
+     * Generate a new seed.
+     */
+    public static void generateFreeColSeed() {
+        FreeColSeed.freeColSeed = new SecureRandom().nextLong();
     }
 
     /**
      * Sets the seed for the PRNG.
      *
      * @param arg A string defining the seed.
+     * @return True if the seed was set successfully.
      */
-    public static void setFreeColSeed(String arg) {
+    public static boolean setFreeColSeed(String arg) {
         try {
             FreeColSeed.freeColSeed = Long.parseLong(arg);
+            FreeColSeed.seeded = true;
+            return true;
         } catch (NumberFormatException nfe) {}
-    }
-
-    /**
-     * Increments the seed for the PRNG.
-     */
-    public static void incrementFreeColSeed() {
-        freeColSeed = getFreeColSeed(false) + 1;
-        logger.config("Reseeded with: " + freeColSeed);
+        return false;
     }
 }

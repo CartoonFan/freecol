@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -97,7 +97,7 @@ public class UnitDetailPanel extends ColopediaGameObjectTypePanel<UnitType> {
         final UnitType type = spec.getUnitType(id);
         panel.setLayout(new MigLayout("wrap 4", "[]20[]40[]20[]"));
 
-        JLabel name = Utility.localizedHeaderLabel(type, FontLibrary.FontSize.SMALL);
+        JLabel name = Utility.localizedHeaderLabel(type, Utility.FONTSPEC_SUBTITLE);
         panel.add(name, "span, align center, wrap 40");
 
         panel.add(Utility.localizedLabel("colopedia.unit.offensivePower"));

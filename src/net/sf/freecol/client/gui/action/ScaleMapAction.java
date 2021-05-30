@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -69,8 +69,7 @@ public class ScaleMapAction extends FreeColAction {
     protected boolean shouldBeEnabled() {
         return super.shouldBeEnabled()
             && freeColClient.isMapEditor()
-            && getGame() != null
-            && getGame().getMap() != null;
+            && getMap() != null;
     }
 
 

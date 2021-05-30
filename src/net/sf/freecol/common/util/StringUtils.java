@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -207,7 +207,9 @@ public class StringUtils {
                 top = t;
             }
             if (i >= len) {
-                if (!top.isEmpty()) result.add(top);
+                if (!top.isEmpty()) {
+                    result.add(top);
+                }
                 break;
             }
             d = text.charAt(i);

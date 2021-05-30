@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -75,7 +75,8 @@ public class ReportPanel extends FreeColPanel {
         super(freeColClient, "ReportPanelUI",
               new MigLayout("wrap 1", "[fill]", "[]30[fill]30[]"));
 
-        header = Utility.localizedHeader(Messages.nameKey(key), false);
+        header = Utility.localizedHeader(Messages.nameKey(key),
+                                         Utility.FONTSPEC_TITLE);
         add(header, "cell 0 0, align center");
 
         reportPanel = new MigPanel("ReportPanelUI");
@@ -89,9 +90,7 @@ public class ReportPanel extends FreeColPanel {
         add(scrollPane, SCROLL_PANE_SIZE);
         add(okButton, "cell 0 2, tag ok");
 
-        float scale = getImageLibrary().getScaleFactor();
-        getGUI().restoreSavedSize(this,
-            new Dimension(200 + (int)(scale*850), 200 + (int)(scale*525)));
+        getGUI().restoreSavedSize(this, new Dimension(1050, 725));
     }
 
 

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -36,6 +36,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 
+import net.sf.freecol.FreeCol;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.FreeColFrame;
 
@@ -52,7 +53,7 @@ public class FreeColMenuTest implements ActionListener, ItemListener {
     private JMenuBar createMenuBar() {
         JMenuBar menuBar = null;
 
-        FreeColClient client = FreeColClient.startTestClient(null);
+        FreeColClient client = FreeCol.startTestClient(null);
 
         //Create the menu bar.
         menuBar = new InGameMenuBar(client, null);
@@ -134,10 +135,10 @@ public class FreeColMenuTest implements ActionListener, ItemListener {
     private static void createAndShowGUI() {
         //Create and set up the window.
         //JFrame frame = new JFrame("MenuDemo");
-        FreeColClient client = FreeColClient.startTestClient(null);
+        FreeColClient client = FreeCol.startTestClient(null);
         FreeColFrame frame = new FreeColFrame(client,
             GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice(),
-            null, null, true, null);
+            null, true, null);
         frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 
         //Create and set up the content pane.

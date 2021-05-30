@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -83,7 +83,8 @@ public final class WarehouseDialog extends FreeColConfirmDialog {
         scrollPane.setBorder(null);
 
         JPanel panel = new MigPanel(new MigLayout("fill, wrap 1", "", ""));
-        panel.add(Utility.localizedHeader(Messages.nameKey("warehouseDialog"), false),
+        panel.add(Utility.localizedHeader(Messages.nameKey("warehouseDialog"),
+                                          Utility.FONTSPEC_TITLE),
                   "align center");
         panel.add(scrollPane, "grow");
         panel.setSize(panel.getPreferredSize());
@@ -149,8 +150,7 @@ public final class WarehouseDialog extends FreeColConfirmDialog {
             // goods label
             Goods goods = new Goods(colony.getGame(), colony, goodsType,
                                     colony.getGoodsCount(goodsType));
-            GoodsLabel goodsLabel = new GoodsLabel(freeColClient.getGUI(),
-                                                   goods);
+            GoodsLabel goodsLabel = new GoodsLabel(freeColClient, goods);
             goodsLabel.setHorizontalAlignment(JLabel.LEADING);
             add(goodsLabel, "span 1 2");
 

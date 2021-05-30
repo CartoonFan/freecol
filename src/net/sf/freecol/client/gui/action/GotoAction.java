@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -52,7 +52,7 @@ public class GotoAction extends UnitAction {
      */
     @Override
     protected boolean shouldBeEnabled() {
-        return super.shouldBeEnabled() && !getGUI().isShowingSubPanel();
+        return super.shouldBeEnabled() && !getGUI().isPanelShowing();
     }
 
 

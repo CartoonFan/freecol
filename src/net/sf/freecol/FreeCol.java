@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -835,9 +835,9 @@ public final class FreeCol {
                 }
             }
 
-            if (line.hasOption("seed")) {
-                FreeColSeed.setFreeColSeed(line.getOptionValue("seed"));
-            }
+            boolean seeded = (line.hasOption("seed")
+                && FreeColSeed.setFreeColSeed(line.getOptionValue("seed")));
+            if (!seeded) FreeColSeed.generateFreeColSeed();
 
             if (line.hasOption("splash")) {
                 String splash = line.getOptionValue("splash");
@@ -1299,6 +1299,9 @@ public final class FreeCol {
      * @return The host name.
      */
     public static String getServerHost() {
+        try {
+            return InetAddress.getLocalHost().getHostAddress();
+        } catch (Exception e) {}
         return InetAddress.getLoopbackAddress().getHostAddress();
     }
 
@@ -1414,7 +1417,7 @@ public final class FreeCol {
     private static void setWindowSize(String arg) {
         windowSize = WINDOWSIZE_FALLBACK; // Set fallback up front
         if (arg != null) {
-            String[] xy =arg.split("[^0-9]");
+            String[] xy = arg.split("[^0-9]");
             if (xy.length == 2) {
                 try {
                     windowSize = new Dimension(Integer.parseInt(xy[0]),
@@ -1507,6 +1510,7 @@ public final class FreeCol {
             .append((save == null) ? "NONE" : save.getPath())
             .append("\n  userMods:   ")
             .append((userMods == null) ? "NONE" : userMods.getPath())
+            .append("\n  seed:       ").append(FreeColSeed.getFreeColSeed())
             .append("\n  debug:      ")
             .append(FreeColDebugger.getDebugModes());
         return sb;
@@ -1535,10 +1539,22 @@ public final class FreeCol {
             // savegame was specified on command line
         }
 
-        final FreeColClient freeColClient
-            = new FreeColClient(splashStream, fontName, guiScale);
-        freeColClient.startClient(windowSize, null, sound, introVideo,
-                                  savegame, spec);
+        new FreeColClient(splashStream, fontName,
+                          guiScale, windowSize,
+                          (String)null, sound, introVideo, savegame, spec);
+    }
+
+    /**
+     * Wrapper for the test suite to start a test client.
+     *
+     * @param spec The {@code Specification} to use in the new client.
+     * @return The new {@code FreeColClient}.
+     */
+    public static FreeColClient startTestClient(Specification spec) {
+        FreeCol.setHeadless(true);
+        return new FreeColClient((InputStream)null, (String)null,
+                                 FreeCol.GUI_SCALE_DEFAULT, (Dimension)null,
+                                 (String)null, false, false, (File)null, spec);
     }
 
     /**

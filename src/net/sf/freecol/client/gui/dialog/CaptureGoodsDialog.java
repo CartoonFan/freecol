@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -225,7 +225,8 @@ public final class CaptureGoodsDialog extends FreeColDialog<List<Goods>> {
 
         JPanel panel = new MigPanel(new MigLayout("wrap 1", "[center]",
                                                   "[]20[]20[]"));
-        panel.add(Utility.localizedHeader("captureGoodsDialog.title", true));
+        panel.add(Utility.localizedHeader("captureGoodsDialog.title",
+                                          Utility.FONTSPEC_SUBTITLE));
         panel.add(this.allButton, "split 2");
         panel.add(this.noneButton);
         panel.add(this.goodsList);

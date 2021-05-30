@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -86,7 +86,6 @@ public class SetNationMessage extends AttributeMessage {
 
         if (player != null && nation != null) {
             player.setNation(nation);
-            freeColClient.getGUI().refreshPlayersTable();
         }
     }
 

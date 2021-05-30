@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -77,7 +77,7 @@ public final class DumpCargoDialog extends FreeColDialog<List<Goods>> {
         }
 
         JPanel panel = new MigPanel(new MigLayout("wrap 1", "", ""));
-        panel.add(Utility.localizedHeader("dumpCargo", true));
+        panel.add(Utility.localizedHeader("dumpCargo", Utility.FONTSPEC_SUBTITLE));
         for (JCheckBox c : checkBoxes) panel.add(c);
         panel.setSize(panel.getPreferredSize());
 

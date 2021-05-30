@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -424,5 +424,20 @@ public class Introspector {
                NoSuchMethodException {
         return returnClass.cast(object.getClass().getMethod(methodName)
             .invoke(object));
+    }
+
+    /**
+     * Invoke an object void method by name.
+     *
+     * @param object The base object.
+     * @param methodName The name of the method to invoke.
+     * @exception IllegalAccessException if the method exists but is hidden.
+     * @exception InvocationTargetException if the target can not be invoked.
+     * @exception NoSuchMethodException if the invocation fails.
+     */
+    public static void invokeVoidMethod(Object object, String methodName)
+        throws IllegalAccessException, InvocationTargetException,
+               NoSuchMethodException {
+        object.getClass().getMethod(methodName).invoke(object);
     }
 }

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -24,6 +24,7 @@ import javax.swing.plaf.ComponentUI;
 import javax.swing.plaf.basic.BasicMenuBarUI;
 
 import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.common.util.ImageUtils;
 
 
 /**
@@ -42,8 +43,8 @@ public class FreeColMenuBarUI extends BasicMenuBarUI {
     @Override
     public void paint(java.awt.Graphics g, javax.swing.JComponent c) {
         if (c.isOpaque()) {
-            ImageLibrary.drawTiledImage("image.background.FreeColMenuBar",
-                                        g, c, null);
+            ImageUtils.drawTiledImage(ImageLibrary.getMenuBackground(),
+                                      g, c, null);
         }
     }
 

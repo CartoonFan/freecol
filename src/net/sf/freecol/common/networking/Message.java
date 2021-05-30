@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -79,6 +79,7 @@ public abstract class Message {
         ATTRIBUTE(-1), // N/A
         ANIMATION(0),  // Do animations first
         REMOVE(100),   // Do removes last
+        ADDPLAYER(4),  // Do add player before stance
         STANCE(5),     // Do stance before updates
         OWNED(20),     // Do owned changes after updates
         PARTIAL(9),    // There are a lot of partial updates
@@ -600,7 +601,7 @@ public abstract class Message {
             if (soundId != null || flush) {
                 invokeLater(freeColClient, () -> {
                         if (soundId != null) igc(fcc).sound(soundId);
-                        if (flush) igc(fcc).displayModelMessages(false);
+                        if (flush) igc(fcc).nextModelMessage();
                     });
             }
         }

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -159,7 +159,8 @@ public abstract class OptionsDialog extends FreeColDialog<OptionGroup> {
         
         this.panel = new MigPanel(new MigLayout("wrap 1, fill"));
         this.panel.add(Utility.localizedHeader(Messages.nameKey(headerKey),
-                                               false), "span, center");
+                                               Utility.FONTSPEC_TITLE),
+                       "span, center");
     }
 
     /**
@@ -224,7 +225,7 @@ public abstract class OptionsDialog extends FreeColDialog<OptionGroup> {
      */
     protected boolean save(File file) {
         if (this.group.save(file, null, true)) return true;
-        getGUI().showErrorMessage(FreeCol.badFile("error.couldNotSave", file));
+        getGUI().showErrorPanel(FreeCol.badFile("error.couldNotSave", file));
         return false;
     }
 

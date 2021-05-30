@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -128,7 +128,7 @@ public class ConfirmDeclarationDialog extends FreeColDialog<List<String>>
 
     // based on the flag of Brazil, particularly the Provisional
     // Flag of Republic of the United States of Brazil (November
-    // 15–19, 1889)
+    // 15-19, 1889)
     public static final Flag PORTUGUESE_FLAG
         = new Flag(Background.FESSES, Decoration.NONE, UnionPosition.CANTON)
         .setUnionColor(new Color(62, 64, 149))

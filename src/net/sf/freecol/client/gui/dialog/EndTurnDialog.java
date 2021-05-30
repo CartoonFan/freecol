@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -152,7 +152,8 @@ public final class EndTurnDialog extends FreeColConfirmDialog {
 
         final Player player = getMyPlayer();
 
-        JLabel header = Utility.localizedHeader(Messages.nameKey("endTurnDialog"), false);
+        JLabel header = Utility.localizedHeader(Messages.nameKey("endTurnDialog"),
+                                                Utility.FONTSPEC_TITLE);
         JTextArea text = Utility.localizedTextArea(StringTemplate
             .template("endTurnDialog.areYouSure")
             .addAmount("%number%", units.size()));
@@ -211,7 +212,7 @@ public final class EndTurnDialog extends FreeColConfirmDialog {
             if (wrapper.unit.isInEurope()) {
                 getGUI().showEuropePanel();
             } else {
-                getGUI().changeView(wrapper.unit);
+                getGUI().changeView(wrapper.unit, false);
                 if (wrapper.unit.getColony() != null) {
                     getGUI().showColonyPanel(wrapper.unit.getColony(),
                                              wrapper.unit);

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2019   The FreeCol Team
+ *  Copyright (C) 2002-2021   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -26,6 +26,7 @@ import javax.swing.plaf.ComponentUI;
 import javax.swing.plaf.basic.BasicListUI;
 
 import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.common.util.ImageUtils;
 
 
 /**
@@ -46,7 +47,8 @@ public class FreeColListUI extends BasicListUI {
 
     @Override
     public void paint(Graphics g, JComponent c) {
-        ImageLibrary.drawTiledImage("image.background.FreeColList", g, c, null);
+        ImageUtils.drawTiledImage(ImageLibrary.getListBackground(),
+                                  g, c, null);
         LAFUtilities.setProperties(g, c);
         super.paint(g, c);
     }
