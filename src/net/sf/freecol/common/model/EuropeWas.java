@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,18 +19,15 @@
 
 package net.sf.freecol.common.model;
 
-import java.util.logging.Logger;
-
-import static net.sf.freecol.common.util.CollectionUtils.*;
+import static net.sf.freecol.common.util.CollectionUtils.cachingIntComparator;
+import static net.sf.freecol.common.util.CollectionUtils.maximize;
 
 
 /**
  * Helper container to remember the Europe state prior to some
  * change, and fire off any consequent property changes.
  */
-public class EuropeWas {
-
-    private static final Logger logger = Logger.getLogger(EuropeWas.class.getName());
+public class EuropeWas extends ObjectWas {
 
     /** The Europe to remember. */
     private final Europe europe;
@@ -65,9 +62,7 @@ public class EuropeWas {
     }
 
     /**
-     * Fire any property changes resulting from actions in Europe.
-     *
-     * @return True if something changed.
+     * {@inheritDoc}
      */
     public boolean fireChanges() {
         final int newCount = europe.getUnitCount();

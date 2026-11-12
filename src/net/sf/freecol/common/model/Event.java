@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -225,17 +225,21 @@ public class Event extends FreeColSpecObjectType {
         // end @compat 0.11.3
             scoreValue = xr.getAttribute(SCORE_VALUE_TAG, 0);
     }
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void clearContainers(FreeColXMLReader xr) throws XMLStreamException {
+        super.clearContainers(xr);
+        limits = null;
+    }
 
     /**
      * {@inheritDoc}
      */
     @Override
     protected void readChildren(FreeColXMLReader xr) throws XMLStreamException {
-        // Clear containers.
-        if (xr.shouldClearContainers()) {
-            limits = null;
-        }
-        
         super.readChildren(xr);
     }        
 

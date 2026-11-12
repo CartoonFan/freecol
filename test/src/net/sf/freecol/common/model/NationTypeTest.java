@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,10 +19,8 @@
 
 package net.sf.freecol.common.model;
 
-import java.util.ArrayList;
 import java.util.List;
 
-import net.sf.freecol.common.model.Specification;
 import net.sf.freecol.common.option.OptionGroup;
 import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.util.test.FreeColTestCase;
@@ -141,7 +139,7 @@ public class NationTypeTest extends FreeColTestCase {
         Game game = getGame();
         game.changeMap(getTestMap(true));
 
-        Colony colony = getStandardColony();
+        Colony colony = createStandardColony();
         colony.getOwner().changeNationType(spec().getNationType("model.nationType.building"));
 
         List<Modifier> modifiers = toList(colony.getOwner().getModifiers("model.goods.hammers"));

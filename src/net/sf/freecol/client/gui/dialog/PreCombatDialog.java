@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -135,7 +135,7 @@ public class PreCombatDialog extends FreeColConfirmDialog {
             }
         }
 
-        Font bigFont = FontLibrary.getUnscaledFont("normal-bold-smaller");
+        Font bigFont = FontLibrary.getScaledFont("normal-bold-smaller");
         float offenceResult
             = FeatureContainer.applyModifiers(0f, turn, attackModifiers);
         JLabel finalLabel = Utility.localizedLabel("finalResult");

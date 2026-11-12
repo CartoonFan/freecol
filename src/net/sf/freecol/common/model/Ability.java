@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -34,6 +34,8 @@ public final class Ability extends Feature {
 
     public static final String TAG = "ability";
 
+    public static final String HITPOINTS_COMBAT_MODEL = "model.ability.hitpointsCombatModel";
+    
     /**
      * The ability to add the current tax as a bonus to the production
      * of bells.  Provided by the {@link FoundingFather} Thomas Paine.

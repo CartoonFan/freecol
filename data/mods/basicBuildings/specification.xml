@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    *  Copyright (C) 2017 David Lewis (highwayoflife@gmail.com)
+    *
+    *  This file is part of FreeCol.
+    *
+    *  FreeCol is free software: you can redistribute it and/or modify
+    *  it under the terms of the GNU General Public License as published by
+    *  the Free Software Foundation, either version 2 of the License, or
+    *  (at your option) any later version.
+    *
+    *  FreeCol is distributed in the hope that it will be useful,
+    *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+    *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    *  GNU General Public License for more details.
+    *
+    *  You should have received a copy of the GNU General Public License
+    *  along with FreeCol.  If not, see <http://www.gnu.org/licenses/>.
+    *
+  -->
+<freecol-specification id="basicBuildings" version="0.1">
+  <building-types>
+    <building-type id="model.building.blacksmithHouse">
+      <production>
+        <input goods-type="model.goods.ore" value="3"/>
+        <output goods-type="model.goods.tools" value="3"/>
+      </production>
+      <required-goods id="model.goods.hammers" value="32" />
+    </building-type>
+    <building-type id="model.building.tobacconistHouse">
+      <production>
+        <input goods-type="model.goods.tobacco" value="3"/>
+        <output goods-type="model.goods.cigars" value="3"/>
+      </production>
+      <required-goods id="model.goods.hammers" value="32" />
+    </building-type>
+    <building-type id="model.building.weaverHouse">
+      <production>
+        <input goods-type="model.goods.cotton" value="3"/>
+        <output goods-type="model.goods.cloth" value="3"/>
+      </production>
+      <required-goods id="model.goods.hammers" value="32" />
+    </building-type>
+    <building-type id="model.building.distillerHouse">
+      <production>
+        <input goods-type="model.goods.sugar" value="3"/>
+        <output goods-type="model.goods.rum" value="3"/>
+      </production>
+      <required-goods id="model.goods.hammers" value="32" />
+    </building-type>
+    <building-type id="model.building.furTraderHouse">
+      <production>
+        <input goods-type="model.goods.furs" value="3"/>
+        <output goods-type="model.goods.coats" value="3"/>
+      </production>
+      <required-goods id="model.goods.hammers" value="32" />
+    </building-type>
+    <building-type id="model.building.chapel" workplaces="0">
+      <production unattended="true">
+        <output goods-type="model.goods.crosses" value="1"/>
+      </production>
+      <required-goods id="model.goods.hammers" value="32" />
+    </building-type>
+  </building-types>
+
+</freecol-specification>

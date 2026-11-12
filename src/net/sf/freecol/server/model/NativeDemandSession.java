@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,26 +19,19 @@
 
 package net.sf.freecol.server.model;
 
-import java.util.logging.Logger;
-
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.Constants.IndianDemandAction;
-import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.GoodsType;
 import net.sf.freecol.common.model.Unit;
 import net.sf.freecol.common.networking.ChangeSet;
 import net.sf.freecol.common.networking.ChangeSet.See;
 import net.sf.freecol.common.networking.CloseMessage;
-import net.sf.freecol.common.networking.Message;
-import net.sf.freecol.server.model.ServerPlayer;
 
 
 /**
  * A type of session to handle trading with a native settlement.
  */
 public class NativeDemandSession extends TimedSession {
-
-    private static final Logger logger = Logger.getLogger(NativeDemandSession.class.getName());
 
     private Unit unit;
     private Colony colony;

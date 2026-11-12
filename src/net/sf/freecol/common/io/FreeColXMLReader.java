@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -48,7 +48,6 @@ import net.sf.freecol.common.model.FreeColGameObject;
 import net.sf.freecol.common.model.FreeColSpecObjectType;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.Location;
-import net.sf.freecol.common.model.Role;
 import net.sf.freecol.common.model.Specification;
 import static net.sf.freecol.common.util.CollectionUtils.*;
 import static net.sf.freecol.common.util.StringUtils.*;
@@ -687,7 +686,7 @@ public class FreeColXMLReader extends StreamReaderDelegate
         FreeColObject fco = lookup(game, attrib);
         if (fco == null && make) {
             Class<? extends FreeColGameObject> c
-                = game.getLocationClass(attrib);
+                = Game.getLocationClass(attrib);
             if (c != null) {
                 fco = makeFreeColObject(game, attributeName, c,
                                         getReadScope()==ReadScope.SERVER);
@@ -850,6 +849,9 @@ public class FreeColXMLReader extends StreamReaderDelegate
                 if (required) throw new XMLStreamException(err);
                 logger.warning(err);
             } else if (ret instanceof FreeColGameObject) {
+                // Do not set the id earlier or interning will happen
+                // by default in the constructor called from newInstance
+                ret.setId(id);
                 if (shouldIntern()) {
                     ((FreeColGameObject)ret).internId(id);
                 } else {
@@ -1049,13 +1051,19 @@ public class FreeColXMLReader extends StreamReaderDelegate
      * Should the game object type being read clear its containers before
      * reading the child elements?
      *
-     * Usually true, but not if the type is extending another one.
-     *
      * @return True if the containers should be cleared.
      */
     public boolean shouldClearContainers() {
-        return !hasAttribute(FreeColSpecObjectType.EXTENDS_TAG)
-            && !hasAttribute(FreeColSpecObjectType.PRESERVE_TAG);
+        return !getAttribute(FreeColSpecObjectType.PRESERVE_TAG, false);
+    }
+    
+    /**
+     * Should the attributes of the game object type be read?
+     *
+     * @return True if the attributes should be read.
+     */
+    public boolean shouldReadAttributes() {
+        return !getAttribute(FreeColSpecObjectType.PRESERVE_ATTRIBUTES_TAG, false);
     }
 
     /**
@@ -1083,6 +1091,38 @@ public class FreeColXMLReader extends StreamReaderDelegate
 
         return (attrib == null) ? defaultValue
             : spec.findType(attrib, returnClass);
+    }
+    
+    /**
+     * Get an initialized FreeColSpecObjectType by identifier from a stream from a
+     * specification.
+     *
+     * @param <T> The actual return type.
+     * @param spec The {@code Specification} to look in.
+     * @param attributeName the name of the attribute identifying the
+     *     {@code FreeColSpecObjectType}.
+     * @param returnClass The expected class of the return value.
+     * @param defaultValue A default value to return if the attributeName 
+     *     attribute is not present.
+     * @return The {@code FreeColSpecObjectType} found, or the
+     *     {@code defaultValue}.
+     */
+    public <T extends FreeColSpecObjectType> T getAlreadyInitializedType(Specification spec,
+        String attributeName, Class<T> returnClass, T defaultValue) {
+
+        final String id = getAttribute(attributeName, (String)null);
+        if (id == null) {
+            return defaultValue;
+        }
+        
+        final T o = spec.getAlreadyInitializedType(id, returnClass);
+        if (o == null) {
+            throw new IllegalArgumentException(String.format(
+                "The object \"%s\" of type \"%s\" was referenced from a \"%s\" attribute before being initialized.",
+                id, returnClass.getSimpleName(), attributeName
+            ));
+        }
+        return o;
     }
 
     /**

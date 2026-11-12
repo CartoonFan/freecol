@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,7 +19,11 @@
 
 package net.sf.freecol.client.gui.plaf;
 
+import java.awt.AlphaComposite;
+import java.awt.Color;
+import java.awt.Composite;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
 
 import javax.swing.JComponent;
 import javax.swing.plaf.ComponentUI;
@@ -38,7 +42,7 @@ public class FreeColTextFieldUI extends BasicTextFieldUI {
     private final JComponent c;
 
 
-    private FreeColTextFieldUI(JComponent c) {
+    protected FreeColTextFieldUI(JComponent c) {
         this.c = c;
     }
 
@@ -49,17 +53,25 @@ public class FreeColTextFieldUI extends BasicTextFieldUI {
     @Override
     public void paintSafely(Graphics g) {
         LAFUtilities.setProperties(g, c);
+     
+        if (!c.isOpaque()) {
+            final Graphics2D g2d = (Graphics2D) g;
+            final Composite origComposite = g2d.getComposite();
+            g.setColor(Color.WHITE);
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,
+                    0.38f));
+            g.fillRect(0, 0, c.getWidth(), c.getHeight());
+            g2d.setComposite(origComposite);
+        }
+        
         super.paintSafely(g);
     }
-
+    
     @Override
     public void paintBackground(java.awt.Graphics g) {
-        JComponent c = getComponent();
-
-        if (c.isOpaque()) {
-            ImageUtils.drawTiledImage(ImageLibrary.getTextFieldBackground(),
-                                      g, c, null);
-        }
+        final JComponent c = getComponent();
+        ImageUtils.drawTiledImage(ImageLibrary.getTextFieldBackground(),
+                                  g, c, null);
     }
 
 }

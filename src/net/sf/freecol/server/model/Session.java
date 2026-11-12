@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,7 +19,9 @@
 
 package net.sf.freecol.server.model;
 
-import java.util.ArrayList;
+import static net.sf.freecol.common.util.CollectionUtils.find;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +30,6 @@ import java.util.logging.Logger;
 
 import net.sf.freecol.common.model.FreeColGameObject;
 import net.sf.freecol.common.networking.ChangeSet;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 
 
 /**
@@ -97,6 +98,15 @@ public abstract class Session {
     }
     
     /**
+     * Checks if there are still unresolved sessions.
+     */
+    public static boolean waitingForSession() {
+        synchronized (allSessions) {
+            return allSessions.values().stream().anyMatch(s -> !s.isComplete());
+        }
+    }
+    
+    /**
      * Is this session complete?
      *
      * @return True if the session is complete.
@@ -132,8 +142,7 @@ public abstract class Session {
      * @param o2 Another string to uniquely identify the transaction.
      * @return A transaction session key.
      */
-    protected static String makeSessionKey(Class type,
-                                           String o1, String o2) {
+    protected static String makeSessionKey(Class<?> type, String o1, String o2) {
         return (o1.compareTo(o2) < 0)
             ? type + "-" + o1 + "-" + o2
             : type + "-" + o2 + "-" + o1;
@@ -147,9 +156,7 @@ public abstract class Session {
      * @param o2 Another {@code FreeColGameObject} involved in the session.
      * @return A transaction session key.
      */
-    protected static String makeSessionKey(Class type,
-                                           FreeColGameObject o1,
-                                           FreeColGameObject o2) {
+    protected static String makeSessionKey(Class<?> type, FreeColGameObject o1, FreeColGameObject o2) {
         return makeSessionKey(type, o1.getId(), o2.getId());
     }
 

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,11 +21,14 @@ package net.sf.freecol.client.gui.dialog;
 
 import java.awt.Color;
 import java.awt.Component;
-import java.util.logging.Logger;
+import java.awt.Dimension;
+import java.awt.event.ActionEvent;
+import java.util.List;
 
-import javax.swing.ImageIcon;
+import javax.swing.AbstractAction;
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -33,10 +36,14 @@ import javax.swing.JSpinner;
 import javax.swing.SpinnerNumberModel;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
+import net.sf.freecol.client.gui.DialogHandler;
 import net.sf.freecol.client.gui.label.GoodsLabel;
-import net.sf.freecol.client.gui.panel.*;
+import net.sf.freecol.client.gui.panel.FreeColButton.ButtonStyle;
+import net.sf.freecol.client.gui.panel.FreeColPanel;
+import net.sf.freecol.client.gui.panel.MigPanel;
+import net.sf.freecol.client.gui.panel.Utility;
+import net.sf.freecol.client.gui.panel.WrapLayout;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Ability;
 import net.sf.freecol.common.model.Colony;
@@ -49,69 +56,79 @@ import net.sf.freecol.common.option.GameOptions;
 /**
  * A dialog to display a colony warehouse.
  */
-public final class WarehouseDialog extends FreeColConfirmDialog {
-
-    private static final Logger logger = Logger.getLogger(WarehouseDialog.class.getName());
-
-    private JPanel warehousePanel;
+public final class WarehouseDialog extends FreeColPanel {
 
 
     /**
      * Creates a dialog to display the warehouse.
      *
      * @param freeColClient The {@code FreeColClient} for the game.
-     * @param frame The owner frame.
      * @param colony The {@code Colony} containing the warehouse.
+     * @param dialogHandler A {@code DialogHandler} for the dialog response.
      */
-    public WarehouseDialog(FreeColClient freeColClient, JFrame frame,
-            Colony colony) {
-        super(freeColClient, frame);
+    public WarehouseDialog(FreeColClient freeColClient, Colony colony, DialogHandler<Boolean> dialogHandler) {
+        super(freeColClient, null, new MigLayout("fill, wrap 1", "", ""));
 
-        warehousePanel = new MigPanel(new MigLayout("wrap 4"));
-        warehousePanel.setOpaque(false);
-        for (GoodsType type : freeColClient.getGame().getSpecification()
-                 .getStorableGoodsTypeList()) {
-            warehousePanel.add(new WarehouseGoodsPanel(freeColClient,
-                                                       colony, type));
-        }
+        final JPanel warehousePanel = createWarehousePanel(freeColClient, colony);
+        final JScrollPane scrollPane = scrollPaneWithHiddenBorder(warehousePanel);
 
-        JScrollPane scrollPane = new JScrollPane(warehousePanel,
-            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-            JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        scrollPane.getViewport().setOpaque(false);
-        scrollPane.setBorder(null);
-
-        JPanel panel = new MigPanel(new MigLayout("fill, wrap 1", "", ""));
-        panel.add(Utility.localizedHeader(Messages.nameKey("warehouseDialog"),
-                                          Utility.FONTSPEC_TITLE),
-                  "align center");
-        panel.add(scrollPane, "grow");
-        panel.setSize(panel.getPreferredSize());
-
-        ImageIcon icon = new ImageIcon(
-            getImageLibrary().getSmallSettlementImage(colony));
-        initializeConfirmDialog(frame, true, panel, icon, "ok", "cancel");
-    }
-
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public Boolean getResponse() {
-        Boolean result = super.getResponse();
-        if (result) {
+        final JPanel panel = new MigPanel(new MigLayout("fill, wrap 1", "", ""));
+        panel.add(Utility.localizedHeader(Messages.nameKey("warehouseDialog"), Utility.FONTSPEC_TITLE), "align center");
+        panel.add(scrollPane, "grow, gap 0 0");
+        
+        final JButton okButton = Utility.localizedButton("ok").withButtonStyle(ButtonStyle.IMPORTANT);
+        okButton.setActionCommand(OK);
+        okButton.addActionListener(event -> {
             for (Component c : warehousePanel.getComponents()) {
                 if (c instanceof WarehouseGoodsPanel) {
                     ((WarehouseGoodsPanel)c).saveSettings();
                 }
             }
-        }
-        warehousePanel = null;
-        return result;
+            getGUI().removeComponent(WarehouseDialog.this);
+            if (dialogHandler != null) {
+                dialogHandler.handle(true);
+            }
+        });
+        panel.add(okButton, "newline, span, split 2, tag ok");
+        
+        final JButton cancelButton = Utility.localizedButton("cancel");
+        final AbstractAction cancelAction = new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent ae) {
+                    getGUI().removeComponent(WarehouseDialog.this);
+                    if (dialogHandler != null) {
+                        dialogHandler.handle(false);
+                    }
+                }
+            };
+        cancelButton.addActionListener(cancelAction);
+        setEscapeAction(cancelAction);
+        panel.add(cancelButton, "tag cancel");
+        
+        add(panel, "grow");
     }
 
+    private JPanel createWarehousePanel(FreeColClient freeColClient, Colony colony) {
+        final JPanel warehousePanel = new JPanel(new WrapLayout());
+        warehousePanel.setOpaque(false);
+        final List<GoodsType> goodsTypes = freeColClient.getGame().getSpecification().getStorableGoodsTypeList();
+        int preferredWidth = 0;
+        for (GoodsType type : goodsTypes) {
+            final WarehouseGoodsPanel wgp = new WarehouseGoodsPanel(freeColClient, colony, type);
+            warehousePanel.add(wgp);
+            preferredWidth += wgp.getPreferredSize().width;
+        }
+        preferredWidth /= 4; // Four rows
+        warehousePanel.setSize(new Dimension(preferredWidth, 1));
+        return warehousePanel;
+    }
+    
+    private JScrollPane scrollPaneWithHiddenBorder(final JPanel warehousePanel) {
+        final JScrollPane scrollPane = new JScrollPane(warehousePanel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.getViewport().setOpaque(false);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
+        return scrollPane;
+    }
 
     private class WarehouseGoodsPanel extends MigPanel {
 
@@ -155,7 +172,6 @@ public final class WarehouseDialog extends FreeColConfirmDialog {
             add(goodsLabel, "span 1 2");
 
             // low level settings
-            String str;
             SpinnerNumberModel lowLevelModel
                 = new SpinnerNumberModel(exportData.getLowLevel(), 0, 100, 1);
             lowLevel = new JSpinner(lowLevelModel);
@@ -229,8 +245,7 @@ public final class WarehouseDialog extends FreeColConfirmDialog {
             exportData.setImportLevel(importLevelValue);
             exportData.setExportLevel(exportLevelValue);
             if (changed) {
-                freeColClient.getInGameController()
-                    .setGoodsLevels(colony, goodsType);
+                getFreeColClient().getInGameController().setGoodsLevels(colony, goodsType);
             }
         }
     }

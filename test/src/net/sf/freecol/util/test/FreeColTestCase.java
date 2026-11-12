@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,8 +19,11 @@
 
 package net.sf.freecol.util.test;
 
-import java.lang.reflect.Field;
+import static net.sf.freecol.common.util.CollectionUtils.find;
+import static net.sf.freecol.common.util.CollectionUtils.matchKey;
+import static net.sf.freecol.common.util.CollectionUtils.none;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,12 +32,13 @@ import java.util.Locale;
 import junit.framework.TestCase;
 import net.sf.freecol.FreeCol;
 import net.sf.freecol.common.i18n.Messages;
-import net.sf.freecol.common.io.FreeColTcFile;
+import net.sf.freecol.common.io.FreeColModFile;
+import net.sf.freecol.common.io.FreeColRules;
 import net.sf.freecol.common.model.AbstractGoods;
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.CombatModel;
 import net.sf.freecol.common.model.CombatModel.CombatOdds;
-import net.sf.freecol.common.model.CombatModel.CombatResult;
+import net.sf.freecol.common.model.CombatModel.CombatEffectType;
 import net.sf.freecol.common.model.FreeColGameObject;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.IndianSettlement;
@@ -51,7 +55,6 @@ import net.sf.freecol.common.model.UnitChangeType;
 import net.sf.freecol.common.model.UnitType;
 import net.sf.freecol.common.model.UnitTypeChange;
 import net.sf.freecol.common.model.WorkLocation;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.server.model.ServerGame;
 import net.sf.freecol.server.model.ServerIndianSettlement;
 import net.sf.freecol.server.model.ServerPlayer;
@@ -84,7 +87,7 @@ public class FreeColTestCase extends TestCase {
 
     @Override
     protected void setUp() throws Exception {
-        FreeColTcFile.loadTCs();
+        FreeColRules.loadRules();
         if (updateLocale) {
             updateLocale = false;
             Messages.loadMessageBundle(Locale.US);
@@ -137,10 +140,10 @@ public class FreeColTestCase extends TestCase {
     public static Specification getSpecification(String name) {
         Specification result = specifications.get(name);
         if (result == null) {
-            FreeColTcFile.loadTCs();
+            FreeColRules.loadRules();
             try {
-                FreeColTcFile tc = FreeColTcFile.getFreeColTcFile(name);
-                result = FreeCol.loadSpecification(tc, null, "model.difficulty.medium");
+                FreeColModFile rules = FreeColRules.getFreeColRulesFile(name);
+                result = FreeCol.loadSpecification(rules, null, "model.difficulty.medium");
                 specifications.put(name, result);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -300,8 +303,8 @@ public class FreeColTestCase extends TestCase {
      *
      * @return The {@code Colony} as specified.
      */
-    public Colony getStandardColony() {
-        return getStandardColony(1, 5, 8);
+    public Colony createStandardColony() {
+        return createStandardColony(1, 5, 8);
     }
 
     /**
@@ -311,8 +314,8 @@ public class FreeColTestCase extends TestCase {
      *     colony.  Must be >= 1.
      * @return The {@code Colony} as specified.
      */
-    public Colony getStandardColony(int numberOfSettlers) {
-        return getStandardColony(numberOfSettlers, 5, 8);
+    public Colony createStandardColony(int numberOfSettlers) {
+        return createStandardColony(numberOfSettlers, 5, 8);
     }
 
     /**
@@ -325,7 +328,7 @@ public class FreeColTestCase extends TestCase {
      * @param tileY Coordinate of tile for the colony.
      * @return The {@code Colony} as specified.
      */
-    public Colony getStandardColony(int numberOfSettlers,
+    public Colony createStandardColony(int numberOfSettlers,
                                     int tileX, int tileY) {
         Game game = getGame();
         Map map = game.getMap();
@@ -600,11 +603,7 @@ public class FreeColTestCase extends TestCase {
 
             // Add braves
             for (int i = 0; i < initialBravesInCamp; i++) {
-                Unit brave = new ServerUnit(game, camp, indianPlayer,
-                                            indianBraveType);
-                if (brave == null) {
-                    throw new RuntimeException("Null brave");
-                }
+                Unit brave = new ServerUnit(game, camp, indianPlayer, indianBraveType);
                 camp.addOwnedUnit(brave);
             }
             camp.placeSettlement(true);
@@ -659,11 +658,11 @@ public class FreeColTestCase extends TestCase {
      * Repeatedly ask the CombatModel for an attack result until it
      * gives the primary one we want (WIN, LOSE, NO_RESULT).
      */
-    public List<CombatResult> fakeAttackResult(CombatResult result,
+    public List<CombatEffectType> fakeAttackResult(CombatEffectType result,
                                                FreeColGameObject attacker,
                                                FreeColGameObject defender)
     {
-        List<CombatResult> crs;
+        List<CombatEffectType> crs;
         final double delta = 0.02;
         CombatModel combatModel = getGame().getCombatModel();
         CombatOdds combatOdds = combatModel.calculateCombatOdds(attacker, defender);
@@ -672,14 +671,14 @@ public class FreeColTestCase extends TestCase {
         List<Integer> number = new ArrayList<>();
         number.add(-1);
         do {
-            p += (result == CombatResult.WIN) ? -delta : delta;
+            p += (result == CombatEffectType.WIN) ? -delta : delta;
             if (p < 0.0 || p >= 1.0) {
                 throw new IllegalStateException("f out of range: "
                                                 + Double.toString(p));
             }
             number.set(0, (int)(Integer.MAX_VALUE * p));
             mr.setNextNumbers(number, true);
-            crs = combatModel.generateAttackResult(mr, attacker, defender);
+            crs = combatModel.generateAttackResult(mr, attacker, defender).getEffects();
         } while (crs.get(0) != result);
         return crs;
     }
@@ -691,11 +690,11 @@ public class FreeColTestCase extends TestCase {
      * @param crs The list of {@code CombatResult} to check.
      * @param results The expected {@code CombatResult}s.
      */
-    public void checkCombat(String name, List<CombatResult> crs,
-                            CombatResult... results) {
+    public void checkCombat(String name, List<CombatEffectType> crs,
+                            CombatEffectType... results) {
         int i = 0;
-        for (CombatResult cr : results) {
-            CombatResult expect = (i < crs.size()) ? crs.get(i) : null;
+        for (CombatEffectType cr : results) {
+            CombatEffectType expect = (i < crs.size()) ? crs.get(i) : null;
             if (expect != cr) break;
             i++;
         }
@@ -704,11 +703,11 @@ public class FreeColTestCase extends TestCase {
             i++;
         }
         String err = name + ", failed at " + i + ":";
-        for (CombatResult cr : results) {
+        for (CombatEffectType cr : results) {
             err += " " + cr;
         }
         err += " !=";
-        for (CombatResult cr : crs) {
+        for (CombatEffectType cr : crs) {
             err += " " + cr;
         }
         fail(err);

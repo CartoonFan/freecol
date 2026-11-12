@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 
 import java.util.ArrayList;
@@ -34,7 +33,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.swing.filechooser.FileSystemView;
 
@@ -42,7 +40,6 @@ import net.sf.freecol.FreeCol;
 import net.sf.freecol.common.FreeColException;
 import net.sf.freecol.common.debug.FreeColDebugger;
 import net.sf.freecol.common.model.StringTemplate;
-import net.sf.freecol.common.util.OSUtils;
 import static net.sf.freecol.common.util.CollectionUtils.*;
 import static net.sf.freecol.common.util.OSUtils.*;
 import static net.sf.freecol.common.util.StringUtils.*;
@@ -69,9 +66,6 @@ public class FreeColDirectories {
     private static final String BASE_DIRECTORY = "base";
 
     private static final String CLASSIC_DIRECTORY = "classic";
-
-    private static final String[] CONFIG_DIRS
-        = { "classic", "freecol" };
 
     private static final String DATA_DIRECTORY = "data";
 
@@ -113,8 +107,6 @@ public class FreeColDirectories {
 
     private static final String SEPARATOR
         = System.getProperty("file.separator");
-
-    private static final String TC_FILE_SUFFIX = ".ftc";
 
     private static final String USER_MAPS_DIRECTORY = "maps";
 
@@ -168,8 +160,8 @@ public class FreeColDirectories {
             && f.getName().endsWith("." + FreeCol.FREECOL_MAP_EXTENSION);
 
     /** Predicate to filter suitable candidates to be made into TCs. */
-    private static final Predicate<File> tcFileFilter = f ->
-        fileAnySuffix(f, TC_FILE_SUFFIX, ZIP_FILE_SUFFIX)
+    private static final Predicate<File> rulesFileFilter = f ->
+        fileAnySuffix(f, ZIP_FILE_SUFFIX)
             || directoryAllPresent(f, MOD_DESCRIPTOR_FILE_NAME,
                                    SPECIFICATION_FILE_NAME);
 
@@ -491,6 +483,14 @@ public class FreeColDirectories {
      * @return The new autosave directory, or null if not possible.
      */
     private static File deriveAutosaveDirectory() {
+        if (saveDirectory != null
+            && saveDirectory.toPath().endsWith(AUTOSAVE_DIRECTORY)) {
+            // Do not create autosave directories inside autosave
+            // directories (BR#3276).  However, having save==autosave
+            // is not a good idea either.  Lets see who that next
+            // complaint is.
+            return saveDirectory;
+        }
         return deriveDirectory(saveDirectory, AUTOSAVE_DIRECTORY);
     }
 
@@ -587,7 +587,6 @@ public class FreeColDirectories {
         }
         // TODO: Drop trace when BR#3097b is settled
         File dir = deriveAutosaveDirectory();
-        System.err.println("Autosave directory initialized to " + dir);
         setAutosaveDirectory(dir);
         userModsDirectory = new File(getUserDataDirectory(), MODS_DIRECTORY);
         if (!insistDirectory(userModsDirectory)) userModsDirectory = null;
@@ -625,9 +624,6 @@ public class FreeColDirectories {
         // Re-establish the autosave directory if it has gone away
         if (!isGoodDirectory(autosaveDirectory)) {
             File dir = deriveAutosaveDirectory();
-            // TODO: Drop trace when BR#3097b is settled
-            System.err.println("Autosave directory " + autosaveDirectory
-                + " is broken, replacing with " + dir);
             setAutosaveDirectory(dir);
         }
         return autosaveDirectory;
@@ -1055,7 +1051,8 @@ public class FreeColDirectories {
      * @return The directory to save user options in.
      */
     public static File getOptionsDirectory() {
-        File dir = new File(getUserConfigDirectory(), FreeCol.getTC());
+        // Keeping this for now, but we should probably use the "tc" instead.
+        File dir = new File(getUserConfigDirectory(), FreeCol.getRules());
         return (insistDirectory(dir)) ? dir : null;
     }
 
@@ -1158,8 +1155,6 @@ public class FreeColDirectories {
         saveDirectory = parent;
         // TODO: Drop trace when BR#3097b is settled
         File dir = deriveAutosaveDirectory();
-        System.err.println("Autosave directory " + autosaveDirectory
-                + " follows saveDirectory change to " + dir);
         setAutosaveDirectory(dir);
         return true;
     }
@@ -1200,8 +1195,8 @@ public class FreeColDirectories {
      *
      * @return A list of {@code File}s containing rulesets.
      */
-    public static List<File> getTcFileList() {
-        return collectFiles(getRulesDirectory(), tcFileFilter);
+    public static List<File> getRulesFileList() {
+        return collectFiles(getRulesDirectory(), rulesFileFilter);
     }
 
     /**

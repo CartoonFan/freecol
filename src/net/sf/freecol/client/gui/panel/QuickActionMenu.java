@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,10 +19,18 @@
 
 package net.sf.freecol.client.gui.panel;
 
+import static net.sf.freecol.common.util.CollectionUtils.find;
+import static net.sf.freecol.common.util.CollectionUtils.sort;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+import static net.sf.freecol.common.util.StringUtils.lastPart;
+import static net.sf.freecol.common.util.StringUtils.upCase;
+
 import java.awt.Font;
 import java.awt.event.ActionEvent;
-import java.util.*;
-import java.util.logging.Logger;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
@@ -34,15 +42,16 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.control.InGameController;
-import net.sf.freecol.client.gui.*;
-import net.sf.freecol.client.gui.panel.ColonyPanel.TilesPanel.ASingleTilePanel;
+import net.sf.freecol.client.gui.GUI;
+import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.client.gui.ModifierFormat;
 import net.sf.freecol.client.gui.label.GoodsLabel;
 import net.sf.freecol.client.gui.label.MarketLabel;
 import net.sf.freecol.client.gui.label.UnitLabel;
 import net.sf.freecol.client.gui.label.UnitLabel.UnitAction;
+import net.sf.freecol.client.gui.panel.ColonyPanel.TilesPanel.ASingleTilePanel;
 import net.sf.freecol.common.FreeColException;
 import net.sf.freecol.common.debug.DebugUtils;
 import net.sf.freecol.common.debug.FreeColDebugger;
@@ -57,20 +66,18 @@ import net.sf.freecol.common.model.GoodsContainer;
 import net.sf.freecol.common.model.GoodsType;
 import net.sf.freecol.common.model.Location;
 import net.sf.freecol.common.model.Player;
+import net.sf.freecol.common.model.Role;
 import net.sf.freecol.common.model.Specification;
 import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.model.Tile;
-import net.sf.freecol.common.model.Role;
 import net.sf.freecol.common.model.Unit;
-import net.sf.freecol.common.model.UnitChangeType;
-import net.sf.freecol.common.model.UnitTypeChange;
 import net.sf.freecol.common.model.Unit.UnitState;
+import net.sf.freecol.common.model.UnitChangeType;
 import net.sf.freecol.common.model.UnitLocation;
 import net.sf.freecol.common.model.UnitType;
+import net.sf.freecol.common.model.UnitTypeChange;
 import net.sf.freecol.common.model.WorkLocation;
 import net.sf.freecol.common.option.GameOptions;
-import static net.sf.freecol.common.util.CollectionUtils.*;
-import static net.sf.freecol.common.util.StringUtils.*;
 
 
 /**
@@ -79,8 +86,6 @@ import static net.sf.freecol.common.util.StringUtils.*;
  * @author Brian
  */
 public final class QuickActionMenu extends JPopupMenu {
-
-    private static final Logger logger = Logger.getLogger(QuickActionMenu.class.getName());
 
     private final FreeColClient freeColClient;
 
@@ -204,7 +209,24 @@ public final class QuickActionMenu extends JPopupMenu {
         }
 
         if (unit.hasAbility(Ability.CAN_BE_EQUIPPED)) {
-            if (addRoleItems(unitLabel)) this.addSeparator();
+            if (addRoleItems(unitLabel)) {
+                this.addSeparator();
+            }
+        }
+        
+        UnitTypeChange uc = unit.getUnitChange(UnitChangeType.CLEAR_SKILL);
+        if (uc != null) {
+            JMenuItem menuItem = Utility.localizedMenuItem("quickActionMenu.clearSpeciality",
+                new ImageIcon(gui.getFixedImageLibrary()
+                    .getTinyUnitTypeImage(uc.to)));
+            menuItem.setActionCommand(UnitAction.CLEAR_SPECIALITY.toString());
+            menuItem.addActionListener(unitLabel);
+            this.add(menuItem);
+            if (unit.getLocation() instanceof Building
+                && !((Building)unit.getLocation()).canAddType(uc.to)) {
+                menuItem.setEnabled(false);
+            }
+            this.addSeparator();
         }
     }
 
@@ -693,21 +715,6 @@ public final class QuickActionMenu extends JPopupMenu {
             }
         }
 
-        UnitTypeChange uc = unit.getUnitChange(UnitChangeType.CLEAR_SKILL);
-        if (uc != null) {
-            if (separatorNeeded) this.addSeparator();
-            JMenuItem menuItem = Utility.localizedMenuItem("quickActionMenu.clearSpeciality",
-                new ImageIcon(gui.getFixedImageLibrary()
-                    .getTinyUnitTypeImage(uc.to)));
-            menuItem.setActionCommand(UnitAction.CLEAR_SPECIALITY.toString());
-            menuItem.addActionListener(unitLabel);
-            this.add(menuItem);
-            if (unit.getLocation() instanceof Building
-                && !((Building)unit.getLocation()).canAddType(uc.to)) {
-                menuItem.setEnabled(false);
-            }
-            separatorNeeded = true;
-        }
         return separatorNeeded;
     }
 
@@ -808,6 +815,12 @@ public final class QuickActionMenu extends JPopupMenu {
                     CargoPanel cargoPanel = (CargoPanel) parentPanel;
                     cargoPanel.initialize();
                 }
+
+                if (parentPanel instanceof EuropePanel) {
+                    EuropePanel europePanel = ((EuropePanel) parentPanel);
+                    europePanel.refreshMarketPanel();
+                }
+
                 parentPanel.revalidate();
             });
         this.add(menuItem);
@@ -850,7 +863,7 @@ public final class QuickActionMenu extends JPopupMenu {
         boolean added = false;
         for (Unit unit : transform(europe.getUnits(), u ->
                 (u.isCarrier() && u.canCarryGoods() && u.canAdd(goods)))) {
-            StringTemplate template = StringTemplate.template("loadOnTo")
+            StringTemplate template = StringTemplate.template("quickActionMenu.loadOnTo")
                 .addStringTemplate("%unit%",
                     unit.getLabel(Unit.UnitLabelType.NATIONAL));
             JMenuItem menuItem = Utility.localizedMenuItem(template);

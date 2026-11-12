@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -42,7 +42,7 @@ import net.sf.freecol.common.model.AbstractGoods;
 import net.sf.freecol.common.model.AbstractUnit;
 import net.sf.freecol.common.model.BuildableType;
 import net.sf.freecol.common.model.Colony;
-import net.sf.freecol.common.model.CombatModel.CombatResult;
+import net.sf.freecol.common.model.CombatModel.CombatEffectType;
 import net.sf.freecol.common.model.Constants.IndianDemandAction;
 import net.sf.freecol.common.model.DiplomaticTrade;
 import net.sf.freecol.common.model.DiplomaticTrade.TradeStatus;
@@ -78,7 +78,6 @@ import net.sf.freecol.common.model.NationSummary;
 import net.sf.freecol.common.model.NativeTrade;
 import net.sf.freecol.common.model.NativeTradeItem;
 import net.sf.freecol.common.model.NativeTrade.NativeTradeAction;
-import net.sf.freecol.common.model.Ownable;
 import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.Player.PlayerType;
 import net.sf.freecol.common.model.Stance;
@@ -106,14 +105,12 @@ import net.sf.freecol.common.option.GameOptions;
 import net.sf.freecol.common.networking.ChangeSet;
 import net.sf.freecol.common.networking.ChangeSet.See;
 import net.sf.freecol.common.networking.ChatMessage;
-import net.sf.freecol.common.networking.DiplomacyMessage;
 import net.sf.freecol.common.networking.GameEndedMessage;
 import net.sf.freecol.common.networking.GameStateMessage;
 import net.sf.freecol.common.networking.HighScoresMessage;
 import net.sf.freecol.common.networking.InciteMessage;
 import net.sf.freecol.common.networking.IndianDemandMessage;
 import net.sf.freecol.common.networking.LootCargoMessage;
-import net.sf.freecol.common.networking.Message;
 import net.sf.freecol.common.networking.MonarchActionMessage;
 import net.sf.freecol.common.networking.NationSummaryMessage;
 import net.sf.freecol.common.networking.NativeTradeMessage;
@@ -649,7 +646,6 @@ public final class InGameController extends Controller {
         if (!valid) return;
         String messageId = action.getTextKey();
         StringTemplate template;
-        MonarchActionMessage message;
         String monarchKey = serverPlayer.getNationId();
 
         switch (action) {
@@ -1332,7 +1328,7 @@ public final class InGameController extends Controller {
     public ChangeSet combat(ServerPlayer attackerPlayer,
                             FreeColGameObject attacker,
                             FreeColGameObject defender,
-                            List<CombatResult> crs) {
+                            List<CombatEffectType> crs) {
         ChangeSet cs = new ChangeSet();
         try {
             attackerPlayer.csCombat(attacker, defender, crs, random, cs);
@@ -1450,9 +1446,9 @@ public final class InGameController extends Controller {
         // Do not use UnitType.getTargetType.
         java.util.Map<UnitType, List<Unit>> unitMap = new HashMap<>();
         for (Colony colony : transform(serverPlayer.getColonies(),
-                                       c -> c.getSoL() > 50)) {
+                                       c -> c.getSonsOfLiberty() > 50)) {
             List<Unit> allUnits = colony.getAllUnitsList();
-            int limit = (allUnits.size() + 2) * (colony.getSoL() - 50) / 100;
+            int limit = (allUnits.size() + 2) * (colony.getSonsOfLiberty() - 50) / 100;
 
             unitMap.clear();
             for (Unit unit : transform(allUnits,
@@ -1779,16 +1775,16 @@ public final class InGameController extends Controller {
      * Denounce an existing mission.
      *
      * @param serverPlayer The {@code ServerPlayer} that is denouncing.
-     * @param unit The {@code Unit} denouncing.
+     * @param sUnit The {@code ServerUnit} denouncing.
      * @param is The {@code IndianSettlement} containing the mission
      *     to denounce.
      * @return A {@code ChangeSet} encapsulating this action.
      */
     public ChangeSet denounceMission(ServerPlayer serverPlayer,
-                                     ServerUnit unit,
+                                     ServerUnit sUnit,
                                      IndianSettlement is) {
         ChangeSet cs = new ChangeSet();
-        unit.csVisit(serverPlayer, is, 0, cs);
+        sUnit.csVisit(serverPlayer, is, 0, cs);
 
         // Determine result
         Unit missionary = is.getMissionary();
@@ -1801,12 +1797,12 @@ public final class InGameController extends Controller {
         if (missionary.hasAbility(Ability.EXPERT_MISSIONARY)) {
             denounce += 0.2;
         }
-        if (unit.hasAbility(Ability.EXPERT_MISSIONARY)) {
+        if (sUnit.hasAbility(Ability.EXPERT_MISSIONARY)) {
             denounce -= 0.2;
         }
 
         if (denounce < 0.5) { // Success, remove old mission and establish ours
-            return establishMission(serverPlayer, unit, is);
+            return establishMission(serverPlayer, sUnit, is);
         }
 
         // Denounce failed
@@ -1815,7 +1811,7 @@ public final class InGameController extends Controller {
         cs.addMessage(serverPlayer,
             new ModelMessage(MessageType.FOREIGN_DIPLOMACY,
                              "indianSettlement.mission.noDenounce",
-                             serverPlayer, unit)
+                             serverPlayer, sUnit)
                 .addStringTemplate("%nation%", owner.getNationLabel()));
         cs.addMessage(enemy,
             new ModelMessage(MessageType.FOREIGN_DIPLOMACY,
@@ -1826,9 +1822,9 @@ public final class InGameController extends Controller {
                     is.getLocationLabelFor(enemy))
                 .addStringTemplate("%nation%", owner.getNationLabel()));
         cs.add(See.perhaps().always(serverPlayer),
-               (FreeColGameObject)unit.getLocation());
-        ((ServerUnit)unit).csRemove(See.perhaps().always(serverPlayer),
-            unit.getLocation(), cs);//-vis(serverPlayer)
+               (FreeColGameObject)sUnit.getLocation());
+        sUnit.csRemove(See.perhaps().always(serverPlayer),
+                       sUnit.getLocation(), cs);//-vis(serverPlayer)
         serverPlayer.invalidateCanSeeTiles();//+vis(serverPlayer)
 
         // Others can see missionary disappear
@@ -2044,7 +2040,23 @@ public final class InGameController extends Controller {
                     : current.getName()) + "'s!");
         }
 
-        ChangeSet cs = new ChangeSet();
+        final ChangeSet cs = new ChangeSet();
+        if (debugOnlyAITurns > 0 && !serverPlayer.isAI()) {
+            Session.completeAll(cs);
+        }
+        
+        /*
+         * XXX: A hack for ensuring that sessions are handled in the same turn. We
+         *      should look into a better solution.
+         */
+        try {
+            while (Session.waitingForSession()) {
+                Thread.sleep(1000);
+            }
+        } catch (InterruptedException e) {
+            logger.log(Level.SEVERE, "Waiting for end session interrupted.", e);
+        }
+
         for (;;) {
             current.csEndTurn(cs);
             logger.finest("Ending turn for " + current.getName());
@@ -2246,6 +2258,7 @@ public final class InGameController extends Controller {
                         serverPlayer.exploreForUnit(theFlyingDutchman));
         serverPlayer.setDead(false);
         serverPlayer.changePlayerType(PlayerType.UNDEAD);
+        serverPlayer.addAbility(new Ability(Ability.UNDEAD));
         serverPlayer.invalidateCanSeeTiles();//+vis(serverPlayer)
 
         // No one likes the undead.
@@ -2318,25 +2331,25 @@ public final class InGameController extends Controller {
      * Establish a new mission.
      *
      * @param serverPlayer The {@code ServerPlayer} that is establishing.
-     * @param unit The missionary {@code Unit}.
+     * @param sUnit The missionary {@code ServerUnit}.
      * @param is The {@code IndianSettlement} to establish at.
      * @return A {@code ChangeSet} encapsulating this action.
      */
     public ChangeSet establishMission(ServerPlayer serverPlayer,
-                                      ServerUnit unit,
+                                      ServerUnit sUnit,
                                       IndianSettlement is) {
         ChangeSet cs = new ChangeSet();
-        unit.csVisit(serverPlayer, is, 0, cs);
+        sUnit.csVisit(serverPlayer, is, 0, cs);
 
         // Result depends on tension wrt this settlement.
         // Establish if at least not angry.
         final Tension tension = is.getAlarm(serverPlayer);
-        Location loc = unit.getLocation();
+        Location loc = sUnit.getLocation();
         switch (tension.getLevel()) {
         case HATEFUL: case ANGRY:
             cs.add(See.perhaps().always(serverPlayer), (FreeColGameObject)loc);
-            ((ServerUnit)unit).csRemove(See.perhaps().always(serverPlayer),
-                                        loc, cs);//-vis(serverPlayer)
+            sUnit.csRemove(See.perhaps().always(serverPlayer),
+                           loc, cs);//-vis(serverPlayer)
             serverPlayer.invalidateCanSeeTiles();//+vis(serverPlayer)
             break;
 
@@ -2345,9 +2358,9 @@ public final class InGameController extends Controller {
             if (is.hasMissionary()) sis.csKillMissionary(Boolean.FALSE, cs);
 
             // Always show the tile the unit was on
-            cs.add(See.perhaps().always(serverPlayer), unit.getTile());
+            cs.add(See.perhaps().always(serverPlayer), sUnit.getTile());
 
-            sis.csChangeMissionary(unit, cs);//+vis(serverPlayer)
+            sis.csChangeMissionary(sUnit, cs);//+vis(serverPlayer)
             break;
         }
 
@@ -2356,7 +2369,7 @@ public final class InGameController extends Controller {
         cs.addMessage(serverPlayer,
             new ModelMessage(MessageType.FOREIGN_DIPLOMACY,
                              "indianSettlement.mission." + tension.getKey(),
-                             serverPlayer, unit)
+                             serverPlayer, sUnit)
                 .addStringTemplate("%nation%", nation));
 
         // Others can see missionary disappear and settlement acquire
@@ -2597,12 +2610,12 @@ public final class InGameController extends Controller {
      * Learn a skill at an IndianSettlement.
      *
      * @param serverPlayer The {@code ServerPlayer} that is learning.
-     * @param unit The {@code Unit} that is learning.
+     * @param sUnit The {@code ServerUnit} that is learning.
      * @param is The {@code IndianSettlement} to learn from.
      * @return A {@code ChangeSet} encapsulating this action.
      */
     public ChangeSet learnFromIndianSettlement(ServerPlayer serverPlayer,
-                                               ServerUnit unit,
+                                               ServerUnit sUnit,
                                                IndianSettlement is) {
         // Sanity checks.
         final Specification spec = getGame().getSpecification();
@@ -2611,33 +2624,33 @@ public final class InGameController extends Controller {
             return serverPlayer.clientError("No skill to learn at "
                 + is.getName());
         }
-        if (unit.getUnitChange(UnitChangeType.NATIVES, skill) == null) {
-            return serverPlayer.clientError("Unit " + unit
+        if (sUnit.getUnitChange(UnitChangeType.NATIVES, skill) == null) {
+            return serverPlayer.clientError("Unit " + sUnit
                 + " can not learn skill " + skill + " at " + is.getName());
         }
 
         // Try to learn
         ChangeSet cs = new ChangeSet();
-        unit.setMovesLeft(0);
+        sUnit.setMovesLeft(0);
         // csVisit has already been called in askLearnSkill
-        Location loc = unit.getLocation();
+        Location loc = sUnit.getLocation();
         switch (is.getAlarm(serverPlayer).getLevel()) {
         case HATEFUL: // Killed, might be visible to other players.
             cs.add(See.perhaps().always(serverPlayer), (FreeColGameObject)loc);
-            ((ServerUnit)unit).csRemove(See.perhaps().always(serverPlayer),
-                                        loc, cs);//-vis(serverPlayer)
+            sUnit.csRemove(See.perhaps().always(serverPlayer),
+                           loc, cs);//-vis(serverPlayer)
             serverPlayer.invalidateCanSeeTiles();//+vis(serverPlayer)
             break;
         case ANGRY: // Learn nothing, not even a pet update
-            cs.addPartial(See.only(serverPlayer), unit,
-                "movesLeft", String.valueOf(unit.getMovesLeft()));
+            cs.addPartial(See.only(serverPlayer), sUnit,
+                "movesLeft", String.valueOf(sUnit.getMovesLeft()));
             break;
         default:
             // Teach the unit, and expend the skill if necessary.
             // Do a full information update as the unit is in the settlement.
-            unit.changeType(skill);//-vis(serverPlayer)
+            sUnit.changeType(skill);//-vis(serverPlayer)
             serverPlayer.invalidateCanSeeTiles();//+vis(serverPlayer)
-            cs.add(See.perhaps(), unit);
+            cs.add(See.perhaps(), sUnit);
             if (!is.isCapital()
                 && !(is.hasMissionary(serverPlayer)
                     && spec.getBoolean(GameOptions.ENHANCED_MISSIONARIES))) {
@@ -3475,12 +3488,12 @@ public final class InGameController extends Controller {
      * Speak to the chief at a native settlement.
      *
      * @param serverPlayer The {@code ServerPlayer} that is scouting.
-     * @param unit The scout {@code Unit}.
+     * @param sUnit The scout {@code ServerUnit}.
      * @param is The {@code IndianSettlement} to scout.
      * @return A {@code ChangeSet} encapsulating this action.
      */
     public ChangeSet scoutSpeakToChief(ServerPlayer serverPlayer,
-                                       ServerUnit unit, IndianSettlement is) {
+                                       ServerUnit sUnit, IndianSettlement is) {
         ChangeSet cs = new ChangeSet();
         Tile tile = is.getTile();
         boolean tileDirty = is.setVisited(serverPlayer);
@@ -3489,10 +3502,10 @@ public final class InGameController extends Controller {
         // Hateful natives kill the scout right away.
         Tension tension = is.getAlarm(serverPlayer);
         if (tension.getLevel() == Tension.Level.HATEFUL) {
-            Location loc = unit.getLocation();
+            Location loc = sUnit.getLocation();
             cs.add(See.perhaps().always(serverPlayer), (FreeColGameObject)loc);
-            ((ServerUnit)unit).csRemove(See.perhaps().always(serverPlayer),
-                                        loc, cs);//-vis(serverPlayer)
+            sUnit.csRemove(See.perhaps().always(serverPlayer),
+                           loc, cs);//-vis(serverPlayer)
             serverPlayer.invalidateCanSeeTiles();//+vis(serverPlayer)
             result = "die";
         } else {
@@ -3500,17 +3513,17 @@ public final class InGameController extends Controller {
             List<UnitType> scoutTypes = getGame().getSpecification()
                 .getUnitTypesWithAbility(Ability.EXPERT_SCOUT);
             UnitType scoutSkill = first(scoutTypes);
-            int radius = unit.getLineOfSight();
+            int radius = sUnit.getLineOfSight();
             UnitType skill = is.getLearnableSkill();
             int rnd = randomInt(logger, "scouting", random, 10);
             if (is.hasAnyScouted()) {
                 // Do nothing if already spoken to.
                 result = "nothing";
-            } else if (scoutSkill != null && unit.getType() != scoutSkill
+            } else if (scoutSkill != null && sUnit.getType() != scoutSkill
                 && ((skill != null && skill.hasAbility(Ability.EXPERT_SCOUT))
                     || rnd == 0)) {
                 // If the scout can be taught to be an expert it will be.
-                unit.changeType(scoutSkill);//-vis(serverPlayer)
+                sUnit.changeType(scoutSkill);//-vis(serverPlayer)
                 serverPlayer.invalidateCanSeeTiles();//+vis(serverPlayer)
                 result = "expert";
             } else {
@@ -3522,7 +3535,7 @@ public final class InGameController extends Controller {
                     radius = Math.max(radius, IndianSettlement.TALES_RADIUS);
                     result = "tales";
                 } else {
-                    if (unit.hasAbility(Ability.EXPERT_SCOUT)) {
+                    if (sUnit.hasAbility(Ability.EXPERT_SCOUT)) {
                         gold = (gold * 11) / 10; // FIXME: magic number
                     }
                     serverPlayer.modifyGold(gold);
@@ -3535,7 +3548,7 @@ public final class InGameController extends Controller {
             }
 
             // Have now spoken to the chief.
-            unit.csVisit(serverPlayer, is, 1, cs);
+            sUnit.csVisit(serverPlayer, is, 1, cs);
             tileDirty = true;
 
             // Update settlement tile with new information, and any
@@ -3547,12 +3560,12 @@ public final class InGameController extends Controller {
 
             // If the unit was promoted, update it completely, otherwise just
             // update moves and possibly gold+score.
-            unit.setMovesLeft(0);
+            sUnit.setMovesLeft(0);
             if ("expert".equals(result)) {
-                cs.add(See.perhaps(), unit);
+                cs.add(See.perhaps(), sUnit);
             } else {
-                cs.addPartial(See.only(serverPlayer), unit,
-                    "movesLeft", String.valueOf(unit.getMovesLeft()));
+                cs.addPartial(See.only(serverPlayer), sUnit,
+                    "movesLeft", String.valueOf(sUnit.getMovesLeft()));
             }
         }
         if (tileDirty) {
@@ -3562,7 +3575,7 @@ public final class InGameController extends Controller {
 
         // Always add result.
         cs.add(See.only(serverPlayer),
-               new ScoutSpeakToChiefMessage(unit, is, result));
+               new ScoutSpeakToChiefMessage(sUnit, is, result));
 
         // Other players may be able to see unit disappearing, or
         // learning.
@@ -3805,6 +3818,9 @@ public final class InGameController extends Controller {
                 + serverPlayer.getGold() + " < " + price
                 + ") to train " + type);
         }
+        if (!type.isAvailableTo(serverPlayer)) {
+            return serverPlayer.clientError("Unit type is not available for the player.");
+        }
 
         final Game game = getGame();
         final Specification spec = game.getSpecification();
@@ -3881,11 +3897,10 @@ public final class InGameController extends Controller {
     public ChangeSet updateTradeRoute(ServerPlayer serverPlayer,
                                       TradeRoute tradeRoute) {
         final Game game = getGame();
-        String name;
         StringTemplate fail;
         TradeRoute tr;
         if (tradeRoute == null || tradeRoute.getId() == null
-            || (name = tradeRoute.getName()) == null) {
+            || tradeRoute.getName() == null) {
             return serverPlayer.clientError("Bogus route");
         } else if ((fail = tradeRoute.verify()) != null) {
             return serverPlayer.clientError(Messages.message(fail));

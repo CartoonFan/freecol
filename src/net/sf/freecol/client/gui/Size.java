@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -31,7 +31,7 @@ public enum Size {
     LARGE  (1.25f, 20f),
     BIG    (1.5f,  24f),
     HUGE   (1.75f, 32f),
-    MAX    (2.0f,  40f);
+    MAX    (2f,  40f);
 
     /** The scaling value to use for images. */
     private final float image;
@@ -52,18 +52,18 @@ public enum Size {
     }
 
     public Size scaled(float f) {
-        int val = this.ordinal() + (int)Math.round(4 * (f - 1.0f));
+        int val = this.ordinal() + Math.round(4 * (f - 1.0f));
         return (val < 0 || val >= Size.MAX.ordinal()) ? null
-            : this.values()[val];
+            : Size.values()[val];
     }
     
     public Size up() {
         return (this == Size.MAX) ? Size.MAX
-            : this.values()[this.ordinal() + 1];
+            : Size.values()[this.ordinal() + 1];
     }
 
     public Size down() {
         return (this == Size.TINY) ? Size.TINY
-            : this.values()[this.ordinal() - 1];
+            : Size.values()[this.ordinal() - 1];
     }
 };

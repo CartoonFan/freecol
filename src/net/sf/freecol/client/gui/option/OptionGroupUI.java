@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -20,14 +20,16 @@
 package net.sf.freecol.client.gui.option;
 
 import java.awt.Color;
-import java.awt.Dimension;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
 import javax.swing.JTree;
 import javax.swing.KeyStroke;
 import javax.swing.event.TreeSelectionEvent;
@@ -35,9 +37,10 @@ import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreeNode;
+import javax.swing.tree.TreePath;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.panel.MigPanel;
 import net.sf.freecol.common.i18n.Messages;
@@ -74,26 +77,19 @@ public final class OptionGroupUI extends MigPanel
          * {@inheritDoc}
          */
         @Override
-        public Dimension getPreferredSize() {
-            return new Dimension(200, super.getPreferredSize().height);
-        }
-
-        /**
-         * {@inheritDoc}
-         */
-        @Override
         public String convertValueToText(Object value, boolean selected,
                                          boolean expanded, boolean leaf,
                                          int row, boolean hasFocus) {
             DefaultMutableTreeNode node = (DefaultMutableTreeNode)value;
-            Option option = (Option)node.getUserObject();
+            Option<?> option = (Option<?>) node.getUserObject();
             return Messages.getName(option.getId());
         }
     };
             
     private final List<OptionUpdater> optionUpdaters = new ArrayList<>();
 
-    private final HashMap<String, OptionUI> optionUIs = new HashMap<>();
+    private final HashMap<String, OptionUI<?>> optionUIs = new HashMap<>();
+    private final Map<String, TreeNode[]> optionGroupSelectionPath = new HashMap<>(); 
 
     private final JPanel detailPanel;
 
@@ -115,9 +111,7 @@ public final class OptionGroupUI extends MigPanel
      * @param editable Is the group editable.
      */
     public OptionGroupUI(GUI gui, OptionGroup group, boolean editable) {
-        super("ReportPanelUI",
-            new MigLayout("fill", "[200:]unrelated[550:, grow, fill]",
-                          "[top]"));
+        super("ReportPanelUI", new MigLayout("fill, insets 0"));
 
         this.gui = gui;
         this.group = group;
@@ -130,14 +124,40 @@ public final class OptionGroupUI extends MigPanel
         tree.setOpaque(false);
         tree.addTreeSelectionListener(this);
 
-        add(tree);
-        detailPanel = new MigPanel(new MigLayout("wrap 2", "[fill]related[fill]"));
-        detailPanel.setOpaque(false);
-        add(detailPanel, "grow");
+        detailPanel = new MigPanel(new MigLayout("wrap 2, fillx", "[fill]related[fill]"));
+        detailPanel.setOpaque(true);
+        
+        final MigPanel treePanel = new MigPanel(new MigLayout("fill"));
+        treePanel.add(tree, "grow");
+        
+        final JScrollPane treeScrollPane =  new JScrollPane(treePanel,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        treeScrollPane.setOpaque(false);
+        
+        final JScrollPane detailsScrollPane =  new JScrollPane(detailPanel,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        detailsScrollPane.setOpaque(false);
+            
+        final JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, treeScrollPane, detailsScrollPane);
+        
+        for (int i=0; i<tree.getRowCount(); i++) {
+            tree.expandRow(i);
+        }
+        
+        add(splitPane, "grow");
     }
 
     public JTree getTree() {
         return tree;
+    }
+    
+    public void selectOption(String key) {
+        final TreeNode[] path = optionGroupSelectionPath.get(key);
+        if (path != null) {
+            tree.setSelectionPath(new TreePath(path));
+        }
     }
 
     /**
@@ -148,13 +168,14 @@ public final class OptionGroupUI extends MigPanel
      * @param parent The tree to build onto.
      */
     private void buildTree(OptionGroup group, DefaultMutableTreeNode parent) {
-        for (Option option : group.getOptions()) {
+        for (Option<?> option : group.getOptions()) {
             if (option instanceof OptionGroup) {
                 if (!((OptionGroup)option).isVisible()) continue;
                 DefaultMutableTreeNode branch
                     = new DefaultMutableTreeNode(option);
                 parent.add(branch);
                 buildTree((OptionGroup) option, branch);
+                optionGroupSelectionPath.put(option.getId(), branch.getPath());
             }
         }
     }
@@ -174,7 +195,7 @@ public final class OptionGroupUI extends MigPanel
         if (node != null) {
             if (node.isLeaf()) {
                 OptionGroup group = (OptionGroup) node.getUserObject();
-                for (Option option : group.getOptions()) {
+                for (Option<?> option : group.getOptions()) {
                     addOptionUI(option, editable && group.isEditable());
                 }
             } else {
@@ -198,18 +219,30 @@ public final class OptionGroupUI extends MigPanel
             }
         }
     }
-
-    public OptionUI getOptionUI(String key) {
+    
+    public OptionUI<?> getOptionUI(String key) {
         return optionUIs.get(key);
     }
+    
+    public <T extends OptionUI<?>> T getOptionUI(String key, Class<T> clazz) {
+        return clazz.cast(optionUIs.get(key));
+    }
 
-    private void addOptionUI(Option option, boolean editable) {
-        OptionUI ui = optionUIs.get(option.getId());
+    private void addOptionUI(Option<?> option, boolean editable) {
+        OptionUI<?> ui = optionUIs.get(option.getId());
         if (ui == null) {
             ui = OptionUI.getOptionUI(gui, option, editable);
             if (ui == null) {
                 logger.warning("Unknown option type: " + option.toString());
                 return;
+            }
+            if (option.getEnabledBy() != null) {
+                BooleanOptionUI enabler = (BooleanOptionUI) optionUIs.get(option.getEnabledBy());
+                final OptionUI<?> theUI = ui;
+                enabler.addActionListener((e) -> {
+                    theUI.initialize();
+                });
+                ui.setEnabler(enabler);
             }
             if (ui instanceof FreeColActionUI) {
                 ((FreeColActionUI)ui).setOptionGroupUI(this);

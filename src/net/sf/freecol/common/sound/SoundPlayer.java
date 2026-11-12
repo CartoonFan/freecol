@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,10 +19,14 @@
 
 package net.sf.freecol.common.sound;
 
+import static net.sf.freecol.common.util.Utils.delay;
+
 import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -41,7 +45,6 @@ import net.sf.freecol.FreeCol;
 import net.sf.freecol.common.option.AudioMixerOption;
 import net.sf.freecol.common.option.AudioMixerOption.MixerWrapper;
 import net.sf.freecol.common.option.PercentageOption;
-import static net.sf.freecol.common.util.Utils.*;
 
 
 /**
@@ -65,7 +68,7 @@ public final class SoundPlayer {
         private static final int WAIT_TIMEOUT = 100; // 100ms
 
         /** A buffer to hold data to be written to the mixer. */
-        private final byte[] data = new byte[8192];
+        private final byte[] data = new byte[16384];
 
         /** A playlist of files queued to be played. */
         private final List<File> playList = new ArrayList<>();
@@ -89,6 +92,9 @@ public final class SoundPlayer {
          */
         public void stopPlaying() {
             this.playDone = true;
+            synchronized (this.playList) {
+                this.playList.clear();
+            }
         }
 
         /**
@@ -122,11 +128,21 @@ public final class SoundPlayer {
          * @exception IOException if unable to read or write the sound data.
          */
         private boolean playSound(File sound) throws IOException {
+            setVolume(volumeOption.getValue());
+            
             boolean ret = false;
+            PropertyChangeListener volumeListener = null;
             try (AudioInputStream in = getAudioInputStream(sound)) {
-                SourceDataLine line = openLine(in.getFormat(), getMixer(),
-                                               data.length);
-                if (line == null) return false;
+                final SourceDataLine line = openLine(in.getFormat(), getMixer(), data.length);
+                if (line == null) {
+                    return false;
+                }
+                
+                volumeListener = (PropertyChangeEvent e) -> {
+                    setVolume((Integer) e.getNewValue());
+                    changeVolume(line, getVolume());
+                };
+                volumeOption.addPropertyChangeListener(volumeListener);
                 changeVolume(line, getVolume());
                 try {
                     this.playDone = false;
@@ -146,6 +162,10 @@ public final class SoundPlayer {
                 logger.log(Level.WARNING, "Can not open "
                     + sound + " as audio stream", ioe);
                 return false;
+            } finally {
+                if (volumeListener != null) {
+                    volumeOption.removePropertyChangeListener(volumeListener);
+                }
             }
             return ret;
         }
@@ -160,8 +180,17 @@ public final class SoundPlayer {
             for (;;) {
                 File sound = remove();
                 if (sound == null) {
-                    delay(WAIT_TIMEOUT, null);
-                } else {
+                    if (!defaultPlayList.isEmpty()) {
+                        synchronized (this.playList) {
+                            this.playList.addAll(defaultPlayList);
+                            Collections.shuffle(this.playList);
+                        }
+                        sound = remove();
+                    } else {
+                        delay(WAIT_TIMEOUT, null);
+                    }
+                }
+                if (sound != null) {
                     try {
                         playSound(sound);
                     } catch (IOException e) {
@@ -181,6 +210,10 @@ public final class SoundPlayer {
 
     /** The subthread that actually writes sound data to the mixer. */
     private final SoundPlayerThread soundPlayerThread;
+    
+    private List<File> defaultPlayList = new ArrayList<>();
+    
+    private PercentageOption volumeOption;
 
 
     /**
@@ -196,10 +229,15 @@ public final class SoundPlayer {
                 setMixer((MixerWrapper)e.getNewValue());
             });
         setVolume(volumeOption.getValue());
-        volumeOption.addPropertyChangeListener((PropertyChangeEvent e) -> {
-                setVolume((Integer)e.getNewValue());
-            });
+
+        this.volumeOption = volumeOption;
         this.soundPlayerThread = new SoundPlayerThread();
+        
+        /*
+         * A high thread priority is necessary in order to avoid stuttering on
+         * slow systems.
+         */
+        soundPlayerThread.setPriority(Thread.MAX_PRIORITY);
         this.soundPlayerThread.start();
     }
 
@@ -260,6 +298,17 @@ public final class SoundPlayer {
         if (getMixer() == null) return false; // Fail faster.
         this.soundPlayerThread.add(file);
         return true;
+    }
+    
+    /**
+     * Defines the default playlist.
+     *
+     * @param file The {@code File}s to be played when
+     *      nothing else is being played.
+     */
+    public void setDefaultPlaylist(File... files) {
+        final List<File> newDefaultPlayList = new ArrayList<>(List.of(files));
+        this.defaultPlayList = newDefaultPlayList;
     }
 
     /**

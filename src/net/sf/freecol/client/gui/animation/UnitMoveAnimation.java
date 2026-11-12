@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,27 +19,23 @@
 
 package net.sf.freecol.client.gui.animation;
 
+import static net.sf.freecol.common.util.CollectionUtils.makeUnmodifiableList;
+import static net.sf.freecol.common.util.Utils.delay;
+import static net.sf.freecol.common.util.Utils.now;
+
 import java.awt.Point;
-import java.lang.Math;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.logging.Logger;
 
 import javax.swing.JLabel;
 
 import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.common.model.Tile;
 import net.sf.freecol.common.model.Unit;
-import static net.sf.freecol.common.util.CollectionUtils.*;
-import static net.sf.freecol.common.util.Utils.*;
 
 
 /**
  * Class for the animation of units movement.
  */
 final class UnitMoveAnimation extends Animation {
-
-    private static final Logger logger = Logger.getLogger(UnitMoveAnimation.class.getName());
 
     /**
      * Display delay between one frame and another, in milliseconds.

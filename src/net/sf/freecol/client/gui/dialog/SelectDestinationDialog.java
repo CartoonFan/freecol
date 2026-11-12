@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -18,6 +18,15 @@
  */
 
 package net.sf.freecol.client.gui.dialog;
+
+import static net.sf.freecol.common.model.Constants.INFINITY;
+import static net.sf.freecol.common.util.CollectionUtils.alwaysTrue;
+import static net.sf.freecol.common.util.CollectionUtils.find;
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.flatten;
+import static net.sf.freecol.common.util.CollectionUtils.isNotNull;
+import static net.sf.freecol.common.util.CollectionUtils.toList;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
 
 import java.awt.Dimension;
 import java.awt.event.ItemEvent;
@@ -49,7 +58,6 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.ChoiceItem;
 import net.sf.freecol.client.gui.ImageLibrary;
@@ -59,9 +67,7 @@ import net.sf.freecol.client.gui.plaf.FreeColComboBoxRenderer;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Ability;
 import net.sf.freecol.common.model.Colony;
-import static net.sf.freecol.common.model.Constants.*;
 import net.sf.freecol.common.model.Europe;
-import net.sf.freecol.common.model.FreeColObject;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.Goods;
 import net.sf.freecol.common.model.GoodsType;
@@ -69,11 +75,9 @@ import net.sf.freecol.common.model.IndianSettlement;
 import net.sf.freecol.common.model.Location;
 import net.sf.freecol.common.model.Map;
 import net.sf.freecol.common.model.Market;
-import net.sf.freecol.common.model.Nation;
 import net.sf.freecol.common.model.PathNode;
 import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.Settlement;
-import net.sf.freecol.common.model.Specification;
 import net.sf.freecol.common.model.Stance;
 import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.model.Unit;
@@ -82,13 +86,12 @@ import net.sf.freecol.common.model.UnitType;
 import net.sf.freecol.common.model.pathfinding.GoalDeciders.MultipleAdjacentDecider;
 import net.sf.freecol.common.resources.ResourceManager;
 import net.sf.freecol.common.util.LogBuilder;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 
 
 /**
  * Select a location as the destination for a given unit.
  */
-public final class SelectDestinationDialog extends FreeColDialog<Location>
+public final class SelectDestinationDialog extends DeprecatedFreeColDialog<Location>
     implements ListSelectionListener {
 
     @SuppressWarnings("unused")

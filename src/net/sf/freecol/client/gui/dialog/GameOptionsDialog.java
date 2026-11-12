@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,14 +19,17 @@
 
 package net.sf.freecol.client.gui.dialog;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.swing.JButton;
 import javax.swing.JFrame;
 
 import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.client.gui.dialog.*;
 import net.sf.freecol.client.gui.option.BooleanOptionUI;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.io.FreeColDirectories;
 import net.sf.freecol.common.option.GameOptions;
-import net.sf.freecol.common.option.OptionGroup;
 
 
 /**
@@ -44,11 +47,9 @@ public final class GameOptionsDialog extends OptionsDialog {
      */
     public GameOptionsDialog(FreeColClient freeColClient, JFrame frame,
                              boolean editable) {
-        super(freeColClient, frame, editable,
+        super(freeColClient,
               freeColClient.getGame().getGameOptions(), GameOptions.TAG,
-              FreeColDirectories.GAME_OPTIONS_FILE_NAME, GameOptions.TAG);
-
-        if (isEditable()) loadDefaultOptions();
+              FreeColDirectories.GAME_OPTIONS_FILE_NAME, GameOptions.TAG, editable);
 
         // Set special cases
         // Disable victory option "All humans defeated"
@@ -61,22 +62,16 @@ public final class GameOptionsDialog extends OptionsDialog {
                 comp.getComponent().setEnabled(false);
             }
         }
-
-        initialize(frame, choices());
-    }
-
-
-    // Override OptionsDialog
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public OptionGroup getResponse() {
-        OptionGroup value = super.getResponse();
-        if (value != null) {
-            if (isEditable()) saveDefaultOptions();
+        
+        final List<JButton> buttons = new ArrayList<>();
+        if (isEditable()) {
+            final JButton resetButton = Utility.localizedButton("reset");
+            resetButton.addActionListener(e -> {
+                getOptionUI().reset();
+            });
+            buttons.add(resetButton);
         }
-        return value;
+
+        initialize(frame, buttons);
     }
 }

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,22 +19,16 @@
 
 package net.sf.freecol.common.model;
 
-import java.util.Iterator;
+import static net.sf.freecol.common.util.CollectionUtils.count;
 
-import net.sf.freecol.server.model.ServerGame;
 import net.sf.freecol.server.model.ServerPlayer;
 import net.sf.freecol.server.model.ServerUnit;
 import net.sf.freecol.util.test.FreeColTestCase;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 
 
 public class PlayerTest extends FreeColTestCase {
     
-    private static final UnitType freeColonist
-        = spec().getUnitType("model.unit.freeColonist");
-    private static final UnitType galleonType
-        = spec().getUnitType("model.unit.galleon");
-
+    private static final UnitType freeColonist = spec().getUnitType("model.unit.freeColonist");
 
     public void testUnits() {
         Game game = getStandardGame();
@@ -50,14 +44,10 @@ public class PlayerTest extends FreeColTestCase {
 
         UnitType freeColonist = spec().getUnitType("model.unit.freeColonist");
 
-        Unit unit1 = new ServerUnit(game, map.getTile(4, 7), dutch,
-                                    freeColonist);
-        Unit unit2 = new ServerUnit(game, map.getTile(4, 8), dutch,
-                                    freeColonist);
-        Unit unit3 = new ServerUnit(game, map.getTile(5, 7), dutch,
-                                    freeColonist);
-        Unit unit4 = new ServerUnit(game, map.getTile(5, 8), dutch,
-                                    freeColonist);
+        final Unit unit1 = new ServerUnit(game, map.getTile(4, 7), dutch, freeColonist);
+        final Unit unit2 = new ServerUnit(game, map.getTile(4, 8), dutch, freeColonist);
+        new ServerUnit(game, map.getTile(5, 7), dutch, freeColonist);
+        new ServerUnit(game, map.getTile(5, 8), dutch, freeColonist);
 
         int count = count(dutch.getUnitSet());
         assertTrue(count == 4);

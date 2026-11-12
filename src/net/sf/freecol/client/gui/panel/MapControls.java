@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -23,20 +23,16 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import net.sf.freecol.client.ClientOptions;
+import javax.swing.JComponent;
+
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.control.FreeColClientHolder;
-import net.sf.freecol.client.control.MapTransform;
-import net.sf.freecol.client.gui.action.ActionManager;
 import net.sf.freecol.client.gui.GUI;
-import net.sf.freecol.common.model.Game;
+import net.sf.freecol.client.gui.action.ActionManager;
 import net.sf.freecol.common.model.Tile;
 import net.sf.freecol.common.model.Unit;
-import net.sf.freecol.common.util.Introspector;
-import static net.sf.freecol.common.util.StringUtils.*;
 
 
 /**
@@ -65,6 +61,7 @@ public abstract class MapControls extends FreeColClientHolder {
     /** The buttons to control unit actions. */
     protected final List<UnitButton> unitButtons = new ArrayList<>();
 
+    private boolean useSkin;
 
     /**
      * The basic constructor.
@@ -72,9 +69,10 @@ public abstract class MapControls extends FreeColClientHolder {
      * @param freeColClient The {@code FreeColClient} for the game.
      * @param useSkin Use a skin or not in the info panel.
      */
-    protected MapControls(final FreeColClient freeColClient, boolean useSkin) {
+    protected MapControls(final FreeColClient freeColClient) {
         super(freeColClient);
 
+        this.useSkin = !this.getFreeColClient().isMapEditor();
         this.infoPanel = new InfoPanel(freeColClient, useSkin);
         this.infoPanel.setFocusable(false);
 
@@ -90,7 +88,19 @@ public abstract class MapControls extends FreeColClientHolder {
         this.miniMapZoomInButton = miniButtons.remove(0);
     }
 
+    
+    public boolean isUseSkin() {
+        return useSkin;
+    }
 
+    /**
+     * Updates the layout with possibly a new skin and/or size.
+     */
+    public void updateLayoutIfNeeded() {
+        this.useSkin = !this.getFreeColClient().isMapEditor();
+        infoPanel.updateLayoutIfNeeded(this.useSkin);
+    }
+    
     /**
      * Initialize the unit buttons.
      *
@@ -116,7 +126,7 @@ public abstract class MapControls extends FreeColClientHolder {
      * @param size The {@code Dimension} of the canvas.
      * @return A list of {@code Component}s to add to the canvas.
      */
-    public abstract List<Component> getComponentsToAdd(Dimension size);
+    public abstract List<JComponent> getComponentsToAdd(Dimension size);
 
     /**
      * Prepare and return a list of map controls components to remove
@@ -124,7 +134,7 @@ public abstract class MapControls extends FreeColClientHolder {
      *
      * @return A list of {@code Component}s to remove from the canvas.
      */
-    public abstract List<Component> getComponentsPresent();
+    public abstract List<JComponent> getComponentsPresent();
     
 
     // Simple public routines
@@ -151,6 +161,8 @@ public abstract class MapControls extends FreeColClientHolder {
      * @param tile The selected {@code Tile} if any.
      */
     public void update(GUI.ViewMode viewMode, Unit active, Tile tile) {
+        updateLayoutIfNeeded();
+        
         if (active != null) {
             boolean iub = initializeUnitButtons();
             if (iub) logger.fine("Unit buttons initialized.");
@@ -177,6 +189,14 @@ public abstract class MapControls extends FreeColClientHolder {
             break;
         }
     }
+    
+    /**
+     * Updates the minimap and repaints it.
+     */
+    public void updateMinimap() {
+        this.miniMap.updateCachedMinimap();
+        repaint();
+    }
 
     public void zoomIn() {
         this.miniMap.zoomIn();
@@ -188,25 +208,7 @@ public abstract class MapControls extends FreeColClientHolder {
         repaint();
     }
 
-    /**
-     * Create a new map controls instance for a FreeColClient.
-     *
-     * @param freeColClient The {@code FreeColClient} to query.
-     * @return A new {@code MapControls} or null on error.
-     */
-    public static MapControls newInstance(final FreeColClient freeColClient) {
-        final String className = freeColClient.getClientOptions()
-            .getString(ClientOptions.MAP_CONTROLS);
-        final String panelName = "net.sf.freecol.client.gui.panel."
-            + lastPart(className, ".");
-        try {
-            return (MapControls)Introspector.instantiate(panelName,
-                new Class[] { FreeColClient.class },
-                new Object[] { freeColClient });
-        } catch (Introspector.IntrospectorException ie) {
-            logger.log(Level.WARNING, "Failed in make map controls for: "
-                + panelName, ie);
-        }
-        return null;
+    public void clear() {
+        unitButtons.clear();
     } 
 }

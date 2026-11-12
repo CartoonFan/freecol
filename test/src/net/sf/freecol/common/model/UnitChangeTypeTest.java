@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,14 +19,11 @@
 
 package net.sf.freecol.common.model;
 
-import java.util.ArrayList;
-import java.util.List;
+import static net.sf.freecol.common.util.CollectionUtils.alwaysTrue;
+import static net.sf.freecol.common.util.CollectionUtils.count;
 
-import net.sf.freecol.common.model.UnitType;
-import net.sf.freecol.common.model.UnitChangeType;
 import net.sf.freecol.server.model.ServerUnit;
 import net.sf.freecol.util.test.FreeColTestCase;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 
 
 public class UnitChangeTypeTest extends FreeColTestCase {
@@ -50,7 +47,6 @@ public class UnitChangeTypeTest extends FreeColTestCase {
     public void testAbilityScope() {
         Game game = getStandardGame();
         Player dutch = game.getPlayerByNationId("model.nation.dutch");
-        Player inca = game.getPlayerByNationId("model.nation.inca");
 
         UnitType gardenerType = new UnitType("gardener", spec());
         gardenerType.setSkill(0);

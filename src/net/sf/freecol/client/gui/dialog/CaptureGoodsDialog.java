@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -25,7 +25,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
@@ -36,10 +35,10 @@ import javax.swing.JPanel;
 import javax.swing.ListCellRenderer;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.ChoiceItem;
-import net.sf.freecol.client.gui.panel.*;
+import net.sf.freecol.client.gui.panel.MigPanel;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Goods;
 import net.sf.freecol.common.model.Market;
@@ -66,10 +65,7 @@ import net.sf.freecol.common.model.Unit;
  *      checkbox and text combination, repeated as
  *      needed.
  */
-public final class CaptureGoodsDialog extends FreeColDialog<List<Goods>> {
-
-    private static final Logger logger = Logger.getLogger(CaptureGoodsDialog.class.getName());
-
+public final class CaptureGoodsDialog extends DeprecatedFreeColDialog<List<Goods>> {
 
     private static class GoodsItem extends JCheckBox {
 
@@ -115,11 +111,6 @@ public final class CaptureGoodsDialog extends FreeColDialog<List<Goods>> {
         implements ListCellRenderer<GoodsItem> {
 
         private Market market;
-
-        public CheckBoxRenderer() {
-            //setBackground(UIManager.getColor("List.textBackground"));
-            //setForeground(UIManager.getColor("List.textForeground"));
-        }
 
         /**
          * Overload constructor for market lookups on good pricing for display

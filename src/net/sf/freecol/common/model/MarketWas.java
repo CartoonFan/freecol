@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,32 +19,24 @@
 
 package net.sf.freecol.common.model;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
-
-import net.sf.freecol.common.model.AbstractGoods;
-import net.sf.freecol.common.model.GoodsType;
-import net.sf.freecol.common.model.Market;
-import net.sf.freecol.common.model.MarketData;
-import net.sf.freecol.common.model.Player;
-import net.sf.freecol.common.model.TransactionListener;
 
 
 /**
  * Helper container to remember the Market state prior to some
  * change, and fire off any consequent property changes.
  */
-public class MarketWas {
-
-    private static final Logger logger = Logger.getLogger(MarketWas.class.getName());
+public class MarketWas extends ObjectWas {
 
     private final Market market;
     private final int tax;
     private final Map<GoodsType, Integer> costToBuy;
     private final Map<GoodsType, Integer> paidForSale;
+    private final List<AbstractGoods> transactions = new ArrayList<>();
 
 
     /**
@@ -66,21 +58,30 @@ public class MarketWas {
 
 
     /**
-     * Fire any property changes resulting from actions in Market.
+     * Add a single transaction.
      *
-     * @param req A list of {@code AbstractGoods} that changed hands.
+     * @param ag The {@code AbstractGoods} describing the transaction.
      */
-    public void fireChanges(List<AbstractGoods> req) {
-        for (AbstractGoods ag : req) fireChanges(ag.getType(), ag.getAmount());
+    public void add(AbstractGoods ag) {
+        this.transactions.add(ag);
     }
 
+    /**
+     * Add multiple transactions.
+     *
+     * @param ag A list of {@code AbstractGoods} describing the transactions.
+     */
+    public void addAll(List<AbstractGoods> ag) {
+        this.transactions.addAll(ag);
+    }
+    
     /**
      * Fire any property changes resulting from actions in Market.
      *
      * @param type A {@code GoodsType} that changed hands.
      * @param amount The amount of goods that changed hands.
      */
-    public void fireChanges(GoodsType type, int amount) {
+    private void fireChange(GoodsType type, int amount) {
         for (TransactionListener l : this.market.getTransactionListener()) {
             if (amount < 0) {
                 int buy = this.costToBuy.get(type);
@@ -100,5 +101,17 @@ public class MarketWas {
                 }
             }
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean fireChanges() {
+        if (this.transactions.isEmpty()) return false;
+        for (AbstractGoods ag : this.transactions) {
+            fireChange(ag.getType(), ag.getAmount());
+        }
+        this.transactions.clear();
+        return true;
     }
 }

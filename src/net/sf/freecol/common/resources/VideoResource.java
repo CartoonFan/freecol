@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -37,12 +37,13 @@ public class VideoResource extends Resource {
     /**
      * Do not use directly.
      *
+     * @param cachingKey The caching key.
      * @param resourceLocator The {@code URI} used when loading this
      *     resource.
      * @exception IOException if the URI is malformed.
      */
-    public VideoResource(URI resourceLocator) throws IOException {
-        super(resourceLocator);
+    public VideoResource(String cachingKey, URI resourceLocator) throws IOException {
+        super(cachingKey, resourceLocator);
         
         this.video = new Video(resourceLocator.toURL());
     }

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -74,10 +74,10 @@ public final class FileOptionUI extends OptionUI<FileOption>  {
                     final File root = (isMap)
                         ? FreeColDirectories.getMapsDirectory()
                         : FreeColDirectories.getSaveDirectory();
-                    final String extension = (isMap)
-                        ? FreeCol.FREECOL_MAP_EXTENSION
-                        : FreeCol.FREECOL_SAVE_EXTENSION;
-                    File f = gui.showLoadSaveFileDialog(root, extension);
+                    final String[] extensions = (isMap)
+                        ? new String[] {FreeCol.FREECOL_MAP_EXTENSION, FreeCol.FREECOL_SAVE_EXTENSION, "*"}
+                        : new String[] {FreeCol.FREECOL_SAVE_EXTENSION, "*"};
+                    File f = gui.showLoadSaveFileDialog(root, extensions);
                     if (f != null) setValue(f);
                 });
         }

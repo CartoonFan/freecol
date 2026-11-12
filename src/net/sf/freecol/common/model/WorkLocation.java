@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -332,7 +332,7 @@ public abstract class WorkLocation extends UnitLocation
         // Is the production actually a good idea?  Not if we are independent
         // and have maximized liberty, or for immigration.
         if (owner.getPlayerType() == Player.PlayerType.INDEPENDENT
-            && ((goodsType.isLibertyType() && getColony().getSoL() >= 100)
+            && ((goodsType.isLibertyType() && getColony().getSonsOfLiberty() >= 100)
                 || goodsType.isImmigrationType())) 
             return null;
         
@@ -765,6 +765,10 @@ public abstract class WorkLocation extends UnitLocation
      */
     @Override
     public NoAddReason getNoAddReason(Locatable locatable) {
+        if (locatable instanceof Unit && ((Unit) locatable).isDamaged()) {
+            return NoAddReason.WORKER_DAMAGED;
+        }
+        
         return (locatable instanceof Unit && ((Unit)locatable).isPerson())
             ? super.getNoAddReason(locatable)
             : NoAddReason.WRONG_TYPE;

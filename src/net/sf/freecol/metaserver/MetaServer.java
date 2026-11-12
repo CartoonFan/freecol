@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -28,7 +28,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import net.sf.freecol.FreeCol;
-import net.sf.freecol.common.metaserver.ServerInfo;
 import net.sf.freecol.common.networking.Connection;
 
 
@@ -95,23 +94,6 @@ public final class MetaServer extends Thread {
     }
 
     /**
-     * Shuts down the server thread.
-     */
-    public void shutdown() {
-        this.running = false;
-
-        try {
-            this.serverSocket.close();
-        } catch (IOException e) {
-            logger.log(Level.WARNING, "Could not close the server socket!", e);
-        }
-
-        Connection c;
-        while ((c = this.connections.remove(0)) != null) c.disconnect();
-        logger.info("Metaserver shutdown.");
-    }
-
-    /**
      * Gets a {@code Connection} identified by a {@code Socket}.
      * 
      * @param socket The {@code Socket} that identifies the
@@ -149,9 +131,8 @@ public final class MetaServer extends Thread {
                 clientSocket = serverSocket.accept();
                 logger.info("Client connection from: "
                     + clientSocket.getInetAddress().toString());
-                Connection connection = new Connection(clientSocket,
-                    FreeCol.METASERVER_THREAD)
-                    .setMessageHandler(getMetaServerHandler());
+                @SuppressWarnings("resource")
+                final Connection connection = new Connection(clientSocket, FreeCol.METASERVER_THREAD).setMessageHandler(getMetaServerHandler());
                 this.connections.put(clientSocket, connection);
                 connection.startReceiving();
             } catch (IOException e) {

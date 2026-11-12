@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,21 +19,23 @@
 
 package net.sf.freecol.client.gui.plaf;
 
-import java.awt.Cursor;
 import java.awt.Font;
-import java.awt.Image;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.swing.UIDefaults;
+import javax.swing.UIDefaults.LazyValue;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.plaf.ColorUIResource;
 import javax.swing.plaf.metal.DefaultMetalTheme;
+import javax.swing.plaf.metal.MetalIconFactory;
 import javax.swing.plaf.metal.MetalLookAndFeel;
 
-import net.sf.freecol.common.FreeColException;
 import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.common.FreeColException;
 
 
 /**
@@ -111,27 +113,35 @@ public class FreeColLookAndFeel extends MetalLookAndFeel {
     private static final String transparentPanelUI
         = "net.sf.freecol.client.gui.plaf.FreeColTransparentPanelUI";
 
-    private static final Class uiClasses[] = {
+    private static final Class<?> uiClasses[] = {
         FreeColButtonUI.class,
+        FreeColCheckBoxMenuItemUI.class,
         FreeColCheckBoxUI.class,
         FreeColComboBoxUI.class,
         FreeColFileChooserUI.class,
+        FreeColInternalFrameUI.class,
         FreeColLabelUI.class,
         FreeColListUI.class,
         FreeColMenuBarUI.class,
         FreeColMenuItemUI.class,
+        FreeColMenuUI.class,
         FreeColOptionPaneUI.class,
         FreeColPanelUI.class,
         FreeColPopupMenuUI.class,
+        FreeColRadioButtonMenuItemUI.class,
         FreeColRadioButtonUI.class,
         FreeColScrollPaneUI.class,
         FreeColTableHeaderUI.class,
         FreeColTableUI.class,
         FreeColTextAreaUI.class,
         FreeColTextFieldUI.class,
+        FreeColFormattedTextFieldUI.class,
         FreeColToolTipUI.class,
-        FreeColTransparentPanelUI.class
+        FreeColTransparentPanelUI.class,
+        FreeColSpinnerUI.class
     };
+    
+    private static float scaleFactor = 1;
 
 
     /**
@@ -207,6 +217,15 @@ public class FreeColLookAndFeel extends MetalLookAndFeel {
         // Add cursors:
         u.put("cursor.go", ImageLibrary.getCursor());
 
+        u.put("CheckBox.icon", (LazyValue) t -> FreeColCheckBoxUI.createCheckBoxIcon());
+        u.put("CheckBoxMenuItem.checkIcon", (LazyValue) t -> FreeColCheckBoxUI.createCheckBoxIcon());
+        
+        u.put("RadioButton.icon", (LazyValue) t -> FreeColRadioButtonUI.createRadioButtonIcon());
+        u.put("RadioButtonMenuItem.checkIcon", (LazyValue) t -> FreeColRadioButtonUI.createRadioButtonIcon());
+        
+        // TODO: We might want to allow overriding font colors for the menu:
+        //u.put("Menu.foreground", java.awt.Color.WHITE);
+
         return u;
     }
 
@@ -232,14 +251,32 @@ public class FreeColLookAndFeel extends MetalLookAndFeel {
      * @param defaultFont A {@code Font} to use by default.
      */
     public static void installFont(Font defaultFont) {
-        UIDefaults u = UIManager.getDefaults();
-        java.util.Enumeration<Object> keys = u.keys();
-        while (keys.hasMoreElements()) {
-            Object key = keys.nextElement();
+        final UIDefaults u = UIManager.getLookAndFeelDefaults();
+        final Set<Object> keySet = new HashSet<>(u.keySet());
+        for (Object key : keySet) {
             if (u.get(key) instanceof javax.swing.plaf.FontUIResource) {
+                u.put(key, defaultFont);
+            } else if (u.get(key) instanceof Font) {
                 u.put(key, defaultFont);
             }
         }
+    }
+    
+    public static void setScaleFactor(float scaleFactor) {
+        FreeColLookAndFeel.scaleFactor = scaleFactor;
+        final UIDefaults u = UIManager.getLookAndFeelDefaults();
+        final int scrollbarWidth = (int) (17 * scaleFactor);
+        u.put("ScrollBar.width", scrollbarWidth);
+        
+        int internalFrameIconSize = (int) (16 * scaleFactor);
+        u.put("InternalFrame.closeIcon", (LazyValue) t -> MetalIconFactory.getInternalFrameCloseIcon(internalFrameIconSize));
+        u.put("InternalFrame.maximizeIcon", (LazyValue) t -> MetalIconFactory. getInternalFrameMaximizeIcon(internalFrameIconSize));
+        u.put("InternalFrame.iconifyIcon", (LazyValue) t -> MetalIconFactory.getInternalFrameMinimizeIcon(internalFrameIconSize));
+        u.put("InternalFrame.minimizeIcon", (LazyValue) t -> MetalIconFactory.getInternalFrameAltMaximizeIcon(internalFrameIconSize));
+    }
+    
+    public static float getScaleFactor() {
+        return scaleFactor;
     }
 
     /**

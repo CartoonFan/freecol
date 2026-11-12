@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,8 +21,8 @@ package net.sf.freecol.client.gui.panel;
 
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
-import java.awt.event.ItemListener;
 import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.logging.Logger;
@@ -41,7 +41,6 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.client.gui.plaf.FreeColComboBoxRenderer;
@@ -63,7 +62,7 @@ public final class FindSettlementPanel extends FreeColPanel
     @SuppressWarnings("unused")
     private static final Logger logger = Logger.getLogger(FindSettlementPanel.class.getName());
 
-    private class SettlementRenderer
+    private static class SettlementRenderer
         extends FreeColComboBoxRenderer<Settlement> {
 
         private final ImageLibrary lib;
@@ -160,6 +159,13 @@ public final class FindSettlementPanel extends FreeColPanel
         getGUI().restoreSavedSize(this, getPreferredSize());
 
         updateSearch(DisplayListOption.valueOf("ALL"));
+        
+        setEscapeAction(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                okButton.doClick();
+            }
+        });
     }
 
     private void updateSearch(DisplayListOption displayListOption) {

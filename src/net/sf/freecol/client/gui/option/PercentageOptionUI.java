@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -61,5 +61,17 @@ public final class PercentageOptionUI extends SliderOptionUI<PercentageOption>  
         slider.setValue(option.getValue());
         slider.setMajorTickSpacing(5);
         slider.setSnapToTicks(false);
+        
+        slider.addChangeListener(event -> {
+            if (getOption().isPreviewEnabled()) {
+                getOption().setValue(slider.getValue());
+            }
+        });
+    }
+    
+    @Override
+    public void reset() {
+        getOption().resetValue();
+        super.reset();
     }
 }

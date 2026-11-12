@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,19 +19,20 @@
 
 package net.sf.freecol.common.io;
 
+import static net.sf.freecol.common.util.CollectionUtils.alwaysTrue;
+import static net.sf.freecol.common.util.CollectionUtils.makeUnmodifiableList;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.BufferedInputStream;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Properties;
-import java.util.stream.Stream;
 
 import javax.xml.stream.XMLStreamException;
 
-import net.sf.freecol.FreeCol;
-import net.sf.freecol.client.gui.dialog.*;
-
-import static net.sf.freecol.common.util.CollectionUtils.*;
+import net.sf.freecol.client.gui.dialog.MapGeneratorOptionsDialog;
 
 
 /**
@@ -94,12 +95,12 @@ public class FreeColSavegameFile extends FreeColDataFile {
      */
     public List<String> peekAttributes(List<String> attributes)
         throws IOException, XMLStreamException {
-        final FreeColXMLReader xr = this.getSavedGameFreeColXMLReader();
-        xr.nextTag();
-        List<String> ret = transform(attributes, alwaysTrue(),
-                                     a -> xr.getAttribute(a, (String)null));
-        xr.close();
-        return ret;
+        try (final FreeColXMLReader xr = this.getSavedGameFreeColXMLReader()) {
+            xr.nextTag();
+            final List<String> ret = transform(attributes, alwaysTrue(),
+                                         a -> xr.getAttribute(a, (String)null));
+            return ret;
+        }
     }
 
     /**
@@ -110,7 +111,9 @@ public class FreeColSavegameFile extends FreeColDataFile {
      */
     public Properties getProperties() throws IOException {
         Properties properties = new Properties();
-        properties.load(getInputStream(SAVEGAME_PROPERTIES));
+        try (InputStream in = getInputStream(SAVEGAME_PROPERTIES)) {
+            properties.load(in);
+        }
         return properties;
     }
         

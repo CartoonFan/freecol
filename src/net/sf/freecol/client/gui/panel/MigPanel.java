@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -22,6 +22,7 @@ package net.sf.freecol.client.gui.panel;
 import java.awt.LayoutManager;
 
 import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
 
 import net.miginfocom.swing.MigLayout;
 
@@ -36,17 +37,23 @@ public class MigPanel extends JPanel {
 
 
     public MigPanel(String uiClassId) {
+        assert SwingUtilities.isEventDispatchThread();
+        
         this.uiClassId = uiClassId;
     }
 
     public MigPanel(LayoutManager layout) {
         super(layout);
 
+        assert SwingUtilities.isEventDispatchThread();
+        
         this.uiClassId = null;
     }
 
     protected MigPanel(String uiClassId, LayoutManager layout) {
         super(layout);
+        
+        assert SwingUtilities.isEventDispatchThread();
         
         this.uiClassId = uiClassId;
     }
@@ -64,18 +71,5 @@ public class MigPanel extends JPanel {
     @Override
     public String getUIClassID() {
         return (uiClassId != null) ? uiClassId : super.getUIClassID();
-    }
-
-
-    // Override Component
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void removeNotify() {
-        super.removeNotify();
-
-        setLayout(null);
     }
 }

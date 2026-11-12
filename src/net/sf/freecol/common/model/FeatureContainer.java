@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -18,15 +18,19 @@
  */
 package net.sf.freecol.common.model;
 
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.forEachMapEntry;
+import static net.sf.freecol.common.util.CollectionUtils.iterable;
+import static net.sf.freecol.common.util.CollectionUtils.removeInPlace;
+import static net.sf.freecol.common.util.CollectionUtils.sort;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Logger;
 import java.util.stream.Stream;
-
-import static net.sf.freecol.common.util.CollectionUtils.*;
 
 
 /**
@@ -42,8 +46,6 @@ import static net.sf.freecol.common.util.CollectionUtils.*;
  * - FreeColObject itself implements a null version.
  */
 public final class FeatureContainer {
-
-    private static final Logger logger = Logger.getLogger(FeatureContainer.class.getName());
 
     /** Lock variables. */
     private final Object abilitiesLock = new Object();
@@ -105,7 +107,12 @@ public final class FeatureContainer {
         }
         return ret;
     }
-    protected Collection<Modifier> getModifierValues() {
+    
+    /**
+     * Gets all modifiers with any filtering applied.
+     * @return All the modifiers stored in this {@code FeatureContainer}.
+     */
+    public Collection<Modifier> getModifierValues() {
         Set<Modifier> ret = new HashSet<>();
         synchronized (modifiersLock) {
             if (modifiers != null) {

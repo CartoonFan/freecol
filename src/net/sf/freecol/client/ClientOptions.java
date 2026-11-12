@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,23 +19,26 @@
 
 package net.sf.freecol.client;
 
+import static net.sf.freecol.common.util.CollectionUtils.makeUnmodifiableList;
+import static net.sf.freecol.common.util.CollectionUtils.makeUnmodifiableMap;
+import static net.sf.freecol.common.util.CollectionUtils.toListNoNulls;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+
 import java.awt.Dimension;
 import java.awt.Point;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.Collator;
-import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.HashMap;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.Map;
-import java.util.Map.Entry;
 
 import javax.xml.stream.XMLStreamException;
 
@@ -46,22 +49,19 @@ import net.sf.freecol.common.io.FreeColModFile;
 import net.sf.freecol.common.io.FreeColSavegameFile;
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.model.Colony;
-import net.sf.freecol.common.model.FreeColObject;
-import net.sf.freecol.common.model.FreeColGameObject;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.Location;
 import net.sf.freecol.common.model.ModelMessage;
-import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.Specification;
 import net.sf.freecol.common.option.BooleanOption;
+import net.sf.freecol.common.option.FullscreenDisplayModeOption;
 import net.sf.freecol.common.option.IntegerOption;
-import net.sf.freecol.common.option.ModListOption;
+import net.sf.freecol.common.option.Option;
 import net.sf.freecol.common.option.OptionGroup;
+import net.sf.freecol.common.option.PercentageOption;
 import net.sf.freecol.common.option.RangeOption;
 import net.sf.freecol.common.option.TextOption;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.common.util.LogBuilder;
-import net.sf.freecol.common.util.Utils;
 
 
 /**
@@ -97,97 +97,57 @@ public class ClientOptions extends OptionGroup {
 
     // clientOptions.personal
 
+    private static final String PERSONAL_GROUP
+        = "clientOptions.personal";
+   
     /** Option for the player's preferred name. */
     public static final String NAME
         = "model.option.playerName";
 
-
-    // clientOptions.gui
-
-    public static final String GUI
-        = "clientOptions.gui";
-
-    /** Option for setting the language. */
+    /** Special option for setting the language. */
     public static final String LANGUAGE
         = "model.option.languageOption";
     /** Value for automatic language selection. */
     public static final String AUTOMATIC
         = "clientOptions.gui.languageOption.autoDetectLanguage";
 
-    /**
-     * Used by GUI, the number will be displayed when a group of goods are
-     * higher than this number.
-     *
-     * @see net.sf.freecol.client.gui.MapViewer
-     */
-    public static final String MIN_NUMBER_FOR_DISPLAYING_GOODS_COUNT
-        = "model.option.guiMinNumberToDisplayGoodsCount";
 
-    /**
-     * Used by GUI, this is the most repetitions drawn of a goods image for a
-     * single goods grouping.
-     *
-     * @see net.sf.freecol.client.gui.MapViewer
-     */
-    public static final String MAX_NUMBER_OF_GOODS_IMAGES
-        = "model.option.guiMaxNumberOfGoodsImages";
+    // clientOptions.gui is an old heading, the constant is still used
+    // in fixClientOptions below.  Several "value" constants still
+    // have clientOptions.gui.* names.
+    private static final String GUI_GROUP
+        = "clientOptions.gui";
+    
 
+    // clientOptions.display
+
+    private static final String DISPLAY_GROUP
+        = "clientOptions.display";
+    
     /**
-     * Used by GUI, this is the minimum number of goods a colony must
-     * possess for the goods to show up at the bottom of the colony
-     * panel.
-     *
-     * @see net.sf.freecol.client.gui.GUI
+     * Option to control the display mode in fullscreen
      */
-    public static final String MIN_NUMBER_FOR_DISPLAYING_GOODS
-        = "model.option.guiMinNumberToDisplayGoods";
+    public static final String DISPLAY_MODE_FULLSCREEN
+        = "model.option.fullscreenDisplayMode";
 
     /**
-     * Selected tiles always gets centered if this option is enabled (even if
-     * the tile is on screen.
-     *
-     * @see net.sf.freecol.client.gui.GUI
+     * Option to control the display scale factor.
      */
-    public static final String ALWAYS_CENTER
-        = "model.option.alwaysCenter";
+    public static final String DISPLAY_SCALING
+        = "model.option.displayScaling";
 
     /**
-     * If this option is enabled, the display will recenter in order
-     * to display the active unit if it is not on screen.
-     *
-     * @see net.sf.freecol.client.gui.GUI
+     * Enable manual override of main font size.
      */
-    public static final String JUMP_TO_ACTIVE_UNIT
-        = "model.option.jumpToActiveUnit";
+    public static final String MANUAL_MAIN_FONT_SIZE
+        = "model.option.manualMainFontSize";
 
-    /** Option to scroll when dragging units on the mapboard. */
-    public static final String MAP_SCROLL_ON_DRAG
-        = "model.option.mapScrollOnDrag";
-
-    /** Option to auto-scroll on mouse movement. */
-    public static final String AUTO_SCROLL
-        = "model.option.autoScroll";
-
-    /** Whether to display a compass rose or not. */
-    public static final String DISPLAY_COMPASS_ROSE
-        = "model.option.displayCompassRose";
-
-    /** Whether to display the map controls or not. */
-    public static final String DISPLAY_MAP_CONTROLS
-        = "model.option.displayMapControls";
-
-    /** Whether to display the grid by default or not. */
-    public static final String DISPLAY_GRID
-        = "model.option.displayGrid";
-
-    /** Whether to display borders by default or not. */
-    public static final String DISPLAY_BORDERS
-        = "model.option.displayBorders";
-
-    /** Whether to delay on a unit's last move or not. */
-    public static final String UNIT_LAST_MOVE_DELAY
-        = "model.option.unitLastMoveDelay";
-
+    /**
+     * Value to use to override the main font size, if enabled by the above.
+     */
+    public static final String MAIN_FONT_SIZE
+        = "model.option.mainFontSize";
+    
     /** Pixmap setting to work around Java 2D graphics bug. */
     public static final String USE_PIXMAPS
         = "model.option.usePixmaps";
@@ -199,77 +159,20 @@ public class ClientOptions extends OptionGroup {
     /** Enable use of XRender pipeline (unix specific). */
     public static final String USE_XRENDER
         = "model.option.useXRender";
+    
+    public static final String USE_TERRAIN_ANIMATIONS
+        = "model.option.useTerrainAnimations";
 
-    /** Whether to remember the positions of various dialogs and panels. */
-    public static final String REMEMBER_PANEL_POSITIONS
-        = "model.option.rememberPanelPositions";
-
-    /** Whether to remember the sizes of various dialogs and panels. */
-    public static final String REMEMBER_PANEL_SIZES
-        = "model.option.rememberPanelSizes";
-
-    /** Whether to enable smooth rendering of the minimap when zoomed out. */
-    public static final String SMOOTH_MINIMAP_RENDERING
-        = "model.option.smoothRendering";
-
-    /** Whether to display end turn grey background or not. */
-    public static final String DISABLE_GRAY_LAYER
-        = "model.option.disableGrayLayer";
-
-    /** Whether to draw the fog of war on the minimap. */
-    public static final String MINIMAP_TOGGLE_FOG_OF_WAR
-        = "model.option.miniMapToggleFogOfWar";
-
-    /** Whether to draw the borders on the minimap. */
-    public static final String MINIMAP_TOGGLE_BORDERS
-        = "model.option.miniMapToggleBorders";
-
-    /** Style of map controls. */
-    public static final String MAP_CONTROLS
-        = "model.option.mapControls";
-    public static final String MAP_CONTROLS_CORNERS
-        = "clientOptions.gui.mapControls.CornerMapControls";
-    public static final String MAP_CONTROLS_CLASSIC
-        = "clientOptions.gui.mapControls.ClassicMapControls";
-
-    /**
-     * The color to fill in around the actual map on the
-     * minimap.  Typically only visible when the minimap is at full
-     * zoom-out, but at the default 'black' you can't differentiate
-     * between the background and the (unexplored) map.  Actually:
-     * clientOptions.minimap.color.background
-     */
-    public static final String MINIMAP_BACKGROUND_COLOR
-        = "model.option.color.background";
-
-    /** What text to display in the tiles. */
-    public static final String DISPLAY_TILE_TEXT
-        = "model.option.displayTileText";
-    public static final int DISPLAY_TILE_TEXT_EMPTY = 0,
-        DISPLAY_TILE_TEXT_NAMES = 1,
-        DISPLAY_TILE_TEXT_OWNERS = 2,
-        DISPLAY_TILE_TEXT_REGIONS = 3;
-
-    /** Style of colony labels. */
-    public static final String COLONY_LABELS
-        = "model.option.displayColonyLabels";
-    public static final int COLONY_LABELS_NONE = 0;
-    public static final int COLONY_LABELS_CLASSIC = 1;
-    public static final int COLONY_LABELS_MODERN = 2;
-
-    /** Used by GUI to sort colonies. */
-    public static final String COLONY_COMPARATOR
-        = "model.option.colonyComparator";
-    public static final int COLONY_COMPARATOR_NAME = 0,
-        COLONY_COMPARATOR_AGE = 1,
-        COLONY_COMPARATOR_POSITION = 2,
-        COLONY_COMPARATOR_SIZE = 3,
-        COLONY_COMPARATOR_SOL = 4;
-
-    /** Default zoom level of the minimap. */
-    public static final String DEFAULT_MINIMAP_ZOOM
-        = "model.option.defaultZoomLevel";
-
+    /** Allows the user to determine the tradeoff between quality and rendering speed. */
+    public static final String GRAPHICS_QUALITY
+        = "model.option.graphicsQuality";
+    
+    public static final int GRAPHICS_QUALITY_LOWEST = 0;
+    public static final int GRAPHICS_QUALITY_LOW = 10;
+    public static final int GRAPHICS_QUALITY_NORMAL = 20;
+    public static final int GRAPHICS_QUALITY_HIGH = 30;
+    public static final int GRAPHICS_QUALITY_HIGHEST = 40;
+    
     /** Animation speed for our units. */
     public static final String MOVE_ANIMATION_SPEED
         = "model.option.moveAnimationSpeed";
@@ -283,16 +186,123 @@ public class ClientOptions extends OptionGroup {
         = "model.option.friendlyMoveAnimationSpeed";
 
 
-    // clientOptions.messages
+    // clientOptions.interface
 
-    public static final String MESSAGES
-        = "clientOptions.messages";
+    private static final String INTERFACE_GROUP
+        = "clientOptions.interface";
+
+    // clientOptions.interface.mapView
+
+    private static final String MAPVIEW_GROUP
+        = "clientOptions.interface.mapView";
+    
+    /** Default zoom level of the minimap. */
+    public static final String DEFAULT_ZOOM_LEVEL
+        = "model.option.defaultZoomLevel";
+    
+    /**
+     * Selected tiles always gets centered if this option is enabled (even if
+     * the tile is on screen.
+     */
+    public static final String ALWAYS_CENTER
+        = "model.option.alwaysCenter";
+
+    /**
+     * If this option is enabled, the display will recenter in order
+     * to display the active unit if it is not on screen.
+     */
+    public static final String JUMP_TO_ACTIVE_UNIT
+        = "model.option.jumpToActiveUnit";
+
+    /** Option to scroll when dragging units on the mapboard. */
+    public static final String MAP_SCROLL_ON_DRAG
+        = "model.option.mapScrollOnDrag";
+
+    /** Option to auto-scroll on mouse movement. */
+    public static final String AUTO_SCROLL
+        = "model.option.autoScroll";
+
+    /** Whether to display the grid by default or not. */
+    public static final String DISPLAY_GRID
+        = "model.option.displayGrid";
+
+    /** Whether to display borders by default or not. */
+    public static final String DISPLAY_BORDERS
+        = "model.option.displayBorders";
+    
+    /** Whether to draw the fog of war on the actual map or not. */
+    public static final String DISPLAY_FOG_OF_WAR
+        = "model.option.displayFogOfWar";
+
+    /** Whether to delay on a unit's last move or not. */
+    public static final String UNIT_LAST_MOVE_DELAY
+        = "model.option.unitLastMoveDelay";
+
+    /** What text to display in the tiles. */
+    public static final String DISPLAY_TILE_TEXT
+        = "model.option.displayTileText";
+    public static final int DISPLAY_TILE_TEXT_EMPTY = 0,
+        DISPLAY_TILE_TEXT_NAMES = 1,
+        DISPLAY_TILE_TEXT_OWNERS = 2,
+        DISPLAY_TILE_TEXT_REGIONS = 3;
+
+    /** Style of colony labels. */
+    public static final String DISPLAY_COLONY_LABELS
+        = "model.option.displayColonyLabels";
+    public static final int COLONY_LABELS_NONE = 0;
+    public static final int COLONY_LABELS_CLASSIC = 1;
+    public static final int COLONY_LABELS_MODERN = 2;
+
+    // clientOptions.interface.mapControls
+
+    private static final String MAPCONTROLS_GROUP
+        = "clientOptions.interface.mapControls";
+    
+    /** Whether to display a compass rose or not. */
+    public static final String DISPLAY_COMPASS_ROSE
+        = "model.option.displayCompassRose";
+
+    /** Whether to display the map controls or not. */
+    public static final String DISPLAY_MAP_CONTROLS
+        = "model.option.displayMapControls";
+
+    /** The type of map controls, corner or classic. */
+    public static final String MAP_CONTROLS
+        = "model.option.mapControls";
+    /** Styles of map controls. */
+    public static final String MAP_CONTROLS_CORNERS
+        = "clientOptions.gui.mapControls.CornerMapControls";
+    public static final String MAP_CONTROLS_CLASSIC
+        = "clientOptions.gui.mapControls.ClassicMapControls";
+
+    /** Whether to draw the fog of war on the minimap. */
+    public static final String MINIMAP_TOGGLE_FOG_OF_WAR
+        = "model.option.miniMapToggleFogOfWar";
+
+    /** Whether to draw the borders on the minimap. */
+    public static final String MINIMAP_TOGGLE_BORDERS
+        = "model.option.miniMapToggleBorders";
+
+    /**
+     * The color to fill in around the actual map on the
+     * minimap.  Typically only visible when the minimap is at full
+     * zoom-out, but at the default 'black' you can't differentiate
+     * between the background and the (unexplored) map.  Actually:
+     * clientOptions.minimap.color.background
+     */
+    public static final String MINIMAP_BACKGROUND_COLOR
+        = "model.option.color.background";
+
+    // clientOptions.interface.messages
+
+    private static final String MESSAGES_GROUP
+        = "clientOptions.messages"; // should be .interface.warehouse
     
     /**
      * Used by GUI, this defines the grouping of ModelMessages.
      * Possible values include nothing, type and source.
      *
-     * @see net.sf.freecol.client.gui.MapViewer
+     * @see net.sf.freecol.client.gui.mapviewer.MapViewer
      * @see net.sf.freecol.common.model.ModelMessage
      */
     public static final String MESSAGES_GROUP_BY
@@ -301,7 +311,7 @@ public class ClientOptions extends OptionGroup {
         MESSAGES_GROUP_BY_TYPE = 1,
         MESSAGES_GROUP_BY_SOURCE = 2;
 
-    /** Show goods movement messages. */
+    /** Show goods movement messages.  Used by followTradeRoute. */
     public static final String SHOW_GOODS_MOVEMENT
         = "model.option.guiShowGoodsMovement";
 
@@ -332,11 +342,120 @@ public class ClientOptions extends OptionGroup {
     public static final int LABOUR_REPORT_CLASSIC = 0;
     public static final int LABOUR_REPORT_COMPACT = 1;
 
+    // clientOptions.interface.warehouse
+
+    private static final String WAREHOUSE_GROUP
+        = "clientOptions.warehouse"; // should be .interface.warehouse
+
+    /** The amount of stock the custom house should keep when selling goods. */
+    public static final String CUSTOM_STOCK
+        = "model.option.customStock";
+
+    /** Generate warning of stock drops below this percentage of capacity. */
+    public static final String LOW_LEVEL
+        = "model.option.lowLevel";
+
+    /** Generate warning of stock exceeds this percentage of capacity. */
+    public static final String HIGH_LEVEL
+        = "model.option.highLevel";
+
+    /**
+     * Should trade route units check production to determine goods levels at
+     * stops along its route?
+     */
+    public static final String STOCK_ACCOUNTS_FOR_PRODUCTION
+        = "model.option.stockAccountsForProduction";
+
+    // clientOptions.other
+
+    private static final String OTHER_GROUP
+        = "clientOptions.other"; // should be .interface.other
+
+    /** Whether to remember the positions of various dialogs and panels. */
+    public static final String REMEMBER_PANEL_POSITIONS
+        = "model.option.rememberPanelPositions";
+
+    /** Whether to remember the sizes of various dialogs and panels. */
+    public static final String REMEMBER_PANEL_SIZES
+        = "model.option.rememberPanelSizes";
+
+    /** Whether to display end turn grey background or not. */
+    public static final String DISABLE_GRAY_LAYER
+        = "model.option.disableGrayLayer";
+
+    /** Option to autoload emigrants on sailing to america. */
+    public static final String AUTOLOAD_EMIGRANTS
+        = "model.option.autoloadEmigrants";
+
+    /** Option to autoload sentried units. */
+    public static final String AUTOLOAD_SENTRIES
+        = "model.option.autoloadSentries";
+
+    /** Automatically end the turn when no units can be * made active. */
+    public static final String AUTO_END_TURN
+        = "model.option.autoEndTurn";
+
+    /** Show the end turn dialog. */
+    public static final String SHOW_END_TURN_DIALOG
+        = "model.option.showEndTurnDialog";
+
+    /** Set the default native demand action. */
+    public static final String INDIAN_DEMAND_RESPONSE
+        = "model.option.indianDemandResponse";
+    public static final int INDIAN_DEMAND_RESPONSE_ASK = 0;
+    public static final int INDIAN_DEMAND_RESPONSE_ACCEPT = 1;
+    public static final int INDIAN_DEMAND_RESPONSE_REJECT = 2;
+
+    /** Set the default warehouse overflow on unload action. */
+    public static final String UNLOAD_OVERFLOW_RESPONSE
+        = "model.option.unloadOverflowResponse";
+    public static final int UNLOAD_OVERFLOW_RESPONSE_ASK = 0;
+    public static final int UNLOAD_OVERFLOW_RESPONSE_NEVER = 1;
+    public static final int UNLOAD_OVERFLOW_RESPONSE_ALWAYS = 2;
+
+    /**
+     * Used by GUI, the number will be displayed when a group of goods are
+     * higher than this number.
+     *
+     * @see net.sf.freecol.client.gui.mapviewer.MapViewer
+     */
+    public static final String MIN_NUMBER_FOR_DISPLAYING_GOODS_COUNT
+        = "model.option.guiMinNumberToDisplayGoodsCount";
+
+    /**
+     * Used by GUI, this is the most repetitions drawn of a goods image for a
+     * single goods grouping.
+     *
+     * @see net.sf.freecol.client.gui.mapviewer.MapViewer
+     */
+    public static final String MAX_NUMBER_OF_GOODS_IMAGES
+        = "model.option.guiMaxNumberOfGoodsImages";
+
+    /**
+     * Used by GUI, this is the minimum number of goods a colony must
+     * possess for the goods to show up at the bottom of the colony
+     * panel.
+     *
+     * @see net.sf.freecol.client.gui.GUI
+     */
+    public static final String MIN_NUMBER_FOR_DISPLAYING_GOODS
+        = "model.option.guiMinNumberToDisplayGoods";
+
+    /** Used by GUI to sort colonies. */
+    public static final String COLONY_COMPARATOR
+        = "model.option.colonyComparator";
+    public static final int COLONY_COMPARATOR_NAME = 0,
+        COLONY_COMPARATOR_AGE = 1,
+        COLONY_COMPARATOR_POSITION = 2,
+        COLONY_COMPARATOR_SIZE = 3,
+        COLONY_COMPARATOR_SOL = 4;
+
 
     // clientOptions.savegames
 
-    public static final String SAVEGAMES
+    private static final String SAVEGAMES_GROUP
         = "clientOptions.savegames";
+
     /** Use default values for savegames instead of displaying a dialog. */
     public static final String SHOW_SAVEGAME_SETTINGS
         = "model.option.showSavegameSettings";
@@ -385,32 +504,10 @@ public class ClientOptions extends OptionGroup {
         = "model.option.beforeLastTurnName";
 
 
-    // clientOptions.warehouse
-
-    public static final String WAREHOUSE
-        = "clientOptions.warehouse";
-
-    /** The amount of stock the custom house should keep when selling goods. */
-    public static final String CUSTOM_STOCK
-        = "model.option.customStock";
-
-    /** Generate warning of stock drops below this percentage of capacity. */
-    public static final String LOW_LEVEL
-        = "model.option.lowLevel";
-
-    /** Generate warning of stock exceeds this percentage of capacity. */
-    public static final String HIGH_LEVEL
-        = "model.option.highLevel";
-
-    /**
-     * Should trade route units check production to determine goods levels at
-     * stops along its route?
-     */
-    public static final String STOCK_ACCOUNTS_FOR_PRODUCTION
-        = "model.option.stockAccountsForProduction";
-
-
     // clientOptions.audio
+
+    private static final String AUDIO_GROUP
+        = "clientOptions.audio";
 
     /** Choose the default mixer. */
     public static final String AUDIO_MIXER
@@ -419,46 +516,18 @@ public class ClientOptions extends OptionGroup {
     /** The volume level to set. */
     public static final String AUDIO_VOLUME
         = "model.option.audioVolume";
+    
+    /** The volume level to set for the music. */
+    public static final String MUSIC_VOLUME
+        = "model.option.musicVolume";
+    
+    /** The volume level to set. */
+    public static final String SOUND_EFFECTS_VOLUME
+        = "model.option.soundEffectsVolume";
 
     /** Play an alert sound on message arrival. */
     public static final String AUDIO_ALERTS
         = "model.option.audioAlerts";
-
-
-    // clientOptions.other
-
-    public static final String OTHER
-        = "clientOptions.other";
-
-    /** Option to autoload emigrants on sailing to america. */
-    public static final String AUTOLOAD_EMIGRANTS
-        = "model.option.autoloadEmigrants";
-
-    /** Option to autoload sentried units. */
-    public static final String AUTOLOAD_SENTRIES
-        = "model.option.autoloadSentries";
-
-    /** Automatically end the turn when no units can be * made active. */
-    public static final String AUTO_END_TURN
-        = "model.option.autoEndTurn";
-
-    /** Show the end turn dialog. */
-    public static final String SHOW_END_TURN_DIALOG
-        = "model.option.showEndTurnDialog";
-
-    /** Set the default native demand action. */
-    public static final String INDIAN_DEMAND_RESPONSE
-        = "model.option.indianDemandResponse";
-    public static final int INDIAN_DEMAND_RESPONSE_ASK = 0;
-    public static final int INDIAN_DEMAND_RESPONSE_ACCEPT = 1;
-    public static final int INDIAN_DEMAND_RESPONSE_REJECT = 2;
-
-    /** Set the default warehouse overflow on unload action. */
-    public static final String UNLOAD_OVERFLOW_RESPONSE
-        = "model.option.unloadOverflowResponse";
-    public static final int UNLOAD_OVERFLOW_RESPONSE_ASK = 0;
-    public static final int UNLOAD_OVERFLOW_RESPONSE_NEVER = 1;
-    public static final int UNLOAD_OVERFLOW_RESPONSE_ALWAYS = 2;
 
 
     // clientOptions.mods
@@ -491,12 +560,12 @@ public class ClientOptions extends OptionGroup {
     /** Compare by descending size then liberty. */
     private static final Comparator<Colony> colonySizeComparator
         = Comparator.comparingInt(Colony::getUnitCount)
-            .thenComparingInt(Colony::getSoL)
+            .thenComparingInt(Colony::getSonsOfLiberty)
             .reversed();
 
     /** Compare by descending liberty then size. */
     private static final Comparator<Colony> colonySoLComparator
-        = Comparator.comparingInt(Colony::getSoL)
+        = Comparator.comparingInt(Colony::getSonsOfLiberty)
             .thenComparingInt(Colony::getUnitCount)
             .reversed();
 
@@ -512,6 +581,22 @@ public class ClientOptions extends OptionGroup {
                 "clientOptions.gui.friendlyMoveAnimationSpeed.slow",
                 "clientOptions.gui.friendlyMoveAnimationSpeed.normal",
                 "clientOptions.gui.friendlyMoveAnimationSpeed.fast"
+            });
+    
+    private static final Map<Integer, String> graphicsQualityChoices
+        = makeUnmodifiableMap(new Integer[] {
+                GRAPHICS_QUALITY_LOWEST,
+                GRAPHICS_QUALITY_LOW,
+                GRAPHICS_QUALITY_NORMAL,
+                GRAPHICS_QUALITY_HIGH,
+                GRAPHICS_QUALITY_HIGHEST
+            },
+            new String[] {
+                "clientOptions.gui.graphicsQuality.lowest",
+                "clientOptions.gui.graphicsQuality.low",
+                "clientOptions.gui.graphicsQuality.normal",
+                "clientOptions.gui.graphicsQuality.high",
+                "clientOptions.gui.graphicsQuality.highest"
             });
         
     
@@ -574,7 +659,10 @@ public class ClientOptions extends OptionGroup {
         ClientOptions clop = new ClientOptions();
         if (!clop.load(save)) return false;
         LogBuilder lb = new LogBuilder(64);
-        boolean ret = this.merge(clop, lb);
+        
+        /** Only the mods should be loaded from the savegame: */
+        boolean ret = this.merge(clop.getOption(USER_MODS), lb);
+        
         lb.shrink("\n"); lb.log(logger, Level.FINEST);
         return ret;
     }
@@ -660,6 +748,14 @@ public class ClientOptions extends OptionGroup {
             return null;
         }
     }
+    
+    public boolean isRiverAnimationEnabled() {
+        return isTerrainAnimationsEnabled() && getRange(ClientOptions.GRAPHICS_QUALITY) >= ClientOptions.GRAPHICS_QUALITY_NORMAL;
+    }
+    
+    public boolean isTerrainAnimationsEnabled() {
+        return getBoolean(ClientOptions.USE_TERRAIN_ANIMATIONS) && getRange(ClientOptions.GRAPHICS_QUALITY) >= ClientOptions.GRAPHICS_QUALITY_LOW;
+    }
 
     /**
      * Perform backward compatibility fixups on new client options as
@@ -667,25 +763,29 @@ public class ClientOptions extends OptionGroup {
      * can clean these up as they become standard.
      */
     public void fixClientOptions() {
-        // @compact 0.11.0
-        addBooleanOption(MINIMAP_TOGGLE_BORDERS, ClientOptions.GUI, true);
-        addBooleanOption(MINIMAP_TOGGLE_FOG_OF_WAR, ClientOptions.GUI, true);
-        addTextOption(AUTO_SAVE_PREFIX, ClientOptions.SAVEGAMES, "Autosave");
-        addTextOption(LAST_TURN_NAME, ClientOptions.SAVEGAMES, "last-turn");
+        // @compat 0.11.0
+        addBooleanOption(MINIMAP_TOGGLE_BORDERS,
+                         GUI_GROUP, true);
+        addBooleanOption(MINIMAP_TOGGLE_FOG_OF_WAR,
+                         GUI_GROUP, true);
+        addTextOption(AUTO_SAVE_PREFIX,
+                      SAVEGAMES_GROUP, "Autosave");
+        addTextOption(LAST_TURN_NAME,
+                      SAVEGAMES_GROUP, "last-turn");
         addTextOption(BEFORE_LAST_TURN_NAME,
-                      ClientOptions.SAVEGAMES, "before-last-turn");
-        // end @compact 0.11.0
+                      SAVEGAMES_GROUP, "before-last-turn");
+        // end @compat 0.11.0
 
         // @compat 0.11.1
         addBooleanOption(STOCK_ACCOUNTS_FOR_PRODUCTION,
-                         ClientOptions.WAREHOUSE, false);
+                         WAREHOUSE_GROUP, false);
         // end @compat 0.11.1
 
         // @compat 0.11.3
-        addBooleanOption(AUTOLOAD_SENTRIES, ClientOptions.OTHER, false);
+        addBooleanOption(AUTOLOAD_SENTRIES,
+                         OTHER_GROUP, false);
         try { // Zoom range was increased
-            RangeOption ro = getOption(DEFAULT_MINIMAP_ZOOM,
-                                       RangeOption.class);
+            RangeOption ro = getOption(DEFAULT_ZOOM_LEVEL, RangeOption.class);
             if (ro.getItemValues().size() != 6) {
                 Integer value = ro.getValue();
                 ro.clearItemValues();
@@ -698,28 +798,113 @@ public class ClientOptions extends OptionGroup {
                 ro.setValue(value); // Make sure the value is valid
             }
         } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to fix " + DEFAULT_MINIMAP_ZOOM
+            logger.log(Level.WARNING, "Failed to fix " + DEFAULT_ZOOM_LEVEL
                 + " option", e);
         }
         // end @compat 0.11.3
 
         // @compat 0.11.6
-        addBooleanOption(SHOW_REGION_NAMING, ClientOptions.MESSAGES, true);
+        addBooleanOption(SHOW_REGION_NAMING,
+                         MESSAGES_GROUP, true);
 
         // These have computed keys in ModelMessage.MessageType
         addBooleanOption("model.option.guiShowCombatResult",
-                         ClientOptions.MESSAGES, true);
+                         MESSAGES_GROUP, true);
         addBooleanOption("model.option.guiShowUnitRepaired",
-                         ClientOptions.MESSAGES, true);
-        addBooleanOption("model.option.guiShowArrived",
-                         ClientOptions.MESSAGES, true);
+                         MESSAGES_GROUP, true);
+        addBooleanOption("model.option.guiShowUnitArrived",
+                         MESSAGES_GROUP, true);
         addBooleanOption("model.option.guiShowDisasters",
-                         ClientOptions.MESSAGES, true);
-        addBooleanOption(USE_OPENGL, ClientOptions.GUI, true);
-        addBooleanOption(USE_XRENDER, ClientOptions.GUI, true);
-        addRangeOption(FRIENDLY_MOVE_ANIMATION_SPEED, ClientOptions.GUI, 3,
-                       friendlyMoveAnimationSpeeds);
+                         MESSAGES_GROUP, true);
+        addBooleanOption(USE_OPENGL,
+                         GUI_GROUP, true);
+        addBooleanOption(USE_XRENDER,
+                         GUI_GROUP, true);
+        addRangeOption(FRIENDLY_MOVE_ANIMATION_SPEED,
+                       GUI_GROUP, 3, friendlyMoveAnimationSpeeds);
+
+        // Reorg ~early 2022
+        // - model.option.smoothRendering is no longer used
+        // - ClientOptions.GUI was split into DISPLAY_GROUP and INTERFACE_GROUP
+        // - LANGUAGE is now in the PERSONAL group
+        regroup(LANGUAGE, PERSONAL_GROUP);
+        // - DISPLAY_SCALING added to DISPLAY_GROUP
+        // - font overrides added to DISPLAY_GROUP
+        // - USE_* booleans and animation speed move to DISPLAY_GROUP
+        addOptionGroup(DISPLAY_GROUP, TAG);
+        addIntegerOption(DISPLAY_SCALING,
+                         DISPLAY_GROUP, 0);
+        addBooleanOption(MANUAL_MAIN_FONT_SIZE,
+                         DISPLAY_GROUP, false);
+        addIntegerOption(MAIN_FONT_SIZE,
+                         DISPLAY_GROUP, 12);
+        for (String n: new String[] {
+                USE_PIXMAPS, USE_OPENGL, USE_XRENDER,
+                MOVE_ANIMATION_SPEED, ENEMY_MOVE_ANIMATION_SPEED,
+                FRIENDLY_MOVE_ANIMATION_SPEED }) {
+            regroup(n, DISPLAY_GROUP);
+        }
+        // Most of the remaining options move to the MAPVIEW_GROUP...
+        addOptionGroup(INTERFACE_GROUP, TAG);
+        addOptionGroup(MAPVIEW_GROUP, INTERFACE_GROUP);
+        for (String n: new String[] {
+                DEFAULT_ZOOM_LEVEL, ALWAYS_CENTER, JUMP_TO_ACTIVE_UNIT,
+                MAP_SCROLL_ON_DRAG, AUTO_SCROLL,
+                DISPLAY_GRID, DISPLAY_BORDERS, UNIT_LAST_MOVE_DELAY,
+                DISPLAY_TILE_TEXT, DISPLAY_COLONY_LABELS }) {
+            regroup(n, MAPVIEW_GROUP);
+        }
+        // ...except the minimap controls which are in MAPCONTROLS_GROUP
+        addOptionGroup(MAPCONTROLS_GROUP, INTERFACE_GROUP);
+        for (String n: new String[] {
+                DISPLAY_COMPASS_ROSE, DISPLAY_MAP_CONTROLS,
+                MINIMAP_TOGGLE_FOG_OF_WAR, MINIMAP_TOGGLE_BORDERS,
+                //MINIMAP_SMOOTH_RENDERING,
+                MINIMAP_BACKGROUND_COLOR }) {
+            regroup(n, MAPCONTROLS_GROUP);
+        }
+        // MESSAGES,WAREHOUSE,OTHER_GROUP move to INTERFACE_GROUP
+        regroup(MESSAGES_GROUP, INTERFACE_GROUP);
+        regroup(WAREHOUSE_GROUP, INTERFACE_GROUP);
+        regroup(OTHER_GROUP, INTERFACE_GROUP);
+        addBooleanOption(DISPLAY_FOG_OF_WAR, MAPCONTROLS_GROUP, false);
         // end @compat 0.11.6
+        // @compat 0.12.0
+        /* Gone after 0.13.0:
+        final PercentageOption volumeOption = getOption(AUDIO_VOLUME, PercentageOption.class);
+        volumeOption.setPreviewEnabled(true);
+        */
+        addRangeOption(GRAPHICS_QUALITY, DISPLAY_GROUP, 20, graphicsQualityChoices);
+        addBooleanOption(USE_TERRAIN_ANIMATIONS, DISPLAY_GROUP, true);
+        // end @compat 0.12.0
+        // @compat 0.13.0
+        addPercentageOption(MUSIC_VOLUME, AUDIO_GROUP, 100);
+        addPercentageOption(SOUND_EFFECTS_VOLUME, AUDIO_GROUP, 100);
+        // end @compat 0.13.0
+        // @compat 1.1.0
+        remove("model.option.mapControls");
+        final RangeOption op = getOption(DISPLAY_SCALING, RangeOption.class);
+        if (!op.getItemValues().containsKey(75)) {
+            op.setItemValueAtIndex(1, 75, "model.option.displayScaling.75");
+        }
+        // end @compat 1.1.0
+        // @compat 1.1.0
+        if (!hasOption(DISPLAY_MODE_FULLSCREEN, FullscreenDisplayModeOption.class)) {
+            final FullscreenDisplayModeOption dmf = new FullscreenDisplayModeOption(null);
+            dmf.setGroup(DISPLAY_GROUP);
+            dmf.setValue(null);
+            add(op);
+        }
+        // end @compat 1.1.0
+    }
+    
+    private void addPercentageOption(String id, String gr, int val) {
+        if (!hasOption(id, PercentageOption.class)) {
+            PercentageOption op = new PercentageOption(id, null);
+            op.setGroup(gr);
+            op.setValue(val);
+            add(op);
+        }
     }
 
     private void addBooleanOption(String id, String gr, boolean val) {
@@ -731,7 +916,6 @@ public class ClientOptions extends OptionGroup {
         }
     }
 
-    /** Currently unused.
     private void addIntegerOption(String id, String gr, int val) {
         if (!hasOption(id, IntegerOption.class)) {
             IntegerOption op = new IntegerOption(id, null);
@@ -739,16 +923,15 @@ public class ClientOptions extends OptionGroup {
             op.setValue(val);
             add(op);
         }
-    }*/
+    }
 
-    /** Currently unused.
     private void addOptionGroup(String id, String gr) {
         if (!hasOption(id, OptionGroup.class)) {
             OptionGroup og = new OptionGroup(id);
             og.setGroup(gr);
             add(og);
         }
-    }*/
+    }
 
     /**
      * Add a new range option.
@@ -785,6 +968,19 @@ public class ClientOptions extends OptionGroup {
             op.setGroup(gr);
             op.setValue(val);
             add(op);
+        }
+    }
+
+    /**
+     * Move an option to a different group.
+     *
+     * @param id The identifier for the option to move.
+     * @param gr The identifier for the option group to move to.
+     */
+    private void regroup(String id, String gr) {
+        final Option<?> op = getOption(id);
+        if (op != null) {
+            op.setGroup(gr);
         }
     }
 

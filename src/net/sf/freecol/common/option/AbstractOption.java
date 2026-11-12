@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -24,6 +24,7 @@ import java.util.logging.Logger;
 import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.common.io.FreeColXMLReader;
+import net.sf.freecol.common.io.FreeColXMLWriter;
 import net.sf.freecol.common.model.FreeColSpecObject;
 import net.sf.freecol.common.model.Specification;
 
@@ -41,6 +42,8 @@ public abstract class AbstractOption<T> extends FreeColSpecObject
 
     private static final Logger logger = Logger.getLogger(AbstractOption.class.getName());
 
+    private static final String ENABLED_BY_TAG = "enabledBy";
+    
     /** The option group prefix. */
     private String optionGroupId = "";
 
@@ -49,6 +52,8 @@ public abstract class AbstractOption<T> extends FreeColSpecObject
      * option won't change when a default value is read from an XML file.
      */
     protected boolean isDefined = false;
+    
+    private String enabledBy = null;
 
 
     /**
@@ -166,6 +171,14 @@ public abstract class AbstractOption<T> extends FreeColSpecObject
      */
     @Override
     public abstract void setValue(T value);
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String getEnabledBy() {
+        return enabledBy;
+    }
 
 
     // Serialization
@@ -192,13 +205,26 @@ public abstract class AbstractOption<T> extends FreeColSpecObject
         } else {
             setValue(value, defaultValue);
         }
+        
+        this.enabledBy = xr.getAttribute(ENABLED_BY_TAG, (String)null);
     }
 
-    // Note: writeAttributes() is not needed/present.
-    // - The identifier is correctly written by the super class.
-    // - The default value does not need to be written in general.
-    // - The value *must* be written by the implementing subclass.
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void writeAttributes(FreeColXMLWriter xw) throws XMLStreamException {
+        super.writeAttributes(xw);
+        
+        // Note:
+        // - The identifier is correctly written by the super class.
+        // - The default value does not need to be written in general.
+        // - The value *must* be written by the implementing subclass.
 
+        if (enabledBy != null) {
+            xw.writeAttribute(ENABLED_BY_TAG, enabledBy);
+        }
+    }
     /**
      * General option reader routine.
      *
@@ -206,11 +232,11 @@ public abstract class AbstractOption<T> extends FreeColSpecObject
      * @return An option.
      * @exception XMLStreamException on stream errors.
      */
-    protected AbstractOption readOption(FreeColXMLReader xr)
+    protected AbstractOption<?> readOption(FreeColXMLReader xr)
         throws XMLStreamException {
         final Specification spec = getSpecification();
         final String tag = xr.getLocalName();
-        AbstractOption option = null;
+        AbstractOption<?> option = null;
 
         if (ACTION_TAG.equals(tag)) {
             // FIXME: load FreeColActions from client options?
@@ -222,6 +248,9 @@ public abstract class AbstractOption<T> extends FreeColSpecObject
 
         } else if (AudioMixerOption.TAG.equals(tag)) {
             option = new AudioMixerOption(spec);
+
+        } else if (FullscreenDisplayModeOption.TAG.equals(tag)) {
+            option = new FullscreenDisplayModeOption(spec);
 
         } else if (BooleanOption.TAG.equals(tag)) {
             option = new BooleanOption(spec);

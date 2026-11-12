@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -29,10 +29,10 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.ChoiceItem;
-import net.sf.freecol.client.gui.panel.*;
+import net.sf.freecol.client.gui.panel.MigPanel;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Goods;
 import net.sf.freecol.common.model.Unit;
@@ -41,7 +41,7 @@ import net.sf.freecol.common.model.Unit;
 /**
  * This panel is used to handle dumping cargo.
  */
-public final class DumpCargoDialog extends FreeColDialog<List<Goods>> {
+public final class DumpCargoDialog extends DeprecatedFreeColDialog<List<Goods>> {
 
     @SuppressWarnings("unused")
     private static final Logger logger = Logger.getLogger(DumpCargoDialog.class.getName());

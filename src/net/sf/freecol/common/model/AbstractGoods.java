@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -23,7 +23,6 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.function.Predicate;
 
-import net.sf.freecol.common.model.GoodsType;
 import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.common.util.Utils;
 

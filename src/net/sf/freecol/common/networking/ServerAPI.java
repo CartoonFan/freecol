@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -36,8 +36,6 @@ import net.sf.freecol.common.model.DiplomaticTrade;
 import net.sf.freecol.common.model.ExportData;
 import net.sf.freecol.common.model.FoundingFather;
 import net.sf.freecol.common.model.FreeColGameObject;
-import net.sf.freecol.common.model.FreeColObject;
-import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.Game.LogoutReason;
 import net.sf.freecol.common.model.Goods;
 import net.sf.freecol.common.model.GoodsType;
@@ -61,7 +59,6 @@ import net.sf.freecol.common.model.Unit;
 import net.sf.freecol.common.model.Unit.UnitState;
 import net.sf.freecol.common.model.UnitType;
 import net.sf.freecol.common.model.WorkLocation;
-import net.sf.freecol.common.networking.ErrorMessage;
 import net.sf.freecol.common.option.OptionGroup;
 
 
@@ -270,6 +267,17 @@ public abstract class ServerAPI {
      */
     public boolean attack(Unit unit, Direction direction) {
         return ask(new AttackMessage(unit, direction));
+    }
+    
+    /**
+     * Server query-response for ranged attacking.
+     *
+     * @param unit The {@code Unit} to perform the attack.
+     * @param target The target {@code Tile} of the attack.
+     * @return True if the server interaction succeeded.
+     */
+    public boolean attackRanged(Unit unit, Tile target) {
+        return ask(new AttackRangedMessage(unit, target));
     }
 
     /**
@@ -638,15 +646,16 @@ public abstract class ServerAPI {
      * Server query-response for logging in a player (pre-game).
      *
      * @param userName The user name.
+     * @param nationId The nationId when the client is selecting a player.
      * @param version The client version.
      * @param single True if this is a single player login.
      * @param current True if the requesting player should become the
      *     current player.
      * @return True if the server interaction succeeded.
      */
-    public boolean login(String userName, String version,
+    public boolean login(String userName, String nationId, String version,
                          boolean single, boolean current) {
-        return ask(new LoginMessage(null, userName, version, null,
+        return ask(new LoginMessage(null, userName, nationId, version, null,
                                     single, current, null));
     }
 

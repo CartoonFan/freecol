@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -248,7 +248,7 @@ public final class REFAIPlayer extends EuropeanAIPlayer {
         final Function<Colony, TargetTuple> newTupleMapper = c -> {
             PathNode path = pathMapper.apply(c);
             return new TargetTuple(c, path,
-                UnitSeekAndDestroyMission.scorePath(aiu, path));
+                UnitSeekAndDestroyMission.scorePath(aiu, path, false, false));
         };
         final List<TargetTuple> targets
             = transform(flatten(player.getRebels(),
@@ -272,7 +272,7 @@ public final class REFAIPlayer extends EuropeanAIPlayer {
                     : (ag.getType().isBuildingMaterial()
                         && ag.getType().isRefined()) ? 1.5
                     : 1.0);
-            t.score *= 0.01 * (101 - Math.min(100, t.colony.getSoL()))
+            t.score *= 0.01 * (101 - Math.min(100, t.colony.getSonsOfLiberty()))
                 * product(t.colony.getBuildings(), b -> b.getLevel() > 1, bdf)
                 * ((6 - ((!t.colony.hasStockade()) ? 0
                             : t.colony.getStockade().getLevel())) / 6.0)
@@ -542,7 +542,10 @@ public final class REFAIPlayer extends EuropeanAIPlayer {
             // Collect privateers that are on the map.
             for (AIUnit aiu : privateers) {
                 Location target = aiu.getMission().getTarget();
-                if (target instanceof Unit && aiu.getUnit().hasTile()) {
+                if (target instanceof Unit
+                        && !((Unit) target).isDisposed()
+                        && target.getTile() != null
+                        && aiu.getUnit().hasTile()) {
                     naval.add(aiu);
                 } else if ((m = getTransportMission(aiu)) != null) {
                     lb.add(" notarget ", m);
@@ -591,7 +594,7 @@ public final class REFAIPlayer extends EuropeanAIPlayer {
      * {@inheritDoc}
      */
     @Override
-    public void giveNormalMissions(LogBuilder lb) {
+    public void giveNormalMissions(LogBuilder lb, List<AIUnit> aiUnits) {
         final Player player = getPlayer();
         final Map<Location, List<AIUnit>> idlers = new HashMap<>();
         List<AIUnit> privateers = new ArrayList<>();
@@ -673,7 +676,7 @@ public final class REFAIPlayer extends EuropeanAIPlayer {
         // - go idle in a port
         for (AIUnit aiu : land) {
             Location target = UnitSeekAndDestroyMission.findMissionTarget(aiu, 
-                seekAndDestroyRange, false);
+                seekAndDestroyRange, false, false);
             if (target != null) {
                 Integer count = targetMap.get(target);
                 if (count == null) count = 0;
@@ -877,7 +880,7 @@ public final class REFAIPlayer extends EuropeanAIPlayer {
         }
 
         // Fall back to the normal EuropeanAI behaviour for remaining units.
-        super.giveNormalMissions(lb);
+        super.giveNormalMissions(lb, getAIUnits());
     }
 
 
@@ -906,8 +909,8 @@ public final class REFAIPlayer extends EuropeanAIPlayer {
                 if (aiu.hasMission(TransportMission.class)) {
                     transport.add(aiu.getMission(TransportMission.class));
                 }
-            } else {
-                if (u.isInEurope()) land.add(aiu);
+            } else if (u.isInEurope()) {
+                land.add(aiu);
             }
         }
         if (!land.isEmpty() && !transport.isEmpty()) {
@@ -921,8 +924,7 @@ public final class REFAIPlayer extends EuropeanAIPlayer {
      * {@inheritDoc}
      */
     @Override
-    public int adjustMission(AIUnit aiUnit, PathNode path, Class type,
-                             int value) {
+    public int adjustMission(AIUnit aiUnit, PathNode path, Class<?> type, int value) {
         if (value > 0) {
             if (type == DefendSettlementMission.class) {
                 // REF garrisons thinly.

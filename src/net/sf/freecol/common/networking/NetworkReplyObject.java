@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,6 +19,7 @@
 
 package net.sf.freecol.common.networking;
 
+import java.util.concurrent.TimeoutException;
 
 /**
  * Class for storing a network response.  If the response has not been
@@ -68,17 +69,25 @@ public class NetworkReplyObject {
      * Gets the response. If the response has not been set, this method
      * will block until {@link #setResponse} has been called.
      *
+     * @param timeout A timeout in milliseconds, after which a
+     *      {@code TimeoutException} gets thrown when waiting for
+     *      a reply.
      * @return the response.
+     * @throws TimeoutException when the timeout is reached.
      */
-    public synchronized Object getResponse() {
+    public synchronized Object getResponse(long timeout) throws TimeoutException {
+        final long end = System.currentTimeMillis() + timeout;
         while (!this.responseGiven) {
+            if (System.currentTimeMillis() > end) {
+                throw new TimeoutException("The network request timed out: " + timeout);
+            }
             try {
                 wait(ONE_SECOND);
             } catch (InterruptedException ie) {}
         }
         return this.response;
     }
-
+    
     /**
      * Sets the response and continues {@code getResponse()}.
      *

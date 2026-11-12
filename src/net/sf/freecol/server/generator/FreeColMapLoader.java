@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -22,11 +22,10 @@ package net.sf.freecol.server.generator;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.common.FreeColException;
-import net.sf.freecol.common.io.FreeColSavegameFile;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.IndianSettlement;
 import net.sf.freecol.common.model.Map;
@@ -38,20 +37,15 @@ import net.sf.freecol.common.model.Tile;
 import net.sf.freecol.common.model.TileItemContainer;
 import net.sf.freecol.common.model.TileType;
 import net.sf.freecol.server.FreeColServer;
-import net.sf.freecol.server.model.ServerGame;
 import net.sf.freecol.server.model.ServerIndianSettlement;
 import net.sf.freecol.server.model.ServerPlayer;
 import net.sf.freecol.server.model.ServerRegion;
-
-import javax.xml.stream.XMLStreamException;
 
 
 /**
  * Load a FreeCol map.
  */
 public class FreeColMapLoader implements MapLoader {
-
-    private static final Logger logger = Logger.getLogger(FreeColMapLoader.class.getName());
 
     private Map importMap = null;
 

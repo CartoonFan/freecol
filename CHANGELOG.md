@@ -1,66 +1,352 @@
-## FreeCol 0.12.0 (Unreleased) ##
+## FreeCol 1.2.1 (In development) ##
 
-### Developer issues ###
+All savegames (without mods) from 0.12.0 and up should continue working with 1.2.1.
 
-* **Java 8 is required to build FreeCol.**
-* Resource keys for same images in different resolution can now be added to support higher resolution images when zooming or using --gui-scale option.
-* All client-server interaction now *must* be asynchronous, as askExpecting() has been removed.
-* DOM is gone, and there was much rejoicing.
+### Graphics ###
+* Adding new graphics for the lost city rumours.
 
-### Common problems ###
+### User Interface ###
+* Changes the default for most confirm dialogs to OK instead of Cancel.
+* Lots of dialogs, that where previously popups outside the game window, have now moved into the main game window.
+* The end turn panel can now be resized.
+* 10 in now the minimum font size. This mitigates the effect from low reported DPI on macos when a non-native resolution is used.
+* Scroll bar speed is now adjusted according to the current font size. This applies when scrolling with the mouse wheel or the scroll bar buttons.
+* The resolution of the screen in fullscreen mode can now be configured in the Preferences.
+* Left and right arrows can now again be used for switching the currently displayed colony
+* It's no longer necessary to activate numlock for keypad navigation.
+* Bugfix: The buttons on the colony panel is now rendered properly for very large fonts.
+* Bugfix: Attack animations are now played in the correct position.
+* Bugfix: Fixes an issue where goods that has been sold is still displayed in the unit info panel.
+* Bugfix: Fixes a bug where the escape key closed multiple panels.
+* Bugfix: An error message is no longer displayed when a goto order cashes in a treasure train.
+* Bugfix: A warning message is no longer displayed if cashing in a treasure train using the context menu while the treasure train is the active unit.
+* Bugfix: Fixes rendering issues in the diplomacy dialog.
+* Buxfix: In the labor report, clicking on a unit carried by a ship no longer forces a reconnect.
+* Bugfix: Paying arrears in Europe now immediately refreshes the display so that goods are no longer greyed out.
+* Bugfix: Secondary accelerator keys for moving on the mapbaord now works again.
 
-* Java 7 is no longer receiving active support, therefore the previous version of FreeCol switched to using Java 8 which is the currently supported release.  This hopefully fixed the problems that many Mac users have been experiencing.  If FreeCol 0.12.0 fails to run, check first if your installed Java libraries are up to date.
+### Performance ###
+* Unit movements are now faster (area redrawn when moving is reduced).
+
+### Rule Changes ###
+* Disabling "Experts have connections" for the classic ruleset.
+* Bugfix: Casas is now the only founding father that will upgrade native converts.
+
+### AI/computer players ###
+* Bugfix: Fixed an issue that prevented diplomacy initiated during the AI players' turns.
+* Bugfix: Ships the AI builds in its colonies no longer wait one turn before being utilized.
+
+### Mod development ###
+* Allow mods to add modifiers ("model.modifier.education.teaching.turns") for the education teaching time. Scope checks are applied to the teacher.
+* Bugfix: Types can now be deleted from the specification.
+
+### Other ###
+* Fixes an issue where not capturing goods from a ship prevents ending the turn.
+* Includes the version number in the freecol application directory when making ZIP-files and other packages. This prevents having the application directory collide with the settings directory if the user extracts the ZIP file (or other installation file) to the Documents directory in Windows.
+* Bugfix: Bolivar's effect on colonies is now immediately applied for all colonies without having to force a change/reconnect.
+* Bugfix: Fallback on maps where European starting location placement previously failed.
+
+## FreeCol 1.2.0 (4th of July, 2024) ##
+
+All savegames (without mods) from 0.12.0 and up should continue working with 1.2.0.
+
+### Graphics ###
+* Awesome new building graphics from Misiulo.
+* Massive redesign of the colony panel with background images and other styling
+* A new styling for the top menu bar with better contrast. This includes changes like showing the top level menus in a button like style.
+* New styling for radio and checkbox buttons.
+* The face of Peter Minuit now has more realistic coloring. 
+
+### Performance ###
+* Improved rendering performance, and especially when scrolling or moving units.
+* Allow to run FreeCol with only 512MB memory. Please keep in mind that 2GB is still needed for higher resolution, smoother scroll and high rendering quality.
+* Better handling of memory -- for example prioritized automatic clearing of caches when running low on memory.
+
+### Rule Changes ###
+* Adding the four extra nations to the classic ruleset. These nations are deactivated by default. Having them as a part of the classic ruleset make it easier to play a game with the classic rules, while still having additional players.
+* Deactivates being able to starve out native settlements.
+* Bugfix: Fixed a bug that made native settlements be scattered all over the map instead of being grouped by nation (this happened mostly on small maps).
+* Bugfix for "Shippable wagons mod": Wagon trains can now be built when the shippable wagons mod has been enabled.
+
+### User Interface ###
+* The mapboard scrolling is now much smoother and supports pixel-by-pixel scrolling.
+* Allowing scrolling past the borders of a map so that edge tiles can also be placed in focus.
+* It's now possible to use 75% display scaling. This can be used when playing on very small screens where fixed size dialogs would otherwise be larger than the screen.
+* The warehouse dialog can now be resized.
+* Focus is now changed on the mapboard with a single mouse click.
+* Unit dragging can now only be started by clicking on the unit (in order to reduce the likelyhood of accidental goto-orders). In addition, the drag can now be started for units that are currently not the active unit.
+* The active unit is kept when opening a colony panel.
+* The colony panel now works better on small screens.
+* The build queue is no longer displayed when clicking on other buildings than the carpenter type of buildings. 
+* The colony panel can now be more easily dragged by clicking-and-dragging almost anywhere on the colony panel's open spaces.
+* Various fixes and a new visualization of goto-paths.
+* Buildings are now randomly distributed in the colony based on the available space, and can be of different sizes.
+* The panel showing the signing of the Declaration of Independence is now made larger on bigger screens.
+* Panels can now cover the entire mapboard area (this is needed for very small screens in order to show all content).
+* The confirm declaration dialog now fits on small screen.
+* 6688 translation string updated (in total) for 38 languages.
+* Bugfix: Fixes hidden OK-button in the Colopedia on small screens. 
+* Bugfix: The height of a colony building no longer changes when a worker is added.
+* Bugfix: Lots of small rendering differences between different systems (DPI and OS) have been fixed.
+* Bugfix: Caps the automatic font size at no more than 25% larger than the current scaleFactor.
+* Bugfix: Hides the display of the "option only"-nation type from the start game panel
+* Bugfix: Fixes the tab order on the new game panel.
+* Bugfix: An error message is now properly displayed if trying to contact natives with a scout onboard a ship.
+* Bugfix: Solved an issue with the Founding Father panel missing the OK button in some languages. 
+* Bugfix: REF color is now white for all REF players and Russia is grey (only if the game was started using this version or later). 
+* Bugfix: Fixes an issue where the unit info panel displays outdated info. The bug could be reproduced by right-clicking on a tile and then selecting a unit.
+
+### Map Editor ###
+* Allow the minimap and other map controls to be resized in the map editor.
+* The areas for native nations can now be defined in the map editor. These areas mark the allowed locations for native settlements for each nations. Overlapping areas are allowed, since proper distance between native settlements are still checked, and can be used for having a random element to the overlap/size of each nation. In addition, it's still possible to define specific settlements that will be used if "Import settlements" is checked when starting a new game.
+* The starting areas for European nations can now be defined in the map editor. A random tile in each nation's starting area is used when starting a new game. The areas may overlap.
+* Unit order buttons are now hidden when in the map editor.
+* Bugfix: Fixes a bug where map width was used for height, and the other way around, when scaling a map in the map editor.
+* Bugfix: A new game is now always loaded before importing or generating a new map. This fixes lots of issues caused by stuff from the old map leaking into the new one.
+
+### AI/computer players ###
+* Bugfix: Fixed a bug that prevented the REF computer player (AI) from completing its turn.
+* Bugfix: Fixed a bug preventing the REF from surrendering.
+* Bugfix: Fixed a bug where the AI sometimes sent ships back and forth to Europe without doing anything.
+
+### Mod development ###
+* Adding an empty image resource file (resource:image.empty) to be used for replacing images with empty space.
+* Mods can now reference abstract types from the base rule without extending a specific base rule.
+* Added "preserve-attributes" that, if true, preserves the attributes of a specification element. This simplifies changing only the subelements. Please note that any "extends" attribute still needs to be repeated since this attributes changes the subelements.
+* The game now displays mod initialization errors to the user in the new game and start game dialogs.
+* An exception is now thrown if a referenced type is used before it's defined.
+
+### Other bug fixes ###
+* Fixed an issue that prevented the Declaration of Independence if the player name had non-ascii characters.
+* Allows automated trade routes to unload goods in colonies with more than 100 goods. In addition, unloading food is now always allowed.
+* Fixes an issue where moving goods into/out from a colony messes up the production. The most noticeable effect of this bug was colonists starving to death while a new colonist was born.
+
+
+## FreeCol 1.1.0 (May 7, 2023) ##
+
+All savegames from 0.12.0 and up should continue working with 1.1.0.
+
+### Music ###
+* New track: El Dorado
+* New track: Free Colonist
+* New track: Lost City
+* New track: Rainy Day
+* New track: Royal Troops
+* New track: Wagon Wheels
+* Updated the old tracks with new updated versions.
+
+### Graphics ###
+* New graphics for hills and mountains.
+* The standard panel background image is now both brighter and without obvious tiling artifacts on larger screens.
+
+### Rule changes ###
+* Jesuit Missionary can now recommision itself in colonies without a church.
+* Added the mod "Hitpoints and Combat" that adds hitpoints and ranged combat to the game.
+
+### Map Generator ###
+* Great rivers (ocean like, navigable by ships only) are no longer generated by default, but can still be generated if enabled using the Map Generator Options.
+* The number of rivers generated can now be properly controlled using the "Number of rivers" map generator option even when changing map sizes and/or amount of mountains.
+* Enabled generation of rivers that are only two tiles long (the previous limit was three).
+
+### User Interface ###
+* Units in Europe are no longer included in the list of possible active units.
+* Game options and Map generator options are no longer automatically saved and loaded. The default values are initially displayed for all new games.
+* Panels/dialogs are now automatically resized and relocated when changing the size of the application window (including when switching between full screen and windowed mode).
+* Allows the player to easily view all files while loading savegames/maps. 
+* The start game panel can now be resized to smaller than the initial size.
+* The chat panel (start game panel in multiplayer) is now placed directly below the list of players making the dialog work better on small screens.
+* The displayed occupation string on a pioneer now shows "C" for clear forest instead of "P".
+
+### AI/computer players ###
+* Greatly reduces the time needed by the AI (the wait time after ending the turn).
+* The AI now gets less benefits on lower difficulty levels to make everything easier.
+* Escort unit missions are now immediately aborted if the protected unit gets destroyed.
+* More efficient transportation of goods and units (better utilization of the capacity of ships and wagon trains).
+* The AI now produces fewer and better colonies.
+
+### Mod development ###
+* Allow mods to be loaded when making maps in the map editor. This allows maps to be made with new terrain types, and other resources, added by mods.
+* New types of mountains and hills defined by mods are now used when generating maps. The specific type of hill/mountain is determined by the latitude.
+* Partial modifications to the specification is now possible again. This fixes a regression introduced in 0.11.x that prevented the "partial" flag from working.
+* Mods can now define new order buttons (and have them applied without having to restart the game).
+* Bugfix: Mods are no longer loaded twice (thereby causing varius problems in the colony panel and other places when modifications were made).
+* Bugfix: Units that are not available to a player can now be captured if a valid "unit-change" exist.
+
+### Bug fixes ###
+* Fixed a bug that caused the same maps always being generated when starting a new game.
+* Fixes game hangs on end turn in some specific cases.
+* Fixed scaling and placement of goods production icons on colony tiles. 
+* A unit in a building is no longer drawn at the top of the building (that is, the area for showing goods production) if the production is zero.
+* Sound effects are now properly played when attacking.
+* Fixed a bug that prevented the map shortcut buttons on the Map Generator dialog from working properly. The bug caused the button to have no effect the first time it was clicked after restarting the application.
+* Fixed an issue that sometimes prevented mods from being deactivated in the Preferences.
+* The game now fails gracefully if the server cannot be started. This prevents an application freeze when failing to start a new game or failing to load a savegame.
+* Revenge mode is now working again.
+* Fixes an issue that allowed a malicious client (in a multiplayer game) to attack with a unit that had no moves left.
+* The "Train" panel in Europe now has five columns of unit buttons instead of just three.
+* Fixes a bug that sometimes stopped trade routes / goto orders from working. For example, this happened if there was a lost city rumor in the search area of a wagon train on a trade route.
+* Fixes activation of tile improvement actions (like "Plow") after reconnecting.
+* Allows the founding father selection to be postponed without an error message.
+* Fixed a bug that sometimes prevented the map from being redrawn properly after a unit move/attack animation.
+* Highscores can now be stored and displayed again.
+
+
+## FreeCol 1.0.0 (January 2, 2023) ##
+
+On this very day, 20 years ago, we made the first public release of FreeCol. Our releases have until now been marked as alpha/beta even though the number of downloads for our game has long been counted in the millions.
+
+We are extremely proud to finally announce FreeCol 1.0.0!
+
+All 0.12.0 and 0.13.0 games should continue to work with 1.0.0.
+
+
+### User-visible changes since 0.13.0-release ###
+
+#### Graphics ####
+
+* New nation specific colony graphics.
+* New forest graphics
+* New graphics for deserts.
+* New transitions between the base tiles.
+* Minor changes to other graphics.
+
+
+#### Rule changes ####
+
+* Major changes to the tile goods production so that the actual values matches the original game.
+
+
+#### Mod development ####
+
+* It's now possible to define nation specific unit types that can be recruited and purchased in Europe.
+* Added tools for easily making new base tiles from a single tiling texture.
+* A bug that prevented certain images from being overridden by mods has been fixed.
+
+
+#### AI/computer players ####
+
+* The AI now chooses better locations when constructing colonies, and also avoid placing the colonies too close to one another.
+* The AI colony development and expansion have been improved.
+* The AI can now construct docks.
+* More efficient transportation of goods.
+* The AI can now buy units from Europe without cheating.
+* The computer players will now use more advanced tactics when defending and attacking.
+* The AI no longer defends its colonies with scouts.
+* Adding a new escort mission for protecting units. This mission is used for dragoons that are escorting artillery when attacking.
+* National advantages will now change how the AI utilizes its military units. For example, the conquest advantage (spanish) will make the player focus on destroying the natives.
+* The AI will no longer equip specialists (like Elder Statemen) with muskets.
+* AI ships should no longer get stuck outside native settlements.
+
+
+#### Bugfixes ####
+
+* Several bugs that might cause the game to crash have been fixed (for example when all settlements of a native player was destroyed).
+* Fixed several issues with goto-orders that made the game hang after end of turn.
+* Fixed several issues that forced a server reconnect.
+* Fixed leaking file descriptors that crashed the game on Windows.
+* Reduces the amount of jumping around on the map while animating the moves of enemy units.
+* Accelerator keys can now be changed, saved and loaded in the preferences.
+* It's now possible to add the same goods multiple times to the same stop in the trade route panel.
+* Fixes the scaling of several different panels (preferences).
+* Scrolling on the map should now be smoother.
+* Units should no longer have their graphics clipped on the map.
+* Smoother playback of audio.
+* The colony panel is now properly updated when clearing the speciality of a worker.
+* Recursive autosave directories should no longer be created.
+* Several text template fixes.
+* Lots of other minor bugfixes.
+
+
+#### Other changes ####
+* The escape key can now be used to close most panels.
+* There are now separate volume sliders for music and sound effects.
+* Added a mod where basic buildings (level 1) needs to be constructed (except Town Hall and Carpenter's house).
+* Added a mod for having 19th century nations.
+* Treasure trains are now displayed in the cargo report panel.
+* A malfunctional AI should no longer stop the game.
+* Better handling of severe errors like out-of-memory and stack-overflow.
+* Translation updates (a total of 5191 translation strings updated in 53 different languages).
+
+
+
+## FreeCol 0.13.0 (July 9, 2022) ##
+
+The FreeCol team are pleased to announce the release of FreeCol 0.13.0. All 0.11.x (x != 4) and 0.12.0 games should continue to work with 0.13.0, but not vice versa.
+
+We hope you enjoy FreeCol 0.13.0. Onward to 1.0.
+
+The FreeCol Team
+
+
+### User-visible changes since 0.12.0-release ###
+
+* In-game music by Alexander Zhelanov.
+* New skins for the minimap and the unit info panel.
+* New animated rivers.
+* Major river tiles now gets the minor river production bonus twice.
+* The rendering performance has been improved.
+* Rendering quality can now be modified using a new option in the Preferences.
+* More high resolution versions of existing images have been added.
+* Better support for screens with low resolution.
+* Adding two new mods for changing the skins for the minimap and the unit info panel.
+* Multiplayer savegame loading has been fixed.
+* Over 30 bugs fixed.
+
+
+## FreeCol 0.12.0 (May 1, 2022) ##
+
+The FreeCol team are pleased to announce the release of FreeCol 0.12.0.  Its been a while.  All 0.11.x (x != 4) games should continue to work with 0.12.0, but not vice versa.
+
+We hope you enjoy FreeCol 0.12.0. Onward to 1.0.
+
+The FreeCol Team
+
+
+### Java Platform ###
+
+FreeCol requires Java 11 at minimum.  Java 11 is a "Long Term Support" release, but later releases are also known to work.
 
 #### Mac OS ####
-Running FreeCol in Full-screen mode on OSX is known to be problematic and may not work.
+
+Running FreeCol in Full-screen mode on OSX is known to be problematic and may not work well.  As far we can tell this is due to a problem with the Java there, which we are unable to fix.
+
+#### Older Mods ####
+
+Old saved games that use old versions of the mods may lose functionality with the new release.  Most of the packaged mods should continue to work (there are known problems with "convertUpgrade").  New games using the updated mods will work.
+
+
 
 ### User-visible changes since 0.11.6-release ###
 
-#### New Features ####
+#### New features ####
 
-* A number of higher resolution images for units, goods and more have been added to the game.
-* A unit may now be ordered to go to an unexplored tile, as long as there is an adjacent explored tile that the unit can reach (without requring transport).
-* Display of European prices in several dialogs [IR#43](https://sourceforge.net/p/freecol/improvement-requests/43), from Brian Kim, Louise Zhang, Seongmin Park and Michael Jeffers,
-* Move all goods with a hot key [IR#199](https://sourceforge.net/p/freecol/improvement-requests/199/) from Brian Kim, Louise Zhang, Seongmin Park and Michael Jeffers.
-* Easier river editing in map editor through separate options for adding/removing and changing the river style.
+* Major graphics rework
+    * New tile and building images from Misiulo
+    * Support for high-DPI screens, customizable font size and high resolution versions of existing graphics
+    * Support for animations, smooth map scrolling and other improvements to the graphics engine
+* Many new maps, from Euzimar, piotrus, Mazim, organized by Blake
+* A huge expansion of the name lists (regions, ships, colonies) from Marcin
+* A unit may now be ordered to go to an unexplored tile, as long as there is an adjacent explored tile that the unit can reach (without requring transport)
+* Display of European prices in several dialogs [IR#43](https://sourceforge.net/p/freecol/improvement-requests/43), from Brian Kim, Louise Zhang, Seongmin Park and Michael Jeffers
+* Move all goods with a hot key [IR#199](https://sourceforge.net/p/freecol/improvement-requests/199/) from Brian Kim, Louise Zhang, Seongmin Park and Michael Jeffers
+* Easier river editing in map editor through separate options for adding/removing and changing the river style
+* There are now separate options controlling movement speed of your units, other friendly nation units, and other hostile nation units (formerly just your units and other nation units)
+* Over 150 bugs fixed
 
-#### Improvements ####
+
+#### Other improvements ####
 
 * Added tool tip to explain the last sale price annotation on the native settlement panel
 * Added "About FreeCol" button to the opening menu screen [IR#15](https://sourceforge.net/p/freecol/improvement-requests/15/)
 * Added option to disable / enable region naming dialog. [IR#222](https://sourceforge.net/p/freecol/improvement-requests/222)
-* Images of native converts who become dragoons or scouts retain ethnicity, [BR#3086](https://sourceforge.net/p/freecol/bugs/3086).
 * Game options added to adjust trade bonus for native alarm. [BR#3092](https://sourceforge.net/p/freecol/bugs/3092/)
 
-#### Bug Fixes ####
 
-* Fixed scout with goto-orders looping at lost city rumours, and broken messages following exploration of "strange mounds", [BR#2932](https://sourceforge.net/p/freecol/bugs/2932)
-* "slowed by" message no longer reveals enemy privateer nation, [BR#2933](https://sourceforge.net/p/freecol/bugs/2933)
-* The most recently arrived carrier is selected by default when the Europe panel is displayed, [BR#2941](https://sourceforge.net/p/freecol/bugs/2941)
-* Various path finding fixes with middle-click gotos, [BR#2943](https://sourceforge.net/p/freecol/bugs/2943), [BR#2944](https://sourceforge.net/p/freecol/bugs/2944), [BR#2980](https://sourceforge.net/p/freecol/bugs/2980).
-* Abandoning an improvement no longer corrupts the work of other pioneers also working on the same improvement, [BR#2946](https://sourceforge.net/p/freecol/bugs/2946).
-* Trying to overfill a unit with goods in Europe now just does nothing (like other such cases) and does not provoke the "server can not do that" message [IR#214 but really a bug](https://sourceforge.net/p/freecol/improvement-requests/214/)
-* Custom options were broken, again, [BR#2948](https://sourceforge.net/p/freecol/bugs/2948).
-* Fixed bad "trade refused" message, [BR#2950](https://sourceforge.net/p/freecol/bugs/2950).
-* deSoto and scouts could desynchronize the map, [BR#2953](https://sourceforge.net/p/freecol/bugs/2953).
-* Bad turn number when sailing from Europe, [BR#2955](https://sourceforge.net/p/freecol/bugs/2955).
-* Suppress bogus payment listing when dumping in Europe, [BR#2956](https://sourceforge.net/p/freecol/bugs/2956).
-* Suppress bogus colony abandonment warning when spying, [BR#2957](https://sourceforge.net/p/freecol/bugs/2957).
-* Drop carried goods when a brave is captured, [BR#2958](https://sourceforge.net/p/freecol/bugs/2958).
-* Fix colony tile ownership inconsistency,  [BR#2963](https://sourceforge.net/p/freecol/bugs/2963).
-* Clickable link problems, [BR#2965](https://sourceforge.net/p/freecol/bugs/2965).
-* Correctly update after feature change (such as goods party), [BR#2966](https://sourceforge.net/p/freecol/bugs/2966).
-* Problems using units that have exhausted their moves, [BR#2968](https://sourceforge.net/p/freecol/bugs/2968).
-* Slight clarification of unattended production modifiers, [BR#2973](https://sourceforge.net/p/freecol/bugs/2973).
-* Stop accumulating colonies in classic colony report, [BR#2974](https://sourceforge.net/p/freecol/bugs/2974).
-* Many Col1-compatibility checks and bugfixes with tile and building production with help from Lone_Wolf, [BR#2978](https://sourceforge.net/p/freecol/bugs/2978), [BR#2979](https://sourceforge.net/p/freecol/bugs/2979), [BR#2981](https://sourceforge.net/p/freecol/bugs/2981).
-* New versions of the national anthems and addition of the missing ones, from CalebRW.
-* Problems with selecting from multiple wagons in the build queue [BR#2014](https://sourceforge.net/p/freecol/bugs/2014), fixed by Lars Willemsens.
-* Problems with auto-save cleanup [BR#1307](https://sourceforge.net/p/freecol/bugs/1307), fixed by Lars Willemsens.
-* Various fixes to the map editor including smaller dialog for changing river styles [BR#2926](https://sourceforge.net/p/freecol/bugs/2926).
-* Layout of Warehouse Panel got improved to better fit inside the minimum supported resolution [BR#3033](https://sourceforge.net/p/freecol/bugs/3033), contributed by Jonas Stevnsvig.
-* Seasoned Scouts no longer disappear at LSR's according to Col1 and no longer increase negative results. [BR#3093](https://sourceforge.net/p/freecol/bugs/3093/)
-* Delivering gifts to Natives has a stronger effect on reducing native alarm. [BR#3092](https://sourceforge.net/p/freecol/bugs/3092/)
+### Developer issues ###
+
+* **Java 11 is required to build FreeCol.**
+* Resource keys for same images in different resolution can now be added to support higher resolution images when zooming or using --gui-scale option.
+* DOM is gone, and there was much rejoicing.
 
 
 ## FreeCol 0.11.6 (October 16, 2015) ##

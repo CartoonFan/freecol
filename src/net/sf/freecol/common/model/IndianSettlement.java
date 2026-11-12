@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,6 +19,24 @@
 
 package net.sf.freecol.common.model;
 
+import static net.sf.freecol.common.util.CollectionUtils.accumulateToMap;
+import static net.sf.freecol.common.util.CollectionUtils.any;
+import static net.sf.freecol.common.util.CollectionUtils.cacheInt;
+import static net.sf.freecol.common.util.CollectionUtils.count;
+import static net.sf.freecol.common.util.CollectionUtils.descendingIntegerComparator;
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.flatten;
+import static net.sf.freecol.common.util.CollectionUtils.forEachMapEntry;
+import static net.sf.freecol.common.util.CollectionUtils.isNotNull;
+import static net.sf.freecol.common.util.CollectionUtils.iterable;
+import static net.sf.freecol.common.util.CollectionUtils.mapEntriesByValue;
+import static net.sf.freecol.common.util.CollectionUtils.maximize;
+import static net.sf.freecol.common.util.CollectionUtils.sort;
+import static net.sf.freecol.common.util.CollectionUtils.sum;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+import static net.sf.freecol.common.util.RandomUtils.getRandomMember;
+import static net.sf.freecol.common.util.RandomUtils.randomInt;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -30,18 +48,15 @@ import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
+import net.sf.freecol.common.model.Constants.IntegrityType;
 import net.sf.freecol.common.option.GameOptions;
-import static net.sf.freecol.common.model.Constants.*;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.common.util.LogBuilder;
-import static net.sf.freecol.common.util.RandomUtils.*;
 
 
 /**
@@ -866,7 +881,7 @@ public class IndianSettlement extends Settlement implements TradeLocation {
                 : (rawProduction < 10) ? 5 * rawProduction + 25
                 : (rawProduction < 20) ? 2 * rawProduction + 55
                 : 100;
-            fakeProduction *= 0.5;
+            fakeProduction /= 2;
             // Pretend that we have actually done so, in proportion to
             // the available space
             current += fakeProduction * Math.max(0, capacity - current) / capacity;
@@ -1184,7 +1199,7 @@ public class IndianSettlement extends Settlement implements TradeLocation {
     public void addRandomGoods(Random random) {
         HashMap<GoodsType, Integer> goodsMap = new HashMap<>();
         for (AbstractGoods ag : iterable(flatten(getOwnedTiles(),
-                    t -> t.getSortedPotential().stream()))) {
+                    t -> t.getSortedAutoPotential().stream()))) {
             accumulateToMap(goodsMap, ag.getType().getStoredAs(),
                             ag.getAmount(), (a, b) -> a + b);
         }
@@ -1367,7 +1382,7 @@ public class IndianSettlement extends Settlement implements TradeLocation {
      * {@inheritDoc}
      */
     @Override
-    public int getSoL() {
+    public int getSonsOfLiberty() {
         // Native settlements do not generate SoL.
         return 0;
     }
@@ -1406,7 +1421,7 @@ public class IndianSettlement extends Settlement implements TradeLocation {
         // that they produce from their entire area at reduced
         // efficiency.
         if (tiles > getUnitCount()) {
-            potential *= (float) getUnitCount() / tiles;
+            potential = (int)(potential * (double)getUnitCount() / tiles);
         }
 
         // Raw production is too generous, apply a fudge factor to reduce it
@@ -1781,8 +1796,9 @@ public class IndianSettlement extends Settlement implements TradeLocation {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder(64);
+        String name = getName();
+        sb.append((name == null) ? "NONAME" : name);
         Tile tile = getTile();
-        sb.append(getName());
         if (tile != null) sb.append(" at (").append(tile.getX())
                               .append(',').append(tile.getY()).append(')');
         return sb.toString();

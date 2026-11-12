@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -31,12 +31,10 @@ import javax.swing.JLabel;
 import javax.swing.JSeparator;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.FontLibrary;
 import net.sf.freecol.client.gui.ImageLibrary;
-import net.sf.freecol.client.gui.panel.*;
-import net.sf.freecol.client.gui.Size;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Ability;
 import net.sf.freecol.common.model.GoodsType;
@@ -48,7 +46,7 @@ import net.sf.freecol.common.model.Tile;
 import net.sf.freecol.common.model.Unit;
 import net.sf.freecol.common.model.UnitType;
 import net.sf.freecol.common.resources.ResourceManager;
-import net.sf.freecol.common.util.*;
+import net.sf.freecol.common.util.CollectionUtils;
 
 
 /**
@@ -106,10 +104,10 @@ public final class ReportIndianPanel extends ReportPanel {
                 .getScaledSettlementTypeImage(opponent.getNationType().getCapitalType())));
         reportPanel.add(villageLabel, SPAN_SPLIT_2);
         JLabel headline = Utility.localizedLabel(opponent.getNationLabel());
-        headline.setFont(FontLibrary.getUnscaledFont("normal-bold-small"));
+        headline.setFont(FontLibrary.getScaledFont("normal-bold-small"));
         reportPanel.add(headline, "wrap 20, aligny center");
         JLabel label = Utility.localizedLabel("report.indian.chieftain");
-        Font font = FontLibrary.getUnscaledFont("normal-bold-tiny");
+        Font font = FontLibrary.getScaledFont("normal-bold-tiny");
         label.setFont(font);
         reportPanel.add(label);
         reportPanel.add(Utility.localizedLabel(opponent.getName()), "left, wrap");

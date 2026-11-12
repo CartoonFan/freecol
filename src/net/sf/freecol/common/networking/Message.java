@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,8 +19,6 @@
 
 package net.sf.freecol.common.networking;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -31,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.lang.reflect.Constructor;
@@ -51,8 +48,6 @@ import net.sf.freecol.server.FreeColServer;
 import net.sf.freecol.server.ai.AIPlayer;
 import net.sf.freecol.server.model.ServerPlayer;
 
-import org.xml.sax.SAXException;
-
 
 /**
  * Base abstract class for all messages.
@@ -70,7 +65,7 @@ public abstract class Message {
             Constructor<? extends Message>>());
 
     /** Classes used by Message.read() */
-    private static final Class[] readClasses = {
+    private static final Class<?>[] readClasses = {
         Game.class, FreeColXMLReader.class };
 
     // Convenient way to specify the relative priorities of the messages

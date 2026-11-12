@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,20 +19,22 @@
 
 package net.sf.freecol.common.i18n;
 
+import static net.sf.freecol.common.util.CollectionUtils.find;
+import static net.sf.freecol.common.util.CollectionUtils.map;
+import static net.sf.freecol.common.util.CollectionUtils.matchKeyEquals;
+import static net.sf.freecol.common.util.StringUtils.downCase;
+
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.AbstractMap.SimpleEntry;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.function.Predicate;
@@ -44,15 +46,12 @@ import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.common.ObjectWithId;
 import net.sf.freecol.common.io.FreeColDirectories;
-import net.sf.freecol.common.io.FreeColDataFile;
 import net.sf.freecol.common.io.FreeColModFile;
-import net.sf.freecol.common.io.FreeColTcFile;
+import net.sf.freecol.common.io.FreeColRules;
 import net.sf.freecol.common.model.Named;
 import net.sf.freecol.common.model.Role;
 import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.model.StringTemplate.TemplateType;
-import static net.sf.freecol.common.util.CollectionUtils.*;
-import static net.sf.freecol.common.util.StringUtils.*;
 import net.sf.freecol.common.util.LogBuilder;
 
 
@@ -176,16 +175,17 @@ public class Messages {
 
         for (File f : FreeColDirectories.getI18nMessageFileList(locale)) {
             if (!f.canRead()) continue;
-            try (InputStream in = Files.newInputStream(f.toPath())) {
-                loadMessages(in);
+            try {
+                loadMessages(Files.newInputStream(f.toPath()));
             } catch (IOException ioe) {
                 System.err.println("Failed to load messages from "
                     + f.getPath() + ": " + ioe.getMessage());
             }
         }
+
         List<String> filenames
             = FreeColDirectories.getMessageFileNameList(locale);
-        for (FreeColTcFile fctf : FreeColTcFile.getRulesList()) {
+        for (FreeColModFile fctf : FreeColRules.getRulesList()) {
             for (String fn : filenames) {
                 InputStream is = null;
                 try {
@@ -209,28 +209,28 @@ public class Messages {
      * Loads messages from a resource file into the current message bundle.
      *
      * Public for the test suite.
+     * 
+     * The {@code InputStream} gets closed in this method.
      *
      * @param is The {@code InputStream} to read from.
      * @throws IOException on failure to read from the stream.
      */
     public static void loadMessages(InputStream is) throws IOException {
-        InputStreamReader inputReader
-            = new InputStreamReader(is, StandardCharsets.UTF_8);
-        BufferedReader in = new BufferedReader(inputReader);
-
-        String line = null;
-        while((line = in.readLine()) != null) {
-            line = line.trim();
-            int index = line.indexOf('#');
-            if (index == 0) continue;
-            index = line.indexOf('=');
-            if (index > 0) {
-                String key = line.substring(0, index).trim();
-                String value = line.substring(index + 1).trim()
-                    .replace("\\n", "\n").replace("\\t", "\t");
-                messageBundle.put(key, value);
-                if (key.startsWith("FileChooser.")) {
-                    UIManager.put(key, value);
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            String line = null;
+            while((line = in.readLine()) != null) {
+                line = line.trim();
+                int index = line.indexOf('#');
+                if (index == 0) continue;
+                index = line.indexOf('=');
+                if (index > 0) {
+                    String key = line.substring(0, index).trim();
+                    String value = line.substring(index + 1).trim()
+                        .replace("\\n", "\n").replace("\\t", "\t");
+                    messageBundle.put(key, value);
+                    if (key.startsWith("FileChooser.")) {
+                        UIManager.put(key, value);
+                    }
                 }
             }
         }

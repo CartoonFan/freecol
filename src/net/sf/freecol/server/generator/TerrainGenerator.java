@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -30,6 +30,7 @@ import java.util.logging.Logger;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.LandMap;
 import net.sf.freecol.common.model.Map;
+import net.sf.freecol.common.model.Area;
 import net.sf.freecol.common.model.Direction;
 import net.sf.freecol.common.model.Region;
 import net.sf.freecol.common.model.Region.RegionType;
@@ -39,7 +40,6 @@ import net.sf.freecol.common.model.Specification;
 import net.sf.freecol.common.model.Tile;
 import net.sf.freecol.common.model.TileImprovement;
 import net.sf.freecol.common.model.TileImprovementType;
-import net.sf.freecol.common.model.TileItemContainer;
 import net.sf.freecol.common.model.TileType;
 import net.sf.freecol.common.option.MapGeneratorOptions;
 import net.sf.freecol.common.option.OptionGroup;
@@ -151,7 +151,7 @@ public class TerrainGenerator {
     /**
      * Gets a tile type fitted to the regional requirements.
      *
-     * FIXME: Can be used for mountains and rivers too.
+     * FIXME: Can be used for rivers too.
      *
      * @param game The {@code Game} to generate for.
      * @param candidates A list of {@code TileType}s to use for
@@ -401,7 +401,6 @@ public class TerrainGenerator {
 
         // Create ServerRegions for all land regions
         ServerRegion[] landregions = new ServerRegion[continents+1];
-        int landIndex = 1;
         for (int c = 1; c <= continents; c++) {
             // c starting at 1, c=0 is all water tiles
             landregions[c] = new ServerRegion(game, RegionType.LAND);
@@ -460,23 +459,16 @@ public class TerrainGenerator {
             "Maximum length of mountain ranges is ", maximumLength, "\n");
         List<ServerRegion> result = new ArrayList<>(number);
 
-        // lookup the resources from specification
-        final TileType hills = spec.getTileType("model.tile.hills");
-        final TileType mountains = spec.getTileType("model.tile.mountains");
-        if (hills == null || mountains == null) {
-            throw new RuntimeException("Both Hills and Mountains TileTypes must be defined: " + spec);
-        }
-
         // Generate the mountain ranges
         List<Tile> tiles = new ArrayList<>();
-        map.forEachTile(t -> t.isGoodMountainTile(mountains),
+        map.forEachTile(t -> t.isGoodMountainTile(),
                         t -> tiles.add(t));
         randomShuffle(logger, "Randomize mountain tiles", tiles, this.random);
 
         int counter = 0;
         for (Tile startTile : tiles) {
             // isGoodMountainTile can change when new mountains are added
-            if (!startTile.isGoodMountainTile(mountains)) continue;
+            if (!startTile.isGoodMountainTile()) continue;
             
             ServerRegion mountainRegion
                 = new ServerRegion(game, RegionType.MOUNTAIN);
@@ -486,7 +478,11 @@ public class TerrainGenerator {
             Tile tile = startTile;
             for (int index = 0; index < length; index++) {
                 // Raise current tile up as mountain
-                if (tile.getType() != mountains) {
+                if (!tile.getType().isMountains()) {
+                    final TileType mountains = getRandomTileType(game, spec.getMountainsTileTypeList(), map.getLatitude(tile.getY()));
+                    if (mountains == null) {
+                        continue;
+                    }
                     tile.setType(mountains);
                     mountainRegion.addTile(tile);
                     counter++;
@@ -496,13 +492,21 @@ public class TerrainGenerator {
                 // mountain
                 for (Tile t : tile.getSurroundingTiles(1)) {
                     if (!t.isGoodHillTile()
-                        || t.getType() == mountains) continue;
+                        || t.getType().isMountains()) continue;
                     int r = this.cache.nextInt(8);
                     if (r < 2) {
+                        final TileType mountains = getRandomTileType(game, spec.getMountainsTileTypeList(), map.getLatitude(t.getY()));
+                        if (mountains == null) {
+                            continue;
+                        }
                         t.setType(mountains);
                         mountainRegion.addTile(t);
                         counter++;
                     } else if (r < 7) {
+                        final TileType hills = getRandomTileType(game, spec.getHillsTileTypeList(), map.getLatitude(t.getY()));
+                        if (hills == null) {
+                            continue;
+                        }
                         t.setType(hills);
                         mountainRegion.addTile(t);
                     }
@@ -530,6 +534,11 @@ public class TerrainGenerator {
             / mapOptions.getRange(MapGeneratorOptions.MOUNTAIN_NUMBER);
         counter = 0;
         for (Tile t : tiles) {
+            final TileType mountains = getRandomTileType(game, spec.getMountainsTileTypeList(), map.getLatitude(t.getY()));
+            final TileType hills = getRandomTileType(game, spec.getHillsTileTypeList(), map.getLatitude(t.getY()));
+            if (mountains == null || hills == null) {
+                continue;
+            }
             // 25% mountains, 75% hills
             boolean m = this.cache.nextInt(4) == 0;
             t.setType((m) ? mountains : hills);
@@ -552,10 +561,7 @@ public class TerrainGenerator {
         final Specification spec = game.getSpecification();
         final OptionGroup mapOptions = game.getMapGeneratorOptions();
         List<ServerRegion> result = new ArrayList<>();
-        final TileImprovementType riverType
-            = spec.getTileImprovementType("model.improvement.river");
-        final int number = getApproximateLandCount(game)
-            / mapOptions.getRange(MapGeneratorOptions.RIVER_NUMBER);
+        final TileImprovementType riverType = spec.getTileImprovementType("model.improvement.river");
         HashMap<Tile, River> riverMap = new HashMap<>();
         List<River> rivers = new ArrayList<>();
 
@@ -564,11 +570,19 @@ public class TerrainGenerator {
                         t -> tiles.add(t));
         randomShuffle(logger, "Randomize river tiles", tiles, this.random);
         
+        final int absoluteMaximumRiverTiles = map.getTileList(t -> riverType.isTileTypeAllowed(t.getType())).size();
+        final int softMaximumRiverTiles = (absoluteMaximumRiverTiles * mapOptions.getRange(MapGeneratorOptions.RIVER_NUMBER)) / 100;
+        
         int counter = 0;
         for (Tile tile : tiles) {
             // Any river here yet?
-            if (riverMap.get(tile) != null)
+            if (riverMap.get(tile) != null) {
                 continue;
+            }
+            
+            if (riverMap.size() > softMaximumRiverTiles) {
+                break;
+            }
 
             ServerRegion riverRegion = new ServerRegion(game, RegionType.RIVER);
             River river = new River(map, riverMap, riverRegion, this.random);
@@ -577,12 +591,11 @@ public class TerrainGenerator {
                     river.getLength(), "\n");
                 result.add(riverRegion);
                 rivers.add(river);
-                if (++counter >= number) break;
             } else {
                 lb.add("Failed to generate river at " + tile + ".\n");
             }
         }
-        lb.add("Created ", counter, " rivers of maximum ", number, "\n");
+        lb.add("Created ", counter, " rivers of maximum ", softMaximumRiverTiles, "\n");
 
         for (River river : rivers) {
             ServerRegion region = river.getRegion();
@@ -636,7 +649,6 @@ public class TerrainGenerator {
             .getTileType("model.tile.lake");
         List<Tile> todo = new ArrayList<>(lakes.size()/10);
         List<ServerRegion> result = new ArrayList<>(lakes.size()/10);
-        int lakeCount = 0;
         while (!lakes.isEmpty()) {
             Tile tile = first(lakes);
             if (tile.getRegion() != null) continue;
@@ -918,6 +930,13 @@ public class TerrainGenerator {
 
         // Probably only needed on import of old maps.
         map.fixupRegions();
+        
+        if (importMap != null) {
+            for (Area importMapArea : importMap.getGame().getAreas()) {
+                game.addArea(new Area(game, importMapArea));
+            }
+        }
+        game.generateDefaultAreas();
 
         // Add the bonuses only after the map is completed.
         // Otherwise we risk creating resources on fields where they

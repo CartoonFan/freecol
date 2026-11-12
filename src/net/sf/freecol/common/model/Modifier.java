@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -79,6 +79,7 @@ public class Modifier extends Feature {
         = "model.modifier.conversionSkill";
     public static final String DEFENCE
         = "model.modifier.defence";
+    public static final String EDUCATION_TEACHING_TURNS = "model.modifier.education.teaching.turns";
     public static final String EXPLORE_LOST_CITY_RUMOUR
         = "model.modifier.exploreLostCityRumour";
     public static final String EXPOSED_TILES_RADIUS
@@ -144,6 +145,7 @@ public class Modifier extends Feature {
     public static final int RESOURCE_PRODUCTION_INDEX = 10;
     public static final int COLONY_PRODUCTION_INDEX = 20;
     public static final int EXPERT_PRODUCTION_INDEX = 30;
+    public static final int COLONYTILE_PRODUCTION_INDEX = 35;
     public static final int FATHER_PRODUCTION_INDEX = 40;
     public static final int IMPROVEMENT_PRODUCTION_INDEX = 50;
     public static final int AUTO_PRODUCTION_INDEX = 60;

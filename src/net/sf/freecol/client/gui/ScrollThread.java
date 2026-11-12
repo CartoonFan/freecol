@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,9 +19,10 @@
 
 package net.sf.freecol.client.gui;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import javax.swing.SwingUtilities;
 
 import net.sf.freecol.FreeCol;
 import net.sf.freecol.client.FreeColClient;
@@ -35,14 +36,16 @@ public class ScrollThread extends Thread {
 
     private static final Logger logger = Logger.getLogger(ScrollThread.class.getName());
 
-    /** Delay between scroll steps. */
-    private static final int SCROLL_DELAY = 100; // ms
-
+    /** Delay between scroll steps in ms. */
+    private static final int SCROLL_DELAY = 50;
+    
     /** The enclosing client. */
     private final FreeColClient freeColClient;
 
     /** The direction to scroll in. */
-    private Direction direction = null;
+    private volatile Direction direction = null;
+    
+    private volatile boolean aborted = false;
 
 
     /**
@@ -54,6 +57,7 @@ public class ScrollThread extends Thread {
         super(FreeCol.CLIENT_THREAD + "Mouse scroller");
         this.freeColClient = freeColClient;
     }
+    
 
     /**
      * Sets the direction in which this ScrollThread will scroll.
@@ -64,6 +68,15 @@ public class ScrollThread extends Thread {
     public void setDirection(Direction d) {
         direction = d;
     }
+    
+    public boolean isAborted() {
+        return aborted;
+    }
+    
+    public void abort() {
+        aborted = true;
+        this.direction = null;
+    }
 
     /**
      * Performs the actual scrolling.
@@ -72,17 +85,48 @@ public class ScrollThread extends Thread {
     @Override
     public void run() {
         final GUI gui = this.freeColClient.getGUI();
-        final Direction dirn = this.direction;
-        gui.invokeNowOrWait(() -> {
-                Direction d = dirn;
-                while (d != null) {
-                    if (!gui.scrollMap(d)) d = null;
-                    try {
-                        sleep(SCROLL_DELAY);
-                    } catch (InterruptedException e) {
-                        break;
+        
+        normalScrolling(gui);
+
+        gui.resetScrollSpeed();
+    }
+
+    
+    private void normalScrolling(final GUI gui) {
+        while (true) {
+            if (isAborted()) {
+                break;
+            }
+            final Direction d = this.direction;
+            if (d == null) {
+                abort();
+                break;
+            }
+            final long start = System.currentTimeMillis();
+            try {
+                SwingUtilities.invokeAndWait(() -> {
+                    if (!gui.scrollMap(d, true)) {
+                        abort();
+                        return;
                     }
-                }
-            });
+                });
+            } catch (Exception ex) {
+                logger.log(Level.WARNING, "Exception while scrolling", ex);
+                abort();
+                break;
+            }
+
+            if (isAborted()) {
+                break;
+            }
+
+            try {
+                final long time = System.currentTimeMillis() - start;
+                sleep(Math.max(2, SCROLL_DELAY - time));
+            } catch (InterruptedException e) {
+                abort();
+                break;
+            }
+        }
     }
 }

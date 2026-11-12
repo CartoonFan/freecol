@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -215,7 +215,7 @@ public class ServerUnitTest extends FreeColTestCase {
         // Before
         assertEquals(0, colony.getGoodsCount(foodType));
         assertEquals(2, colony.getFoodConsumption());
-        assertEquals(5 + 5, colony.getFoodProduction());
+        assertEquals(4 + 4, colony.getFoodProduction());
         assertFalse(hasImprovement(plain58, plow));
         assertEquals(0, colony.getProductionBonus());
         assertEquals("" + soldier.getLocation(), colony.getColonyTile(map.getTile(5, 8)), soldier.getLocation());
@@ -224,10 +224,10 @@ public class ServerUnitTest extends FreeColTestCase {
         ServerTestHelper.newTurn();
 
         assertFalse(hasImprovement(plain58, plow));
-        assertEquals(8, colony.getGoodsCount(foodType));
+        assertEquals(6, colony.getGoodsCount(foodType));
         assertEquals(2, colony.getFoodConsumption());
         assertEquals(0, colony.getProductionBonus());
-        assertEquals(5 + 5, colony.getFoodProduction());
+        assertEquals(4 + 4, colony.getFoodProduction());
 
         // Start Plowing
         //TileImprovement plowImprovement
@@ -244,10 +244,10 @@ public class ServerUnitTest extends FreeColTestCase {
 
         assertTrue(hasImprovement(plain58, plow));
         // Production for next turn is updated
-        assertEquals(5 + 6, colony.getFoodProduction());
+        assertEquals(4 + 5, colony.getFoodProduction());
         assertEquals(2, colony.getFoodConsumption());
         // But in only 10 - 2 == 8 are added from last turn
-        assertEquals(8 + n * 8, colony.getGoodsCount(foodType));
+        assertEquals(6 + n * 6, colony.getGoodsCount(foodType));
 
         // In game, this should happen via a Tile update
         colony.invalidateCache();
@@ -255,9 +255,9 @@ public class ServerUnitTest extends FreeColTestCase {
         ServerTestHelper.newTurn();
 
         assertTrue(hasImprovement(plain58, plow));
-        assertEquals(5 + 6, colony.getFoodProduction());
+        assertEquals(4 + 5, colony.getFoodProduction());
         assertEquals(2, colony.getFoodConsumption());
-        assertEquals(8 + n * 8 + 9, colony.getGoodsCount(foodType));
+        assertEquals(6 + n * 6 + 7, colony.getGoodsCount(foodType));
     }
 
     /**
@@ -343,9 +343,9 @@ public class ServerUnitTest extends FreeColTestCase {
     }
 
     public void testUnitGetsExperienceThroughWork() {
-        Game game = ServerTestHelper.startServerGame(getTestMap());
+        ServerTestHelper.startServerGame(getTestMap());
 
-        Colony colony = getStandardColony();
+        Colony colony = createStandardColony();
         Unit colonist = colony.getUnitList().get(0);
 
         assertEquals("Colonist should not have any experience",
@@ -370,9 +370,9 @@ public class ServerUnitTest extends FreeColTestCase {
     }
 
     public void testUnitPromotionWorkingInWorkTile() {
-        Game game = ServerTestHelper.startServerGame(getTestMap(plains));
+        ServerTestHelper.startServerGame(getTestMap(plains));
 
-        Colony colony = getStandardColony();
+        Colony colony = createStandardColony();
         assertTrue("Colony should only have 1 colonist for test setup",
                    colony.getUnitCount() == 1);
 
@@ -471,7 +471,7 @@ public class ServerUnitTest extends FreeColTestCase {
     public void testUnitLumberDelivery() {
         Game game = ServerTestHelper.startServerGame(getTestMap(savannahForest));
         InGameController igc = ServerTestHelper.getInGameController();
-        Colony colony = getStandardColony(3);
+        Colony colony = createStandardColony(3);
         ServerPlayer player = (ServerPlayer)colony.getOwner();
         Tile tile = colony.getTile();
         

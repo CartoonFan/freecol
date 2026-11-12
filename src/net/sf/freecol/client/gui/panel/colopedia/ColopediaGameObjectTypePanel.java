@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,9 +19,12 @@
 
 package net.sf.freecol.client.gui.panel.colopedia;
 
-import java.awt.Graphics2D;
-import java.awt.Image;
+import static net.sf.freecol.common.util.CollectionUtils.alwaysTrue;
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+
 import java.awt.image.BufferedImage;
+import java.awt.Dimension;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -36,22 +39,22 @@ import javax.swing.text.StyledDocument;
 import javax.swing.tree.DefaultMutableTreeNode;
 
 import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.client.gui.*;
+import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.client.gui.ModifierFormat;
 import net.sf.freecol.client.gui.action.ColopediaAction.PanelType;
-import net.sf.freecol.client.gui.panel.*;
+import net.sf.freecol.client.gui.panel.FreeColPanel;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Ability;
 import net.sf.freecol.common.model.AbstractGoods;
 import net.sf.freecol.common.model.AbstractUnit;
-import net.sf.freecol.common.model.BuildableType;
 import net.sf.freecol.common.model.FreeColSpecObjectType;
 import net.sf.freecol.common.model.GoodsType;
 import net.sf.freecol.common.model.Modifier;
-import net.sf.freecol.common.model.Nation;
 import net.sf.freecol.common.model.ResourceType;
 import net.sf.freecol.common.model.Specification;
 import net.sf.freecol.common.model.UnitType;
-import static net.sf.freecol.common.util.CollectionUtils.*;
+import net.sf.freecol.common.util.ImageUtils;
 
 
 /**
@@ -129,18 +132,9 @@ public abstract class ColopediaGameObjectTypePanel<T extends FreeColSpecObjectTy
         String name = getName();
         ColopediaTreeItem cti = new ColopediaTreeItem(this, id, name, null);
         DefaultMutableTreeNode node = new DefaultMutableTreeNode(cti);
-        int width = ImageLibrary.ICON_SIZE.width;
-        int height = ImageLibrary.ICON_SIZE.height;
         for (FreeColSpecObjectType type : types) {
-            Image image = lib.getObjectImage(type, ImageLibrary.ICON_SIZE);
-            int x = (width - image.getWidth(null)) / 2;
-            int y = (height - image.getHeight(null)) / 2;
-            BufferedImage centeredImage
-                = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g = centeredImage.createGraphics();
-            g.drawImage(image, x, y, null);
-            g.dispose();
-            node.add(buildItem(type, new ImageIcon(centeredImage)));
+            final BufferedImage image = ImageUtils.createCenteredImage(lib.getObjectImage(type), getListItemIconSize());
+            node.add(buildItem(type, new ImageIcon(image)));
         }
         root.add(node);
     }
@@ -271,17 +265,8 @@ public abstract class ColopediaGameObjectTypePanel<T extends FreeColSpecObjectTy
             logger.log(Level.WARNING, "Insert fail", ble);
         }
     }
-        
-
-    // Override Component
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void removeNotify() {
-        super.removeNotify();
-
-        colopediaPanel = null;
+    
+    public Dimension getListItemIconSize() {
+        return colopediaPanel.getListItemIconSize();
     }
 }

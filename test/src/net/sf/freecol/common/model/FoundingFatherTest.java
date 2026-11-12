@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,15 +19,17 @@
 
 package net.sf.freecol.common.model;
 
+import static net.sf.freecol.common.util.CollectionUtils.alwaysTrue;
+import static net.sf.freecol.common.util.CollectionUtils.any;
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.toList;
+
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 import net.sf.freecol.common.model.FoundingFather.FoundingFatherType;
-import net.sf.freecol.common.model.Modifier;
 import net.sf.freecol.common.model.Modifier.ModifierType;
 import net.sf.freecol.common.option.GameOptions;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.util.test.FreeColTestCase;
 
 
@@ -36,17 +38,6 @@ import net.sf.freecol.util.test.FreeColTestCase;
  * FoundingFather class in general.
  */
 public class FoundingFatherTest extends FreeColTestCase {
-
-    private static final GoodsType musketsType
-        = spec().getGoodsType("model.goods.muskets");
-
-    private static final UnitType servantType
-        = spec().getUnitType("model.unit.indenturedServant");
-    private static final UnitType colonistType
-        = spec().getUnitType("model.unit.freeColonist");
-    private static final UnitType statesmanType
-        = spec().getUnitType("model.unit.elderStatesman");
-
 
     public void testFeatures() {
         Game game = getStandardGame();
@@ -97,7 +88,7 @@ public class FoundingFatherTest extends FreeColTestCase {
         Game game = getGame();
         game.changeMap(getTestMap(true));
 
-        Colony colony = getStandardColony(4);
+        Colony colony = createStandardColony(4);
         Player player = colony.getOwner();
 
         // check that all fathers can be added

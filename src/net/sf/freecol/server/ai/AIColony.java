@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -445,6 +445,7 @@ public final class AIColony extends AIObject implements PropertyChangeListener {
         // exported only to the extent of not filling the warehouse.
         for (GoodsType g : spec.getStorableGoodsTypeList()) {
             if (!g.isFoodType()
+                && !g.isRawMaterialForUnstorableBuildingMaterial() // lumber
                 && !g.isBuildingMaterial()
                 && !g.getMilitary()
                 && !g.isTradeGoods()) {
@@ -769,11 +770,22 @@ public final class AIColony extends AIObject implements PropertyChangeListener {
             outer: for (GoodsType gt : getSpecification().getGoodsTypeList()) {
                 if (colony.getAdjustedNetProductionOf(gt) < 0) continue;
                 int count = colony.getGoodsCount(gt);
+                
+                int exportAmount = fullExport.contains(gt) || partExport.contains(gt) ? count : -1;
+                /* 
+                 * We should strive to only transport 100 goods ... and the partExport handling below
+                 * is the complete opposite of that.
+                 * 
+                 * Raw materials should only be exported if there's a surplus production in the colony,
+                 * but that can be fixed later.
+                 *  
                 int exportAmount = (fullExport.contains(gt))
                     ? count
                     : (partExport.contains(gt))
                     ? count - colony.getExportData(gt).getExportLevel()
                     : -1;
+                */
+                
                 if (exportAmount <= 0) continue;
                 int priority = (exportAmount >= capacity)
                     ? TransportableAIObject.IMPORTANT_DELIVERY
@@ -1078,12 +1090,14 @@ public final class AIColony extends AIObject implements PropertyChangeListener {
         // FIXME: add missionaries
 
         // Improve defence.
+        /*
         if (isBadlyDefended()) {
             UnitType bestDefender = colony.getBestDefenderType();
             if (bestDefender != null) {
                 requireWorkerWish(bestDefender, true, 100, lb);
             }
         }
+        */
     }
 
     /**
@@ -1135,6 +1149,7 @@ public final class AIColony extends AIObject implements PropertyChangeListener {
 
         // Add materials required to build military equipment,
         // but make sure there is a unit present that can use it.
+        /*
         if (isBadlyDefended()) {
             Role role = first(spec.getMilitaryRoles());
             Player owner = colony.getOwner();
@@ -1148,6 +1163,7 @@ public final class AIColony extends AIObject implements PropertyChangeListener {
                 }
             }
         }
+        */
 
         // Drop wishes that are no longer needed.
         for (Wish wish : transform(wishes, w -> {

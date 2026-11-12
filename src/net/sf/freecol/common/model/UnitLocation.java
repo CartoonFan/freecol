@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -39,6 +39,13 @@ import static net.sf.freecol.common.util.StringUtils.*;
  * The {@code UnitLocation} is a place where a {@code Unit}
  * can be put.  The UnitLocation can not store any other Locatables,
  * such as {@link Goods}, or {@link TileItem}s.
+ *
+ * Be *very* careful with use of the units list for low level routines
+ * as distinct from use of getUnits()/getUnitList()/getUnitCount()
+ * etc.  Beware that Colony is a UnitLocation, but it does *not* store
+ * its units in the unit list, they live in its WorkLocations.
+ * Therefore Colony overrides several such routines to do the right thing,
+ * which can lead to confusion especially when debugging.
  *
  * @see Locatable
  */
@@ -106,7 +113,12 @@ public abstract class UnitLocation extends FreeColGameObject implements Location
         /**
          * Either unclaimed or claimed but could be acquired.
          */
-        CLAIM_REQUIRED;
+        CLAIM_REQUIRED,
+        
+        /**
+         * The worker is damaged (not at maximum hitpoints).
+         */
+        WORKER_DAMAGED;
 
         /**
          * Get a message key describing this reason.
@@ -157,26 +169,25 @@ public abstract class UnitLocation extends FreeColGameObject implements Location
     @Override
     public void intern() {
         super.intern();
-        for (Unit u : getUnitList()) u.intern();
+        for (Unit u : this.units) u.intern();
     }
     
     /**
      * Internal addition of a unit to this location.
      *
      * @param u The {@code Unit} to add.
+     * @return True if the unit is added.
      */
-    private void addUnit(Unit u) {
-        if (u == null) return;
-        if (u.getLocation() != this) {
-            logger.warning("Fixing bogus unit location for " + u.getId()
-                + ", expected " + this
-                + " but found " + u.getLocation());
-            u.setLocationNoUpdate(this);
-        }
+    private boolean addUnit(Unit u) {
+        if (u == null) return false;
+        boolean ret = false;
+        u.setLocationNoUpdate(this);
         synchronized (this.units) {
-            this.units.add(u);
+            ret = this.units.add(u);
         }
+        return ret;
     }
+
 
     // Some useful utilities, marked final as they will work as long
     // as working implementations of getUnits/List(), getUnitCount(),
@@ -240,7 +251,7 @@ public abstract class UnitLocation extends FreeColGameObject implements Location
      * @see Unit#isCarrier
      */
     public boolean hasCarrierWithSpace(int space) {
-        return any(getUnits(), u -> u.isCarrier() && !u.isDamaged()
+        return any(getUnits(), u -> u.isCarrier() && !u.isDamagedAndUnderForcedRepair()
             && u.getSpaceLeft() >= space);
     }
 
@@ -328,11 +339,7 @@ public abstract class UnitLocation extends FreeColGameObject implements Location
             if (contains(unit)) {
                 return true;
             } else if (canAdd(unit)) {
-                synchronized (this.units) {
-                    if (!this.units.add(unit)) return false;
-                }
-                unit.setLocationNoUpdate(this);
-                return true;
+                return addUnit(unit);
             }
         } else if (locatable instanceof Goods) {
             // dumping goods is a valid action
@@ -401,7 +408,7 @@ public abstract class UnitLocation extends FreeColGameObject implements Location
     @Override
     public Stream<Unit> getUnits() {
         synchronized (this.units) {
-            return getUnitList().stream();
+            return this.units.stream();
         }
     }
 
@@ -562,12 +569,9 @@ public abstract class UnitLocation extends FreeColGameObject implements Location
         if (o == null || !super.copyIn(o)) return false;
         final Game game = getGame();
         clearUnitList();
-        for (Unit u : o.getUnitList()) { // Allow creation, unit may be new
-            synchronized (this.units) {
-                Unit nu = game.update(u, true);
-                this.units.add(nu);
-                nu.setLocationNoUpdate(this);
-            }
+        for (Unit u : o.units) { // Allow creation, unit may be new
+            Unit nu = game.update(u, true);
+            addUnit(nu);
         }
         return true;
     }
@@ -583,10 +587,11 @@ public abstract class UnitLocation extends FreeColGameObject implements Location
         super.writeChildren(xw);
 
         synchronized (this.units) {
-            // FIXME: Do *not* use getUnits/List here, because Colony lies!
+            // Do *not* use getUnits/List here, because Colony lies!
             for (Unit unit : this.units) {
                 if (unit.getLocation() != this) {
-                    logger.warning("UnitLocation contains unit " + unit
+                    logger.warning("UnitLocation " + this
+                        + " contains unit " + unit
                         + " with bogus location " + unit.getLocation()
                         + ", fixing.");
                     unit.setLocationNoUpdate(this);

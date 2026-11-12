@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,31 +19,33 @@
 
 package net.sf.freecol.client.gui.panel;
 
+import java.awt.Color;
 import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.image.BufferedImage;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.swing.JLabel;
+
+import net.miginfocom.swing.MigLayout;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.label.CargoLabel;
 import net.sf.freecol.client.gui.label.GoodsLabel;
 import net.sf.freecol.client.gui.label.UnitLabel;
-import net.sf.freecol.client.gui.plaf.FreeColLookAndFeel;
 import net.sf.freecol.common.model.Goods;
 import net.sf.freecol.common.model.GoodsType;
 import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.model.Unit;
-
-import net.miginfocom.swing.MigLayout;
-
 
 /**
  * A panel that holds units and goods that represent Units and cargo
  * that are on board the currently selected ship.
  */
 public class CargoPanel extends FreeColPanel
-    implements DropTarget, PropertyChangeListener {
+        implements DropTarget, PropertyChangeListener {
 
     private static final Logger logger = Logger.getLogger(CargoPanel.class.getName());
 
@@ -51,25 +53,28 @@ public class CargoPanel extends FreeColPanel
     private Unit carrier;
 
     private DefaultTransferHandler defaultTransferHandler = null;
-
+    private boolean withStyling; 
 
     /**
      * Creates this CargoPanel.
      *
      * @param freeColClient The {@code FreeColClient} for the game.
-     * @param withTitle Should the panel have a title?
+     * @param withTitle     Should the panel have a title?
      */
-    public CargoPanel(FreeColClient freeColClient, boolean withTitle) {
+    public CargoPanel(FreeColClient freeColClient, boolean withTitle, boolean withStyling) {
         super(freeColClient, "CargoPanelUI",
-              new MigLayout("wrap 6, fill, insets 0"));
+                new MigLayout("wrap 6, gap 0 0, insets 0", "[79!, center][79!, center][79!, center][79!, center][79!, center][79!, center]", "[100!]"));
 
         this.carrier = null;
-        this.defaultTransferHandler
-            = new DefaultTransferHandler(getFreeColClient(), this);
+        this.defaultTransferHandler = new DefaultTransferHandler(getFreeColClient(), this);
+        this.withStyling = withStyling;
 
-        if (withTitle) setBorder(Utility.localizedBorder("cargoOnCarrier"));
+        if (withTitle) {
+            setBorder(Utility.localizedBorder("cargoOnCarrier"));
+        } else {
+            setBorder(null);
+        }
     }
-
 
     /**
      * Initialize this CargoPanel.
@@ -120,6 +125,11 @@ public class CargoPanel extends FreeColPanel
 
             for (Goods g : carrier.getGoodsList()) {
                 GoodsLabel label = new GoodsLabel(fcc, g);
+                if (withStyling) {
+                    label.setHorizontalTextPosition(JLabel.CENTER);
+                    label.setVerticalTextPosition(JLabel.BOTTOM);
+                    label.setForeground(Color.WHITE);
+                }
                 if (isEditable()) {
                     label.setTransferHandler(defaultTransferHandler);
                     label.addMouseListener(dl);
@@ -131,7 +141,6 @@ public class CargoPanel extends FreeColPanel
         revalidate();
         repaint();
     }
-
 
     /**
      * Whether this panel is active.
@@ -168,14 +177,16 @@ public class CargoPanel extends FreeColPanel
      * Update the title of this CargoPanel.
      */
     private void updateTitle() {
+        if (getBorder() == null) {
+            return;
+        }
         Utility.localizeBorder(this, (carrier == null)
-            ? StringTemplate.key("cargoOnCarrier")
-            : StringTemplate.template("cargoPanel.cargoAndSpace")
-                .addStringTemplate("%name%",
-                    carrier.getLabel(Unit.UnitLabelType.NATIONAL))
-                .addAmount("%space%", carrier.getSpaceLeft()));
+                ? StringTemplate.key("cargoOnCarrier")
+                : StringTemplate.template("cargoPanel.cargoAndSpace")
+                        .addStringTemplate("%name%",
+                                carrier.getLabel(Unit.UnitLabelType.NATIONAL))
+                        .addAmount("%space%", carrier.getSpaceLeft()));
     }
-
 
     // Interface DropTarget
 
@@ -201,7 +212,7 @@ public class CargoPanel extends FreeColPanel
     @Override
     public Component add(Component comp, boolean editState) {
         if (carrier != null && comp instanceof CargoLabel && editState
-            && ((CargoLabel)comp).addCargo(comp, carrier, this)) {
+                && ((CargoLabel) comp).addCargo(comp, carrier, this)) {
             return comp;
         }
         return null;
@@ -215,17 +226,15 @@ public class CargoPanel extends FreeColPanel
         return carrier.getLoadableAmount(type);
     }
 
-
     // Interface PropertyChangeListener
 
     @Override
     public void propertyChange(PropertyChangeEvent event) {
         logger.finest("CargoPanel change " + event.getPropertyName()
-                      + ": " + event.getOldValue()
-                      + " -> " + event.getNewValue());
+                + ": " + event.getOldValue()
+                + " -> " + event.getNewValue());
         update();
     }
-
 
     // Override Container
 
@@ -238,7 +247,6 @@ public class CargoPanel extends FreeColPanel
             ((CargoLabel) comp).removeCargo(comp, this);
         }
     }
-
 
     // Override Component
 
@@ -253,5 +261,49 @@ public class CargoPanel extends FreeColPanel
         removePropertyChangeListeners();
 
         defaultTransferHandler = null;
+    }
+    
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        
+        if (!withStyling) {
+            return;
+        }
+        
+        final Dimension size = getSize();
+        
+        final int cargoHoldsPerRow = 6;
+        final BufferedImage available = getImageLibrary().getScaledCargoHold(true);
+        final BufferedImage unavailable = getImageLibrary().getScaledCargoHold(false);
+        
+        final int totalAvailableHolds = (carrier != null) ? carrier.getCargoCapacity() : 0;
+        final int rows = totalAvailableHolds / cargoHoldsPerRow + ((totalAvailableHolds % cargoHoldsPerRow > 0) ? 1 : 0);
+
+        if (rows == 0) {
+            int x = 0;
+            while (x < size.width) {
+                g.drawImage(unavailable, x, 0, null);
+                x += unavailable.getWidth();
+            }
+            g.drawImage(unavailable, x, 0, null);
+            return;
+        }
+        
+        int y = 0;
+        for (int row=0; row<rows; row++) {
+            final int availableHolds = (row < rows - 1) ? cargoHoldsPerRow : totalAvailableHolds - cargoHoldsPerRow * row;
+            int x = 0;
+            for (int i=0; i<availableHolds; i++) {
+                g.drawImage(available, x, y, null);
+                x += available.getWidth();
+            }
+            while (x < size.width) {
+                g.drawImage(unavailable, x, y, null);
+                x += unavailable.getWidth();
+            }
+            g.drawImage(unavailable, x, y, null);
+            y += available.getHeight();
+        }        
     }
 }

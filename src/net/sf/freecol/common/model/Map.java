@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,43 +19,51 @@
 
 package net.sf.freecol.common.model;
 
+import static net.sf.freecol.common.model.Constants.INFINITY;
+import static net.sf.freecol.common.model.Constants.UNDEFINED;
+import static net.sf.freecol.common.util.CollectionUtils.alwaysTrue;
+import static net.sf.freecol.common.util.CollectionUtils.cachingIntComparator;
+import static net.sf.freecol.common.util.CollectionUtils.find;
+import static net.sf.freecol.common.util.CollectionUtils.matchKeyEquals;
+import static net.sf.freecol.common.util.CollectionUtils.minimize;
+import static net.sf.freecol.common.util.CollectionUtils.sort;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+import static net.sf.freecol.common.util.RandomUtils.randomInt;
+import static net.sf.freecol.common.util.RandomUtils.randomShuffle;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
-import javax.swing.ImageIcon;
 import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.common.debug.FreeColDebugger;
-import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
-import static net.sf.freecol.common.model.Constants.*;
+import net.sf.freecol.common.model.Constants.IntegrityType;
 import net.sf.freecol.common.model.pathfinding.CostDecider;
 import net.sf.freecol.common.model.pathfinding.CostDeciders;
 import net.sf.freecol.common.model.pathfinding.GoalDecider;
 import net.sf.freecol.common.model.pathfinding.GoalDeciders;
 import net.sf.freecol.common.util.LogBuilder;
-import static net.sf.freecol.common.util.CollectionUtils.*;
-import static net.sf.freecol.common.util.RandomUtils.*;
 
 
 /**
@@ -66,7 +74,7 @@ import static net.sf.freecol.common.util.RandomUtils.*;
  * In theory, a {@link Game} might contain several Map instances
  * connected by the HighSeas.
  */
-public class Map extends FreeColGameObject implements Location {
+public class Map extends FreeColGameObject implements Location, Iterable<Tile> {
 
     private static final Logger logger = Logger.getLogger(Map.class.getName());
 
@@ -611,6 +619,17 @@ public class Map extends FreeColGameObject implements Location {
             this.regions.add(region);
         }
     }
+    
+    /**
+     * Remove a region from this map.
+     *
+     * @param region The {@code Region} to be removed.
+     */
+    public void removeRegion(final Region region) {
+        synchronized (this.regions) {
+            this.regions.remove(region);
+        }
+    }
 
     /**
      * Clear the regions list.
@@ -645,6 +664,16 @@ public class Map extends FreeColGameObject implements Location {
     public Region getRegionByKey(final String key) {
         return (key == null) ? null
             : find(getRegions(), matchKeyEquals(key, Region::getKey));
+    }
+    
+    public void removeRegionsByKey(final String key) {
+        synchronized (this.regions) {
+            for (Region region : new ArrayList<>(regions)) {
+                if (key.equals(region.getKey())) {
+                    removeRegion(region);
+                }
+            }
+        }
     }
 
     /**
@@ -826,6 +855,11 @@ public class Map extends FreeColGameObject implements Location {
         return ret;
     }
 
+    @Override
+    public Iterator<Tile> iterator() {
+        return Collections.unmodifiableList(tileList).iterator();
+    }
+
     /**
      * Get a list of all the tiles that match a predicate.
      *
@@ -971,9 +1005,11 @@ public class Map extends FreeColGameObject implements Location {
             }
             this.radius = radius;
             n = 0;
-
+            
             Position step;
-            if (isFilled || radius == 1) {
+            if (radius <= 0) {
+                x = y = UNDEFINED;
+            } else if (isFilled || radius == 1) {
                 step = Direction.NE.step(center.getX(), center.getY());
                 x = step.x;
                 y = step.y;
@@ -992,16 +1028,6 @@ public class Map extends FreeColGameObject implements Location {
                 y = step.y;
             }
             if (!isValid(x, y)) nextTile();
-        }
-
-        /**
-         * Gets the current radius of the circle.
-         *
-         * @return The distance from the center tile this
-         *     {@code CircleIterator} was initialized with.
-         */
-        public int getCurrentRadius() {
-            return currentRadius;
         }
 
         /**
@@ -1089,11 +1115,12 @@ public class Map extends FreeColGameObject implements Location {
      *
      * @param center The center {@code Tile} to iterate around.
      * @param isFilled True to get all of the positions in the circle.
-     * @param radius The radius of circle.
-     * @return The circle iterator.
+     * @param radius The radius of circle. No tiles are returned if
+     *      {@code radius <= 0}.
+     * @return The circle iterator. The center tile is never returned.
+     *      The innermost tiles are returned first.
      */
-    public Iterator<Tile> getCircleIterator(Tile center, boolean isFilled,
-        int radius) {
+    public Iterator<Tile> getCircleIterator(Tile center, boolean isFilled, int radius) {
         return new CircleIterator(center, isFilled, radius);
     }
 
@@ -1103,12 +1130,12 @@ public class Map extends FreeColGameObject implements Location {
      *
      * @param center The center {@code Tile} to iterate around.
      * @param isFilled True to get all of the positions in the circle.
-     * @param radius The radius of circle.
-     * @return An {@code Iterable} for a circle of tiles.
+     * @param radius The radius of circle. No tiles are returned if
+     *      {@code radius <= 0}.
+     * @return An {@code Iterable} The center tile is never returned.
+     *      The innermost tiles are returned first.
      */
-    public Iterable<Tile> getCircleTiles(final Tile center,
-        final boolean isFilled,
-        final int radius) {
+    public Iterable<Tile> getCircleTiles(final Tile center, final boolean isFilled, final int radius) {
         return new Iterable<Tile>() {
             @Override
             public Iterator<Tile> iterator() {
@@ -1500,7 +1527,7 @@ public class Map extends FreeColGameObject implements Location {
                 // This is suboptimal.  We do not know where to enter from
                 // Europe, so start with the standard entry location...
             } else if ((p = searchMap(unit,
-                        (Tile)offMapUnit.getFullEntryLocation(),
+                        offMapUnit.getFullEntryLocation(),
                         goalDecider, costDecider, maxTurns, carrier,
                         null, lb)) == null) {
                 path = null;
@@ -1613,14 +1640,17 @@ public class Map extends FreeColGameObject implements Location {
                 if (dst.getTile() != null && !dst.getTile().isExplored()) {
                     this.turns += 2;
                     this.movesLeft = 0;
+                    this.cost = PathNode.getNodeCost(this.turns, this.movesLeft);
                 } else {
-                    throw new RuntimeException("Invalid move candidate:"
-                        + " for " + unit + " to " + dst);
+                    this.turns = INFINITY;
+                    this.movesLeft = 0;
+                    this.cost = INFINITY;
                 }
+            } else {
+                this.turns += cd.getNewTurns();
+                this.movesLeft = cd.getMovesLeft();
+                this.cost = PathNode.getNodeCost(this.turns, this.movesLeft);
             }
-            this.turns += cd.getNewTurns();
-            this.movesLeft = cd.getMovesLeft();
-            this.cost = PathNode.getNodeCost(this.turns, this.movesLeft);
         }
 
         /**
@@ -2025,6 +2055,9 @@ ok:     while (!openMap.isEmpty()) {
                     }
                     stepLog = " " + step + "_";
                 }
+                if (move.cost >= INFINITY) {
+                    continue;
+                }
                 assert move.getCost() >= 0;
                 // Tighten the bounds on a previously seen case if possible
                 if (closed != null) {
@@ -2218,6 +2251,47 @@ ok:     while (!openMap.isEmpty()) {
         }
     }
 
+    /**
+     * Collect lists of valid starting tiles on this map.
+     * Called from the map generator to help choose starting tiles
+     * for European units.
+     *
+     * @param eastTiles A list of {@code Tile}s on the east of the map
+     *     to fill in.
+     * @param westTiles A list of {@code Tile}s on the west of the map
+     *     to fill in.
+     */
+    public void collectStartingTiles(List<Tile> eastTiles,
+                                     List<Tile> westTiles) {
+        // Find the innermost high seas connected tile on each row (if
+        // any) on the east and west sides of the map
+        final int west = 0;
+        final int east = getWidth() - 1;
+        eastTiles.clear();
+        westTiles.clear();
+        for (int y = 0; y < getHeight(); y++) {
+            int x;
+            Tile ok = getTile(east, y);
+            if (ok.isDirectlyHighSeasConnected()) {
+                for (x = east; x > west; x--) {
+                    Tile t = getTile(x, y);
+                    if (!t.isDirectlyHighSeasConnected()) break;
+                    ok = t;
+                }
+                if (ok != null) eastTiles.add(ok);
+            }
+            ok = getTile(west, y);
+            if (ok.isDirectlyHighSeasConnected()) {
+                for (x = west; x < east; x++) {
+                    Tile t = getTile(x, y);
+                    if (!t.isDirectlyHighSeasConnected()) break;
+                    ok = t;
+                }
+                if (ok != null) westTiles.add(ok);
+            }
+        }
+    }
+    
     /**
      * Places the "high seas"-tiles on the border of this map.
      *

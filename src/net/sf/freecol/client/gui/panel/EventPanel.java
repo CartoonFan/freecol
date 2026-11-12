@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,26 +19,21 @@
 
 package net.sf.freecol.client.gui.panel;
 
-import java.util.logging.Logger;
+import java.awt.event.ActionEvent;
 
+import javax.swing.AbstractAction;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.FontLibrary;
-import net.sf.freecol.client.gui.ImageLibrary;
-import net.sf.freecol.client.gui.Size;
 
 
 /**
  * This panel is displayed when an imporantant event in the game has happened.
  */
 public final class EventPanel extends FreeColPanel {
-
-    private static final Logger logger = Logger.getLogger(EventPanel.class.getName());
-
 
     /**
      * The constructor that will add the items to this panel.
@@ -54,11 +49,10 @@ public final class EventPanel extends FreeColPanel {
               new MigLayout("wrap 1", "[center]", "[]20"));
 
         JLabel headerLabel = new JLabel(header);
-        headerLabel.setFont(FontLibrary.getUnscaledFont(Utility.FONTSPEC_TITLE,
-                                                        header));
+        headerLabel.setFont(FontLibrary.getScaledFont(Utility.FONTSPEC_TITLE, header));
 
         JLabel imageLabel
-            = new JLabel(new ImageIcon(ImageLibrary.getUnscaledImage(key)));
+            = new JLabel(new ImageIcon(getImageLibrary().getScaledImage(key)));
 
         JLabel footerLabel = (footer == null) ? null : new JLabel(footer);
 
@@ -67,6 +61,13 @@ public final class EventPanel extends FreeColPanel {
         if (footerLabel != null) add(footerLabel);
         add(okButton, "tag ok");
 
+        setEscapeAction(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                okButton.doClick();
+            }
+        });
+        
         setSize(getPreferredSize());
     }
 }

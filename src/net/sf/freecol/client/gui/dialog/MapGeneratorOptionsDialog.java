@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,15 +19,12 @@
 
 package net.sf.freecol.client.gui.dialog;
 
-import java.awt.Dimension;
 import java.awt.Image;
 import java.awt.event.ActionEvent;
 import java.io.File;
 import java.io.IOException;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
-import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -38,23 +35,19 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 
+import net.miginfocom.swing.MigLayout;
 import net.sf.freecol.FreeCol;
 import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.option.BooleanOptionUI;
 import net.sf.freecol.client.gui.option.FileOptionUI;
 import net.sf.freecol.client.gui.option.OptionGroupUI;
-import net.sf.freecol.client.gui.option.OptionUI;
-import net.sf.freecol.client.gui.panel.*;
+import net.sf.freecol.client.gui.panel.FreeColButton;
+import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.io.FreeColDirectories;
 import net.sf.freecol.common.io.FreeColSavegameFile;
 import net.sf.freecol.common.model.StringTemplate;
-import net.sf.freecol.common.option.BooleanOption;
-import net.sf.freecol.common.option.FileOption;
-import net.sf.freecol.common.option.IntegerOption;
 import net.sf.freecol.common.option.MapGeneratorOptions;
 import net.sf.freecol.common.option.OptionGroup;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 
 
 /**
@@ -77,95 +70,62 @@ public final class MapGeneratorOptionsDialog extends OptionsDialog {
      */
     public MapGeneratorOptionsDialog(FreeColClient freeColClient, JFrame frame,
                                      boolean editable) {
-        super(freeColClient, frame, editable,
+        super(freeColClient,
               freeColClient.getGame().getMapGeneratorOptions(),
               MapGeneratorOptions.TAG,
               FreeColDirectories.MAP_GENERATOR_OPTIONS_FILE_NAME,
-              MapGeneratorOptions.TAG);
-
+              MapGeneratorOptions.TAG,
+              editable);
+        
         if (isEditable()) {
-            loadDefaultOptions();
             // FIXME: The update should be solved by PropertyEvent.
-
+            
             final List<File> mapFiles = FreeColDirectories.getMapFileList();
-            JPanel mapPanel = new JPanel();
+            final JPanel mapPanel = new JPanel(new MigLayout("wrap 4, fill"));
+            final JButton randomMap = new FreeColButton(Messages.message("mapGeneratorOptions.landGenerator.name"));
+            randomMap.addActionListener((ActionEvent ae) -> {
+                        updateFile(null);
+                    });
+            mapPanel.add(randomMap, "sizegroup button, grow");
             for (File f : mapFiles) {
                 JButton mapButton = makeMapButton(f);
                 if (mapButton == null) continue;
                 mapButton.addActionListener((ActionEvent ae) -> {
                         updateFile(f);
                     });
-                mapPanel.add(mapButton);
+                mapPanel.add(mapButton, "sizegroup button, grow");
             }
 
-            JScrollPane scrollPane = new JScrollPane(mapPanel,
-                JScrollPane.VERTICAL_SCROLLBAR_NEVER,
-                JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-            scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+            final JScrollPane scrollPane = new JScrollPane(mapPanel);
             scrollPane.getViewport().setOpaque(false);
             panel.add(scrollPane, "height 80%, width 100%");
         }
-        initialize(frame, choices());
+        initialize(frame, List.of());
     }
 
     /**
      * Update the selected map file.
      *
-     * The option UI may not have been created if we just click on the
-     * map, because the text field is under mapGeneratorOptions.import.
-     * Hence the null tests against the OptionUIs.
-     *
      * @param file The new map {@code File}.
      */
     private void updateFile(File file) {
-        final OptionGroup mgo = getGroup();
         final OptionGroupUI mgoUI = getOptionUI();
-        final GUI gui = freeColClient.getGUI();
 
-        FileOptionUI foui = (FileOptionUI)mgoUI
-            .getOptionUI(MapGeneratorOptions.IMPORT_FILE);
-        if (foui == null) {
-            FileOption op = mgo.getOption(MapGeneratorOptions.IMPORT_FILE,
-                                          FileOption.class);
-            foui = (FileOptionUI)OptionUI.getOptionUI(gui, op, true);
-        }
-        foui.setValue(file);
+        /*
+         * This needs to be selected first to initialize the OptionUIs we're
+         * asking for below.
+         */
+        mgoUI.selectOption(MapGeneratorOptions.MAPGENERATOROPTIONS_IMPORT);
         
-        BooleanOptionUI terrainUI = (BooleanOptionUI)mgoUI
-            .getOptionUI(MapGeneratorOptions.IMPORT_TERRAIN);
-        if (terrainUI == null) {
-            BooleanOption op = mgo.getOption(MapGeneratorOptions.IMPORT_TERRAIN,
-                                             BooleanOption.class);
-            terrainUI = (BooleanOptionUI)OptionUI.getOptionUI(gui, op, true);
+        mgoUI.getOptionUI(MapGeneratorOptions.IMPORT_FILE, FileOptionUI.class).setValue(file);
+        mgoUI.getOptionUI(MapGeneratorOptions.IMPORT_TERRAIN, BooleanOptionUI.class).setValue(true);
+        mgoUI.getOptionUI(MapGeneratorOptions.IMPORT_BONUSES, BooleanOptionUI.class).setValue(false);
+        mgoUI.getOptionUI(MapGeneratorOptions.IMPORT_RUMOURS, BooleanOptionUI.class).setValue(false);
+        mgoUI.getOptionUI(MapGeneratorOptions.IMPORT_SETTLEMENTS, BooleanOptionUI.class).setValue(false);
+        
+        if (file == null) {
+            mgoUI.selectOption(MapGeneratorOptions.MAPGENERATOROPTIONS_LAND_GENERATOR);
         }
-        terrainUI.setValue(true);
-
-        BooleanOptionUI bonusesUI = (BooleanOptionUI)mgoUI
-            .getOptionUI(MapGeneratorOptions.IMPORT_BONUSES);
-        if (bonusesUI == null) {
-            BooleanOption op = mgo.getOption(MapGeneratorOptions.IMPORT_BONUSES,
-                                             BooleanOption.class);
-            bonusesUI = (BooleanOptionUI)OptionUI.getOptionUI(gui, op, true);
-        }
-        bonusesUI.setValue(false);
-
-        BooleanOptionUI rumourUI = (BooleanOptionUI)mgoUI
-            .getOptionUI(MapGeneratorOptions.IMPORT_RUMOURS);
-        if (rumourUI == null) {
-            BooleanOption op = mgo.getOption(MapGeneratorOptions.IMPORT_RUMOURS,
-                                             BooleanOption.class);
-            rumourUI = (BooleanOptionUI)OptionUI.getOptionUI(gui, op, true);
-        }
-        rumourUI.setValue(false);
-
-        BooleanOptionUI settUI = (BooleanOptionUI)mgoUI
-            .getOptionUI(MapGeneratorOptions.IMPORT_SETTLEMENTS);
-        if (settUI == null) {
-            BooleanOption op = mgo.getOption(MapGeneratorOptions.IMPORT_SETTLEMENTS,
-                                             BooleanOption.class);
-            settUI = (BooleanOptionUI)OptionUI.getOptionUI(gui, op, true);
-        }
-        settUI.setValue(false);
     }
 
     /**
@@ -199,7 +159,7 @@ public final class MapGeneratorOptionsDialog extends OptionsDialog {
         }
 
         if (thumbnail != null) {
-            mapButton = Utility.localizedButton("freecol.map." + mapName);
+            mapButton = new FreeColButton(Messages.message("freecol.map." + mapName));
             mapButton.setIcon(new ImageIcon(thumbnail));
             mapButton.setHorizontalTextPosition(JButton.CENTER);
             mapButton.setVerticalTextPosition(JButton.BOTTOM);
@@ -247,17 +207,5 @@ public final class MapGeneratorOptionsDialog extends OptionsDialog {
             return false;
         }
         return super.save(file);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public OptionGroup getResponse() {
-        OptionGroup value = super.getResponse();
-        if (value != null) {
-            if (isEditable()) saveDefaultOptions();
-        }
-        return value;
     }
 }

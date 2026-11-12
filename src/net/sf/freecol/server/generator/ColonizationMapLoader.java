@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -125,8 +125,7 @@ public class ColonizationMapLoader implements MapLoader {
 
     public ColonizationMapLoader(File file) throws IOException {
 
-        try {
-            RandomAccessFile reader = new RandomAccessFile(file, "r");
+        try (RandomAccessFile reader = new RandomAccessFile(file, "r")) {
             reader.readFully(header);
 
             int size = header[WIDTH] * header[HEIGHT];

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -148,8 +148,8 @@ public final class BuildColonyMission extends Mission {
 
         final Tile tile = (Tile)loc;
         final Player player = aiUnit.getUnit().getOwner();
-        float turns = path.getTotalTurns() + 1.0f;
-        return player.getColonyValue(tile) / turns;
+        float turns = path.getTotalTurns() + 3.0f;
+        return (3 * player.getColonyValue(tile)) / turns;
     }
 
     /**

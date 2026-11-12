@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -26,8 +26,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import javax.swing.AbstractAction;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
 import javax.swing.JTree;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
@@ -38,9 +40,11 @@ import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.client.gui.panel.*;
+import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.client.gui.panel.FreeColPanel;
+import net.sf.freecol.client.gui.panel.MigPanel;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.FreeColObject;
 
@@ -70,36 +74,54 @@ public final class ColopediaPanel extends FreeColPanel
      */
     public ColopediaPanel(FreeColClient freeColClient, String id) {
         super(freeColClient, "ColopediaPanelUI",
-              new MigLayout("fill", "[200:]unrelated[550:, grow, fill]",
+              new MigLayout("fill", "[grow, fill]",
                             "[][grow, fill][]"));
 
         add(Utility.localizedHeader("colopedia", Utility.FONTSPEC_TITLE),
             "span, align center");
 
-        listPanel = new MigPanel("ColopediaPanelUI");
+        listPanel = new MigPanel(new MigLayout("fill"));
         listPanel.setOpaque(true);
+        
+        tree = buildTree();
+        listPanel.add(tree, "grow");
+        
         JScrollPane sl = new JScrollPane(listPanel,
-                                         JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,
-                                         JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        sl.getVerticalScrollBar().setUnitIncrement(16);
+                                         JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                                         JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED) {
+            @Override
+            public Dimension getPreferredSize() {
+                final Dimension preferredSize = listPanel.getPreferredSize();
+                return new Dimension(preferredSize.width + 32, preferredSize.height);
+            }
+        };
+
         sl.getViewport().setOpaque(false);
-        add(sl);
 
         detailPanel = new MigPanel("ColopediaPanelUI");
         detailPanel.setOpaque(true);
         JScrollPane detail = new JScrollPane(detailPanel,
                                              JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-                                             JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        detail.getVerticalScrollBar().setUnitIncrement(16);
+                                             JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         detail.getViewport().setOpaque(false);
-        add(detail, "grow");
-
-        add(okButton, "newline 20, span, tag ok");
-
-        getGUI().restoreSavedSize(this, new Dimension(1050, 725));
-        tree = buildTree();
-
+        
         select(id);
+
+        final int width = getImageLibrary().scaleInt(1050);
+        final int height = getImageLibrary().scaleInt(725);
+        getGUI().restoreSavedSize(this, new Dimension(width, height));
+        
+        final JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, sl, detail);
+
+        add(splitPane, "grow");
+        add(okButton, "newline, span, tag ok");
+        
+        setEscapeAction(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                okButton.doClick();
+            }
+        });
     }
 
     /**
@@ -137,25 +159,31 @@ public final class ColopediaPanel extends FreeColPanel
         new ConceptDetailPanel(fcc, this).addSubTrees(root);
 
         DefaultTreeModel treeModel = new DefaultTreeModel(root);
-        tree = new JTree(treeModel) {
-                @Override
-                public Dimension getPreferredSize() {
-                    return new Dimension(200, super.getPreferredSize().height);
-                }
-            };
+        tree = new JTree(treeModel);
         tree.setRootVisible(false);
-        tree.setCellRenderer(new ColopediaTreeCellRenderer());
+        tree.setCellRenderer(new ColopediaTreeCellRenderer(this, getImageLibrary()));
         tree.setOpaque(false);
         tree.addTreeSelectionListener(this);
 
-        listPanel.add(tree);
-        Enumeration allNodes = root.depthFirstEnumeration();
+        Enumeration<?> allNodes = root.depthFirstEnumeration();
         while (allNodes.hasMoreElements()) {
             DefaultMutableTreeNode node = (DefaultMutableTreeNode) allNodes.nextElement();
             ColopediaTreeItem item = (ColopediaTreeItem) node.getUserObject();
             nodeMap.put(item.getId(), node);
         }
         return tree;
+    }
+    
+    /**
+     * Gets the preferred size for the list item images in the colopedia tree.
+     *
+     * @return The {@code Dimension} to use.
+     */
+    public Dimension getListItemIconSize() {
+        final int width = getImageLibrary().scaleInt(ImageLibrary.ICON_SIZE.width * 3 / 2);
+        final int height = getImageLibrary().scaleInt(ImageLibrary.ICON_SIZE.height);
+        
+        return new Dimension(width, height);
     }
 
     /**

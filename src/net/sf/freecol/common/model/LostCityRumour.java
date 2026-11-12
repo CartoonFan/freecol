@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -33,7 +33,6 @@ import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
 import static net.sf.freecol.common.model.Constants.*;
 import net.sf.freecol.common.model.Map.Layer;
-import net.sf.freecol.common.model.ModelMessage;
 import net.sf.freecol.common.option.GameOptions;
 import net.sf.freecol.common.util.LogBuilder;
 import net.sf.freecol.common.util.RandomChoice;
@@ -52,9 +51,6 @@ public class LostCityRumour extends TileItem {
 
     // The bogus end of the world year.
     private static final int MAYAN_PROPHESY_YEAR = 2012;
-
-    // How many `nothing' rumours are there.
-    private static int rumourNothing = -1;
 
     /** Constants describing types of Lost City Rumours. */
     public static enum RumourType {

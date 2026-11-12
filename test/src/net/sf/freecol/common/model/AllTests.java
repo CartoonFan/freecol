@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -34,6 +34,7 @@ public class AllTests {
         suite.addTestSuite(ColonyTest.class);
         suite.addTestSuite(ColonyProductionTest.class);
         suite.addTestSuite(CombatTest.class);
+        suite.addTestSuite(CombatAmbushTest.class);
         suite.addTestSuite(DisasterTest.class);
         suite.addTestSuite(EuropeTest.class);
         suite.addTestSuite(FoundingFatherTest.class);
@@ -59,6 +60,7 @@ public class AllTests {
         suite.addTestSuite(SerializationTest.class);
         suite.addTestSuite(SettlementTest.class);
         suite.addTestSuite(SoLTest.class);
+        suite.addTestSuite(ClassicTileProductionTest.class);
         suite.addTestSuite(TileImprovementTest.class);
         suite.addTestSuite(TileItemContainerTest.class);
         suite.addTestSuite(TileTest.class);

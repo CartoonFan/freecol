@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -22,11 +22,13 @@ package net.sf.freecol.client.gui.panel.colopedia;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
+import javax.swing.ImageIcon;
 import javax.swing.JEditorPane;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -34,14 +36,12 @@ import javax.swing.SwingConstants;
 import javax.swing.tree.DefaultMutableTreeNode;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.client.gui.FontLibrary;
 import net.sf.freecol.client.gui.action.ColopediaAction.PanelType;
-import net.sf.freecol.client.gui.panel.*;
-import net.sf.freecol.client.gui.panel.colopedia.*;
-import net.sf.freecol.client.gui.Size;
+import net.sf.freecol.client.gui.panel.FreeColPanel;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.i18n.Messages;
+import net.sf.freecol.common.util.ImageUtils;
 
 
 /**
@@ -140,8 +140,9 @@ public class ConceptDetailPanel extends FreeColPanel
         for (String concept : concepts) {
             String nodeId = "colopedia.concepts." + concept;
             String nodeName = Messages.getName(nodeId);
+            final BufferedImage image = ImageUtils.createCenteredImage(getImageLibrary().getColopediaConceptImage(), colopediaPanel.getListItemIconSize());
             nodes.add(new DefaultMutableTreeNode(new ColopediaTreeItem(this,
-                        nodeId, nodeName, null)));
+                        nodeId, nodeName, new ImageIcon(image))));
         }
         Collections.sort(nodes, nodeComparator);
         for (DefaultMutableTreeNode n : nodes) {
@@ -155,7 +156,7 @@ public class ConceptDetailPanel extends FreeColPanel
      */
     @Override
     public void buildDetail(String id, JPanel panel) {
-        if (this.id.equals(id)) return;
+        if (ConceptDetailPanel.id.equals(id)) return;
 
         panel.setLayout(new MigLayout("wrap 1, center"));
 

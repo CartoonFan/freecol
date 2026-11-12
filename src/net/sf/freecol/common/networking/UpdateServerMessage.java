@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -31,7 +31,7 @@ import net.sf.freecol.common.model.Game;
  */
 public class UpdateServerMessage extends ServerInfoMessage {
 
-    public static final String TAG = "update";
+    public static final String TAG = "updateServer";
 
 
     /**

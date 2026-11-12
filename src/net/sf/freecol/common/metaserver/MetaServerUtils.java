@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,8 +19,11 @@
 
 package net.sf.freecol.common.metaserver;
 
+import static net.sf.freecol.common.util.CollectionUtils.find;
+import static net.sf.freecol.common.util.CollectionUtils.matchKeyEquals;
+import static net.sf.freecol.common.util.Utils.delay;
+
 import java.io.IOException;
-import java.util.function.Consumer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,6 +32,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -37,17 +42,14 @@ import javax.xml.stream.XMLStreamException;
 import net.sf.freecol.FreeCol;
 import net.sf.freecol.common.FreeColException;
 import net.sf.freecol.common.networking.Connection;
+import net.sf.freecol.common.networking.ConnectionVerificationMessage;
 import net.sf.freecol.common.networking.DisconnectMessage;
 import net.sf.freecol.common.networking.Message;
 import net.sf.freecol.common.networking.MessageHandler;
 import net.sf.freecol.common.networking.RegisterServerMessage;
 import net.sf.freecol.common.networking.RemoveServerMessage;
 import net.sf.freecol.common.networking.ServerListMessage;
-import net.sf.freecol.common.networking.TrivialMessage;
 import net.sf.freecol.common.networking.UpdateServerMessage;
-import static net.sf.freecol.common.util.CollectionUtils.*;
-import static net.sf.freecol.common.util.Utils.*;
-import net.sf.freecol.server.FreeColServer;
 
 
 /**
@@ -55,6 +57,8 @@ import net.sf.freecol.server.FreeColServer;
  * talk to the meta-server.
  */
 public class MetaServerUtils {
+
+    private static final long METASERVER_REPLY_TIMEOUT = 10000;
 
     private static final Logger logger = Logger.getLogger(MetaServerUtils.class.getName());
 
@@ -153,13 +157,17 @@ public class MetaServerUtils {
         // This update is really a "Hi! I am still here!"-message,
         // since an additional update should be sent when a new
         // player is added to/removed from this server etc.
-        Timer t = new Timer(true);
+        final Timer t = new Timer(true);
         updaters.put(t, si);
         t.scheduleAtFixedRate(new TimerTask() {
                 @Override
                 public void run() {
-                    ServerInfo si = updaters.get(this);
-                    if (si == null || !updateServer(si)) cancel();
+                    ServerInfo si = updaters.get(t);
+                    if (si == null) {
+                        cancel();
+                    } else {
+                        updateServer(si);
+                    }
                 }
             }, UPDATE_INTERVAL, UPDATE_INTERVAL);
         return true;
@@ -218,8 +226,8 @@ public class MetaServerUtils {
         String host = FreeCol.getMetaServerAddress();
         int port = FreeCol.getMetaServerPort();
         try {
-            Connection c = new Connection(host, port, "MetaServer")
-                .setMessageHandler(new MetaInputHandler(consumer));
+            @SuppressWarnings("resource")
+            final Connection c = new Connection(host, port, "MetaServer").setMessageHandler(new MetaInputHandler(consumer));
             c.startReceiving();
             return c;
         } catch (IOException ioe) {
@@ -238,26 +246,36 @@ public class MetaServerUtils {
      */
     private static boolean metaMessage(MetaMessageType type, ServerInfo si) {
         try (Connection mc = getMetaServerConnection(null)) {
-            if (mc == null) return false;
-            si.setConnection(mc.getName(), mc.getHostAddress(), mc.getPort());
             switch (type) {
             case REGISTER:
-                mc.sendMessage(new RegisterServerMessage(si));
-                return startTimer(si);
+                startTimer(si);
+                if (mc != null) {
+                    final ConnectionVerificationMessage reply = (ConnectionVerificationMessage) mc.askMessage(
+                            new RegisterServerMessage(si), METASERVER_REPLY_TIMEOUT);
+                    return reply.isConnectable();
+                }
             case REMOVE:
-                mc.sendMessage(new RemoveServerMessage(si));
-                return stopTimer(si);
+                stopTimer(si);
+                if (mc != null) {
+                    mc.sendMessage(new RemoveServerMessage(si));
+                }
+                return true;
             case UPDATE:
-                mc.sendMessage(new UpdateServerMessage(si));
-                return updateTimer(si);
+                updateTimer(si);
+                if (mc != null) {
+                    mc.sendMessage(new UpdateServerMessage(si));
+                }
+                return true;
             default:
                 logger.log(Level.WARNING, "Wrong metaMessage type: " + type);
                 break;
             }
-        } catch (FreeColException|IOException|XMLStreamException ex) {
-            logger.log(Level.WARNING, "Meta message " + type + " failure", ex);
+        } catch (FreeColException|IOException|XMLStreamException|TimeoutException ex) {
+            logger.log(Level.WARNING, "Meta message " + type + " failure.", ex);
+            // Do not fail: Try registering again later:
+            return true;
         }
-        return false;
+        return true;
     }
 
 

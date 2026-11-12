@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -18,6 +18,10 @@
  */
 
 package net.sf.freecol.server.ai;
+
+import static net.sf.freecol.common.util.CollectionUtils.sort;
+import static net.sf.freecol.common.util.StringUtils.chop;
+import static net.sf.freecol.common.util.StringUtils.lastPart;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -43,8 +47,6 @@ import net.sf.freecol.server.ai.mission.IdleAtSettlementMission;
 import net.sf.freecol.server.ai.mission.Mission;
 import net.sf.freecol.server.ai.mission.UnitSeekAndDestroyMission;
 import net.sf.freecol.server.ai.mission.UnitWanderHostileMission;
-import static net.sf.freecol.common.util.CollectionUtils.*;
-import static net.sf.freecol.common.util.StringUtils.*;
 
 
 /**
@@ -310,7 +312,7 @@ public abstract class MissionAIPlayer extends AIPlayer {
     public Mission getSeekAndDestroyMission(AIUnit aiUnit, int range) {
         Location loc = null;
         if (UnitSeekAndDestroyMission.invalidMissionReason(aiUnit) == null) {
-            loc = UnitSeekAndDestroyMission.findMissionTarget(aiUnit, range, false);
+            loc = UnitSeekAndDestroyMission.findMissionTarget(aiUnit, range, false, false);
         }
         return (loc == null) ? null
             : getSeekAndDestroyMission(aiUnit, loc);
@@ -377,7 +379,6 @@ public abstract class MissionAIPlayer extends AIPlayer {
      * @param type The mission type.
      * @return A score representing the desirability of this mission.
      */
-    public abstract int adjustMission(AIUnit aiUnit, PathNode path, Class type,
-                                      int value);
+    public abstract int adjustMission(AIUnit aiUnit, PathNode path, Class<?> type, int value);
 
 }

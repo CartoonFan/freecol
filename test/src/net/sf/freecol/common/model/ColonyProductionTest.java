@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -31,40 +31,23 @@ import net.sf.freecol.util.test.FreeColTestCase;
 
 public class ColonyProductionTest extends FreeColTestCase {
 
-    private static final BuildingType countryType
-        = spec().getBuildingType("model.building.country");
-    private static final BuildingType depotType
-        = spec().getBuildingType("model.building.depot");
-    private static final BuildingType townHallType
-        = spec().getBuildingType("model.building.townHall");
+    private static final BuildingType countryType = spec().getBuildingType("model.building.country");
+    private static final BuildingType depotType = spec().getBuildingType("model.building.depot");
+    private static final BuildingType townHallType = spec().getBuildingType("model.building.townHall");
 
-    private static final GoodsType bellsType
-        = spec().getGoodsType("model.goods.bells");
-    private static final GoodsType clothType
-        = spec().getGoodsType("model.goods.cloth");
-    private static final GoodsType cottonType
-        = spec().getGoodsType("model.goods.cotton");
-    private static final GoodsType crossesType
-        = spec().getGoodsType("model.goods.crosses");
-    private static final GoodsType foodType
-        = spec().getGoodsType("model.goods.food");
-    private static final GoodsType grainType
-        = spec().getGoodsType("model.goods.grain");
-    private static final GoodsType horsesType
-        = spec().getGoodsType("model.goods.horses");
+    private static final GoodsType bellsType = spec().getGoodsType("model.goods.bells");
+    private static final GoodsType cottonType = spec().getGoodsType("model.goods.cotton");
+    private static final GoodsType foodType = spec().getGoodsType("model.goods.food");
+    private static final GoodsType grainType = spec().getGoodsType("model.goods.grain");
+    private static final GoodsType horsesType = spec().getGoodsType("model.goods.horses");
 
-    private static final ResourceType grainResource
-        = spec().getResourceType("model.resource.grain");
+    private static final ResourceType grainResource = spec().getResourceType("model.resource.grain");
 
-    private static final TileType plainsType
-        = spec().getTileType("model.tile.plains");
+    private static final TileType plainsType = spec().getTileType("model.tile.plains");
 
-    private static final UnitType freeColonistType
-        = spec().getUnitType("model.unit.freeColonist");
-    private static final UnitType pioneerType
-        = spec().getUnitType("model.unit.hardyPioneer");
-    private static final UnitType veteranSoldierType
-        = spec().getUnitType("model.unit.veteranSoldier");
+    private static final UnitType freeColonistType = spec().getUnitType("model.unit.freeColonist");
+    private static final UnitType pioneerType = spec().getUnitType("model.unit.hardyPioneer");
+    private static final UnitType veteranSoldierType = spec().getUnitType("model.unit.veteranSoldier");
 
 
     public void testProductionSoldier() {
@@ -167,7 +150,7 @@ public class ColonyProductionTest extends FreeColTestCase {
 
         // Get a minimal colony so that the units-that-use-no-bells
         // parameter will not be relevant.
-        final Colony colony = getStandardColony(1);
+        final Colony colony = createStandardColony(1);
         final Player player = colony.getOwner();
         final int noBellUnits = colony.getSpecification()
             .getInteger(GameOptions.UNITS_THAT_USE_NO_BELLS);
@@ -244,10 +227,10 @@ public class ColonyProductionTest extends FreeColTestCase {
         Game game = getGame();
         game.changeMap(getTestMap());
 
-        Colony colony = getStandardColony(1);
+        Colony colony = createStandardColony(1);
         Building pasture = colony.getBuilding(countryType);
         Unit unit = colony.getFirstUnit();
-        unit.setLocation(colony.getWorkLocationFor(unit, bellsType));
+        unit.setLocation(colony.getWorkLocationFor(unit, foodType));
 
         List<AbstractGoods> outputs = toList(pasture.getOutputs());
         assertEquals(1, outputs.size());
@@ -261,7 +244,7 @@ public class ColonyProductionTest extends FreeColTestCase {
         colony.invalidateCache();
 
         assertEquals(99, colony.getGoodsCount(horsesType));
-        assertTrue(colony.getNetProductionOf(foodType) > 0);
+        assertTrue(colony.getNetProductionOf(foodType) > 1);
         assertEquals("Wrong horse production", 1,
             pasture.getTotalProductionOf(horsesType));
         assertEquals("Wrong maximum horse production", 1,
@@ -288,7 +271,7 @@ public class ColonyProductionTest extends FreeColTestCase {
         Game game = getGame();
         game.changeMap(getTestMap());
 
-        Colony colony = getStandardColony(3);
+        Colony colony = createStandardColony(3);
         int units = colony.getUnitCount();
         int buildings = colony.getBuildings().size();
 
@@ -374,12 +357,12 @@ public class ColonyProductionTest extends FreeColTestCase {
         Game game = getGame();
         game.changeMap(getTestMap());
 
-        Colony colony = getStandardColony(3);
+        Colony colony = createStandardColony(3);
         ColonyTile tile = colony.getColonyTile(colony.getTile());
 
         assertEquals(0, colony.getGoodsCount(foodType));
         assertEquals(grainType, tile.getProduction().get(0).getType());
-        assertEquals(5, tile.getProduction().get(0).getAmount());
+        assertEquals(3, tile.getProduction().get(0).getAmount());
         assertEquals(cottonType, tile.getProduction().get(1).getType());
         assertEquals(2, tile.getProduction().get(1).getAmount());
 
@@ -494,7 +477,7 @@ public class ColonyProductionTest extends FreeColTestCase {
         Game game = getGame();
         game.changeMap(getTestMap());
 
-        Colony colony = getStandardColony(1);
+        Colony colony = createStandardColony(1);
         ColonyTile colonyTile = colony.getColonyTile(colony.getTile());
         assertNotNull(colonyTile);
         assertEquals(plainsType, colony.getTile().getType());

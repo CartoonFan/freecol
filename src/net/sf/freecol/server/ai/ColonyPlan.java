@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -456,10 +456,14 @@ public class ColonyPlan {
             } else if (g.getMilitary()) {
                 militaryGoodsTypes.add(g);
             } else if (g.isRawBuildingMaterial()) {
-                rawBuildingGoodsTypes.add(g);
+                if (g.isRawMaterialForUnstorableBuildingMaterial()) {
+                    rawBuildingGoodsTypes.add(g);
+                }
             } else if (g.isBuildingMaterial()
-                && g.getInputType().isRawBuildingMaterial()) {
-                buildingGoodsTypes.add(g);
+                    && g.getInputType().isRawBuildingMaterial()) {
+                if (!g.isStorable()) {
+                    buildingGoodsTypes.add(g);
+                }
             } else if (g.isNewWorldGoodsType()) {
                 rawLuxuryGoodsTypes.add(g);
             } else if (g.isRefined()
@@ -639,13 +643,13 @@ public class ColonyPlan {
             if ("conquest".equals(advantage)) factor = 1.2;
             ret = prioritize(type, MILITARY_WEIGHT * factor,
                 1.0/*FIXME: amount present wrt amount to equip*/);
-        } else if (goodsType.isBuildingMaterial()) {
+        } else if (goodsType.isBuildingMaterial() && !goodsType.isStorable()) {
             ret = prioritize(type, BUILDING_WEIGHT * factor,
                 1.0/*FIXME: need for this type*/);
         } else if (goodsType.isLibertyType()) {
             if (player.isREF()) return false; // no bells for REF colonies
             ret = prioritize(type, LIBERTY_WEIGHT,
-                (colony.getSoL() >= 100) ? 0.01 : 1.0);
+                (colony.getSonsOfLiberty() >= 100) ? 0.01 : 1.0);
         } else if (goodsType.isImmigrationType()) {
             if ("immigration".equals(advantage)) factor = 1.2;
             ret = prioritize(type, IMMIGRATION_WEIGHT * factor,
@@ -663,7 +667,7 @@ public class ColonyPlan {
      * Updates the build plans for this colony.
      */
     private void updateBuildableTypes() {
-        final AIPlayer euaip = getAIMain()
+        final EuropeanAIPlayer euaip = (EuropeanAIPlayer) getAIMain()
             .getAIPlayer(colony.getOwner());
         String advantage = euaip.getAIAdvantage();
         buildPlans.clear();
@@ -709,8 +713,7 @@ public class ColonyPlan {
                     && colony.getTile().isShore()) {
                     int landFood = 0, seaFood = 0;
                     for (Tile t : transform(colony.getTile().getSurroundingTiles(1,1),
-                            t2 -> (t2.getOwningSettlement() == colony
-                                || player.canClaimForSettlement(t2)))) {
+                            t2 -> (t2.getOwningSettlement() == colony || player.canClaimForSettlement(t2)))) {
                         for (AbstractGoods ag : t.getSortedPotential()) {
                             if (ag.isFoodType()) {
                                 if (t.isLand()) {
@@ -790,7 +793,7 @@ public class ColonyPlan {
             if (unitType.hasAbility(Ability.NAVAL_UNIT)) {
                 ; // FIXME: decide to build a ship
             } else if (unitType.isDefensive()) {
-                if (colony.isBadlyDefended()) {
+                if (euaip.needsMoreArtillery()) {
                     prioritize(unitType, DEFENCE_WEIGHT,
                         1.0/*FIXME: how badly defended?*/);
                 }
@@ -895,7 +898,7 @@ public class ColonyPlan {
                 .reversed();
 
         // If we need liberty put it before the new world production.
-        if (colony.getSoL() < 100) {
+        if (colony.getSonsOfLiberty() < 100) {
             produce.addAll(0, transform(libertyGoodsTypes,
                     gt -> production.containsKey(gt),
                     Function.<GoodsType>identity(), productionComparator));
@@ -1055,7 +1058,7 @@ public class ColonyPlan {
                 && u.getUnitChange(UnitChangeType.EXPERIENCE, expert) != null) {
                 score += 10000;
             } else if (expert != null
-                && u.getUnitChange(UnitChangeType.EXPERIENCE, expert) != null) {
+                && u.getUnitChange(UnitChangeType.EXPERIENCE) != null) {
                 score -= 10000;
             }
             if (score > bestValue) {
@@ -1095,13 +1098,8 @@ public class ColonyPlan {
      * @param colony The {@code Colony} storing the equipment.
      * @return True if the unit was equipped.
      */
-    private static boolean fullEquipUnit(Specification spec, Unit unit,
-                                         Role role, Colony colony) {
-        return (role.isOffensive())
-            ? any(transform(spec.getMilitaryRoles(),
-                            r -> unit.roleIsAvailable(r)
-                                && colony.equipForRole(unit, r, r.getMaximumCount())))
-            : colony.equipForRole(unit, role, role.getMaximumCount());
+    private static boolean fullEquipUnit(Specification spec, Unit unit, Role role, Colony colony) {
+        return colony.equipForRole(unit, role, role.getMaximumCount());
     }
 
     /**
@@ -1156,10 +1154,15 @@ public class ColonyPlan {
                 if (workers.size() <= 1) break;
                 Role role = outdoorRole;
                 if (role == null) {
-                    if ((role = u.getMilitaryRole()) == null) continue;
-                }
-                if (u.getType() == role.getExpertUnit()
-                    && fullEquipUnit(spec(), u, role, col)) {
+                    for (Role r : u.getSortedMilitaryRoles()) {
+                        if (u.getType() == r.getExpertUnit() && fullEquipUnit(spec(), u, r, col)) {
+                            workers.remove(u);
+                            lb.add(u.getId(), "(", u.getType().getSuffix(),
+                                ") -> ", r.getSuffix(), "\n");
+                            break;
+                        }
+                    }
+                } else if (u.getType() == role.getExpertUnit() && fullEquipUnit(spec(), u, role, col)) {
                     workers.remove(u);
                     lb.add(u.getId(), "(", u.getType().getSuffix(),
                         ") -> ", role.getSuffix(), "\n");
@@ -1180,16 +1183,26 @@ public class ColonyPlan {
                     produce.indexOf(u.getType().getExpertProduction()))
                 .reversed()
                 .thenComparingInt(Unit::getExperience);
+        /* 
+         * Defence is now handled by the military coordinator.
+         * 
         for (Unit u : sort(workers, soldierComparator)) {
             if (workers.size() <= 1) break;
             if (!col.isBadlyDefended()) break;
-            Role role = u.getMilitaryRole();
-            if (role != null && fullEquipUnit(spec(), u, role, col)) {
-                workers.remove(u);
-                lb.add(u.getId(), "(", u.getType().getSuffix(), ") -> ",
-                       u.getRoleSuffix(), "\n");
+            if (u.getSkillLevel() > 0) {
+                // Stops experts from being used as soldiers
+                continue;
+            }
+            for (Role role : u.getSortedMilitaryRoles()) {
+                if (role != null && fullEquipUnit(spec(), u, role, col)) { 
+                    workers.remove(u);
+                    lb.add(u.getId(), "(", u.getType().getSuffix(), ") -> ",
+                            u.getRoleSuffix(), "\n");
+                    break;
+                }
             }
         }
+        */
 
         // Greedy assignment of other workers to plans.
         List<AbstractGoods> buildGoods = new ArrayList<>();
@@ -1405,7 +1418,7 @@ plans:          for (WorkLocationPlan w : getFoodPlans()) {
                 nonExperts.add(u);
             }
         }
-        int expert = 0;
+
         Iterator<Unit> expertIterator = experts.iterator();
         while (expertIterator.hasNext()) {
             Unit u1 = expertIterator.next();
@@ -1435,13 +1448,15 @@ plans:          for (WorkLocationPlan w : getFoodPlans()) {
 
         // Rearm what remains as far as possible.
         for (Unit u : sort(workers, soldierComparator)) {
-            Role role = u.getMilitaryRole();
-            if (role == null) continue;
-            if (fullEquipUnit(spec(), u, role, col)) {
-                lb.add("    ", u.getId(), "(", u.getType().getSuffix(),
-                       ") -> ", u.getRoleSuffix(), "\n");
-                workers.remove(u);
-            } else break;
+            if (u.getSkillLevel() > 0) continue;
+            for (Role role : u.getSortedMilitaryRoles()) {
+                if (fullEquipUnit(spec(), u, role, col)) {
+                    lb.add("    ", u.getId(), "(", u.getType().getSuffix(),
+                           ") -> ", u.getRoleSuffix(), "\n");
+                    workers.remove(u);
+                    break;
+                }
+            }
         }
         for (Unit u : transform(col.getUnits(), u -> !u.hasDefaultRole())) {
             logger.warning("assignWorkers bogus role for " + u);

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,20 +21,15 @@ package net.sf.freecol.client.gui.dialog;
 
 import java.awt.event.ActionEvent;
 import java.io.File;
-import java.util.logging.Logger;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
-import javax.swing.event.TreeSelectionEvent;
-import javax.swing.event.TreeSelectionListener;
-import javax.swing.tree.DefaultMutableTreeNode;
-import javax.swing.tree.TreePath;
 
 import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.client.gui.panel.*;
-import net.sf.freecol.common.io.FreeColDataFile;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.io.FreeColDirectories;
-import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Specification;
 import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.option.OptionGroup;
@@ -45,13 +40,7 @@ import net.sf.freecol.common.option.OptionGroup;
  *
  * @see OptionGroup
  */
-public final class DifficultyDialog extends OptionsDialog
-    implements TreeSelectionListener {
-
-    private static final Logger logger = Logger.getLogger(DifficultyDialog.class.getName());
-
-    /** The currently selected subgroup. */
-    private OptionGroup selected;
+public final class DifficultyDialog extends OptionsDialog {
 
     /**
      * We need our own copy of the specification, as the dialog is
@@ -74,29 +63,28 @@ public final class DifficultyDialog extends OptionsDialog
     public DifficultyDialog(FreeColClient freeColClient, JFrame frame,
                             Specification specification, OptionGroup level,
                             boolean editable) {
-        super(freeColClient, frame, editable, level, "difficultyDialog",
+        super(freeColClient, level, "difficultyDialog",
               FreeColDirectories.CUSTOM_DIFFICULTY_FILE_NAME,
-              "model.difficulty.custom");
+              "model.difficulty.custom", editable);
 
         this.specification = specification;
-        this.selected = level;
-
-        getOptionUI().getTree().addTreeSelectionListener(this);
+        
+        final List<JButton> extraButtons = new ArrayList<>();
         if (isEditable()) {
-            JButton resetButton = Utility.localizedButton("reset");
+            final JButton resetButton = Utility.localizedButton("reset");
             addResetAction(resetButton);
             
-            JButton loadButton = Utility.localizedButton("load");
+            final JButton loadButton = Utility.localizedButton("load");
             addLoadAction(loadButton);
                     
-            JButton saveButton = Utility.localizedButton("save");
+            final JButton saveButton = Utility.localizedButton("save");
             addSaveAction(saveButton);
 
-            this.panel.add(resetButton, "span, split 3");
-            this.panel.add(loadButton);
-            this.panel.add(saveButton);
+            extraButtons.add(resetButton);
+            extraButtons.add(loadButton);
+            extraButtons.add(saveButton);
         }
-        initialize(frame, choices());
+        initialize(frame, extraButtons);
     }
 
 
@@ -166,25 +154,8 @@ public final class DifficultyDialog extends OptionsDialog
     // Implement TreeSelectionListener
 
     @Override
-    public void valueChanged(TreeSelectionEvent event) {
-        TreePath path = event.getPath();
-        if (path.getPathCount() >= 2) {
-            DefaultMutableTreeNode node
-                = (DefaultMutableTreeNode)path.getPathComponent(1);
-            this.selected = (OptionGroup)node.getUserObject();
-        }
-    }
-
-
-    // Override OptionsDialog
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public OptionGroup getResponse() {
-        OptionGroup value = super.getResponse();
-        return (value == null) ? null // Cancelled
-            : getGroup();
+    protected boolean saveDefaultOptions() {
+        // No saving of default options.
+        return false;
     }
 }

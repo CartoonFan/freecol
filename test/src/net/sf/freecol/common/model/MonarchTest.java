@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -26,7 +26,6 @@ import java.util.List;
 import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.common.io.FreeColXMLWriter;
-import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.Monarch.MonarchAction;
 import net.sf.freecol.common.option.GameOptions;
 import net.sf.freecol.common.util.RandomChoice;
@@ -58,7 +57,7 @@ public class MonarchTest extends FreeColTestCase {
             = dutch.getMonarch().getActionChoices();
         assertTrue(choices.isEmpty());
 
-        Colony colony = getStandardColony();
+        createStandardColony();
         game.setTurn(new Turn(100));
         dutch.setTax(Monarch.MINIMUM_TAX_RATE / 2);
         choices = dutch.getMonarch().getActionChoices();

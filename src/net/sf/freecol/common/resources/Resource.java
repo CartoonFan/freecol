@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -20,6 +20,7 @@
 package net.sf.freecol.common.resources;
 
 import java.net.URI;
+import java.util.Objects;
 
 
 /**
@@ -47,25 +48,50 @@ public abstract class Resource {
      * The {@code URI} used when loading this resource.
      */
     private final URI resourceLocator;
+    
+    /**
+     * The key for the resource to be used for caching purposes.
+     * 
+     * This is used when multiple keys are pointing to the same {@code Resource}.
+     */
+    private final String cachingKey;
 
 
     /**
      * Trivial constructor.
+     *
+     * @param cachingKey The key used for caching the image.
      */
-    protected Resource() {
-        this.resourceLocator = null;
+    protected Resource(String cachingKey) {
+        this(cachingKey, null);
     }
 
     /**
      * Do not use directly.
      *
+     * @param cachingKey The key for the primary version of the resource,
+     *      that is the key when the {@code Resource} was created.
      * @param resourceLocator The {@code URI} used when loading this
      *      resource.
      */
-    protected Resource(URI resourceLocator) {
+    protected Resource(String cachingKey, URI resourceLocator) {
+        this.cachingKey = Objects.requireNonNull(cachingKey);
         this.resourceLocator = resourceLocator;
     }
 
+    
+    /**
+     * The caching key of the resource. This key is used for caching
+     * purposes since it will be the same for a resource no matter how
+     * many keys point to the same resource.
+     * 
+     * Beware: All variations and sizes share the same primary key.
+     * 
+     * @return The key.
+     */
+    public String getCachingKey() {
+        return cachingKey;
+    }
 
     /**
      * Returns the {@code URI} used for loading the resource.

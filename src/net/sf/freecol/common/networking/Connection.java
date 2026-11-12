@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -22,17 +22,13 @@ package net.sf.freecol.common.networking;
 import java.io.BufferedReader;
 import java.io.Closeable;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.StringReader;
-import java.io.StringWriter;
-import java.io.Writer;
 import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -43,7 +39,6 @@ import net.sf.freecol.common.debug.FreeColDebugger;
 import net.sf.freecol.common.io.FreeColDirectories;
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
-import net.sf.freecol.common.util.Utils;
 
 
 /**
@@ -54,6 +49,15 @@ public class Connection implements Closeable {
 
     private static final Logger logger = Logger.getLogger(Connection.class.getName());
 
+    /**
+     * The default timeout when waiting for a reply from the server. Defined
+     * in milliseconds.
+     * 
+     * Setting 30s for now since there was no timeout earlier when waiting
+     * for å reply.
+     */
+    public static final long DEFAULT_REPLY_TIMEOUT = 30000;
+    
     public static final char END_OF_STREAM = '\n';
     private static final char[] END_OF_STREAM_ARRAY = { END_OF_STREAM };
     public static final int BUFFER_SIZE = 1 << 14;
@@ -91,6 +95,8 @@ public class Connection implements Closeable {
 
     /** The subthread to read the input. */
     private ReceivingThread receivingThread;
+    
+    private final Object receivingThreadLock = new Object();
 
     /** The message handler to process incoming messages with. */
     private MessageHandler messageHandler = null;
@@ -128,6 +134,7 @@ public class Connection implements Closeable {
      * @param name The connection name.
      * @exception IOException if streams can not be derived from the socket.
      */
+    @SuppressWarnings("resource")
     public Connection(Socket socket, String name) throws IOException {
         this(name);
 
@@ -417,13 +424,17 @@ public class Connection implements Closeable {
      * Send a message, and return the response.  Log both.
      *
      * @param message The {@code Message} to send.
+     * @param timeout A timeout in milliseconds, after which a
+     *      {@code TimeoutException} gets thrown when waiting
+     *      for a reply.
      * @return The response.
      * @exception FreeColException on extreme confusion.
      * @exception IOException on failure to send.
      * @exception XMLStreamException on stream write error.
+     * @exception TimeoutException when the timeout is reached.
      */
-    protected Message askMessage(Message message)
-        throws FreeColException, IOException, XMLStreamException {
+    public Message askMessage(Message message, long timeout)
+        throws FreeColException, IOException, XMLStreamException, TimeoutException {
         if (message == null) return null;
         final String tag = message.getType();
         if (Thread.currentThread() == this.receivingThread) {
@@ -440,7 +451,7 @@ public class Connection implements Closeable {
 
         // Block waiting for the reply to occur.  Expect a reply
         // message, except on shutdown.
-        Object response = nro.getResponse();
+        Object response = nro.getResponse(timeout);
         if (response == null && !this.connected) {
             return null;
         } else if (!(response instanceof ReplyMessage)) {
@@ -547,10 +558,14 @@ public class Connection implements Closeable {
     public void request(Message message)
         throws FreeColException, IOException, XMLStreamException {
         if (message == null) return;
-        Message response = askMessage(message);
-        if (response != null) {
-            Message reply = handle(response);
-            assert reply == null;
+        try {
+            Message response = askMessage(message, DEFAULT_REPLY_TIMEOUT);
+            if (response != null) {
+                Message reply = handle(response);
+                assert reply == null;
+            }
+        } catch (TimeoutException e) {
+            throw new IOException(e);
         }
     }
         
@@ -574,10 +589,12 @@ public class Connection implements Closeable {
      * Close this connection.
      */
     public void close() {
-        if (this.receivingThread != null) {
-            this.receivingThread.askToStop("connection closing");
-            this.receivingThread.interrupt();
-            this.receivingThread = null;
+        synchronized (receivingThreadLock) {
+            if (this.receivingThread != null) {
+                this.receivingThread.askToStop("connection closing");
+                this.receivingThread.interrupt();
+                this.receivingThread = null;
+            }
         }
 
         // Close the socket before the input stream.  Socket closure will

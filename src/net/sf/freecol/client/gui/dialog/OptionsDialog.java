@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -20,20 +20,23 @@
 package net.sf.freecol.client.gui.dialog;
 
 import java.awt.Dimension;
+import java.awt.event.ActionEvent;
 import java.io.File;
 import java.util.List;
 import java.util.logging.Logger;
 
+import javax.swing.AbstractAction;
+import javax.swing.JButton;
 import javax.swing.JFrame;
-import javax.swing.JScrollPane;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.FreeCol;
 import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.client.gui.ChoiceItem;
+import net.sf.freecol.client.gui.DialogHandler;
 import net.sf.freecol.client.gui.option.OptionGroupUI;
-import net.sf.freecol.client.gui.panel.*;
+import net.sf.freecol.client.gui.panel.FreeColPanel;
+import net.sf.freecol.client.gui.panel.MigPanel;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.io.FreeColDirectories;
 import net.sf.freecol.common.option.OptionGroup;
@@ -42,12 +45,9 @@ import net.sf.freecol.common.option.OptionGroup;
 /**
  * Dialog for changing the options of an {@link OptionGroup}.
  */
-public abstract class OptionsDialog extends FreeColDialog<OptionGroup> {
+public abstract class OptionsDialog extends FreeColPanel {
 
     private static final Logger logger = Logger.getLogger(OptionsDialog.class.getName());
-
-    /** Are the settings in this dialog editable? */
-    private final boolean editable;
 
     /** The option group to display. */
     private OptionGroup group;
@@ -65,45 +65,34 @@ public abstract class OptionsDialog extends FreeColDialog<OptionGroup> {
     private final String optionGroupId;
 
     /** Dialog internal parts. */
-    private JScrollPane scrollPane;
     private MigPanel optionPanel;
     protected MigPanel panel;
+    
+    private DialogHandler<OptionGroup> dialogHandler;
 
 
     /**
      * The constructor that will add the items to this panel.
      *
      * @param freeColClient The {@code FreeColClient} for the game.
-     * @param frame The owner frame.
-     * @param editable Whether the dialog is editable.
      * @param group The {@code OptionGroup} to display.
      * @param headerKey The message identifier for the header.
      * @param defaultFileName The name of the default file to back
      *     this dialog with.
      * @param optionGroupId The identifier for the overall option group.
      */
-    protected OptionsDialog(FreeColClient freeColClient, JFrame frame,
-                            boolean editable, OptionGroup group, String headerKey,
-                            String defaultFileName, String optionGroupId) {
-        super(freeColClient, frame);
+    protected OptionsDialog(FreeColClient freeColClient, OptionGroup group, String headerKey,
+                            String defaultFileName, String optionGroupId, boolean editable) {
+        super(freeColClient, null, new MigLayout("fill"));
 
         this.editable = editable;
         this.group = group;
-        this.ui = new OptionGroupUI(getGUI(), this.group, this.editable);
+        this.ui = new OptionGroupUI(getGUI(), this.group, editable);
         this.defaultFileName = defaultFileName;
         this.optionGroupId = optionGroupId;
         preparePanel(headerKey, this.ui);
     }
 
-
-    /**
-     * Is this dialog editable?
-     *
-     * @return True if the dialog is editable.
-     */
-    protected boolean isEditable() {
-        return this.editable;
-    }
 
     /**
      * Get the option group being displayed by this dialog.
@@ -140,6 +129,10 @@ public abstract class OptionsDialog extends FreeColDialog<OptionGroup> {
     protected String getOptionGroupId() {
         return this.optionGroupId;
     }
+    
+    public void setDialogHandler(DialogHandler<OptionGroup> dialogHandler) {
+        this.dialogHandler = dialogHandler;
+    }
 
     /**
      * Load the panel.
@@ -148,16 +141,12 @@ public abstract class OptionsDialog extends FreeColDialog<OptionGroup> {
      * @param ui The {@code OptionGroupUI} to encapsulate.
      */
     private void preparePanel(String headerKey, OptionGroupUI ui) {
-        this.optionPanel = new MigPanel("ReportPanelUI");
-        this.optionPanel.setOpaque(true);
-        this.optionPanel.add(ui);
+        this.optionPanel = new MigPanel(new MigLayout("fill, insets 0"));
+        this.optionPanel.setOpaque(false);
+        this.optionPanel.add(ui, "grow, gap 0 0, pad 0");
         this.optionPanel.setSize(this.optionPanel.getPreferredSize());
-        this.scrollPane = new JScrollPane(this.optionPanel,
-            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-            JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        this.scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        
-        this.panel = new MigPanel(new MigLayout("wrap 1, fill"));
+
+        this.panel = new MigPanel(new MigLayout("wrap 1, fill, insets 0"));
         this.panel.add(Utility.localizedHeader(Messages.nameKey(headerKey),
                                                Utility.FONTSPEC_TITLE),
                        "span, center");
@@ -169,16 +158,35 @@ public abstract class OptionsDialog extends FreeColDialog<OptionGroup> {
      * @param frame The owner frame.
      * @param c Extra choices to add beyond the default ok and cancel.
      */
-    protected void initialize(JFrame frame, List<ChoiceItem<OptionGroup>> c) {
-        this.panel.add(this.scrollPane, "height 100%, width 100%");
-        this.panel.setPreferredSize(new Dimension(850, 650));
-        this.panel.setSize(this.panel.getPreferredSize());
+    protected void initialize(JFrame frame, List<JButton> extraButtons) {
+        this.panel.add(this.optionPanel, "width 100%, height 100%, gap 0 0, pad 0");
 
-        c.add(new ChoiceItem<>(Messages.message("ok"), this.group).okOption());
-        c.add(new ChoiceItem<>(Messages.message("cancel"), (OptionGroup)null,
-                               isEditable()).cancelOption().defaultOption());
+        add(panel, "grow, gap 0 0, pad 0");
+        add(okButton, "newline, split, tag ok");
         
-        initializeDialog(frame, DialogType.PLAIN, true, this.panel, null, c);
+        if (isEditable()) {
+            final JButton cancelButton = Utility.localizedButton("cancel");
+            cancelButton.setActionCommand(CANCEL);
+            cancelButton.addActionListener(this);
+            add(cancelButton, "tag cancel");
+            setEscapeAction(new AbstractAction() {
+                    @Override
+                    public void actionPerformed(ActionEvent ae) {
+                        OptionsDialog.this.cancelOptionsDialog();
+                    }
+                });
+        }
+        
+        for (JButton button : extraButtons) {
+            add(button, "tag left");
+        }
+        
+        final float scaleFactor = getImageLibrary().getScaleFactor();
+        final int maxWidth = (int) (850 * scaleFactor);
+        final int maxHeight = (int) (650 * scaleFactor);
+        final int width = Math.min(maxWidth, frame.getWidth() - 200);
+        final int height = Math.min(maxHeight, frame.getHeight() - 200);
+        panel.setSize(new Dimension(width, height));
     }
 
     /**
@@ -197,7 +205,7 @@ public abstract class OptionsDialog extends FreeColDialog<OptionGroup> {
     private void update() {
         this.optionPanel.removeAll();
         this.ui = new OptionGroupUI(getGUI(), this.group, this.editable);
-        this.optionPanel.add(this.ui);
+        this.optionPanel.add(this.ui, "grow");
         invalidate();
         validate();
         repaint();
@@ -210,9 +218,16 @@ public abstract class OptionsDialog extends FreeColDialog<OptionGroup> {
      * @return True if the load succeeded.
      */
     protected boolean load(File file) {
-        OptionGroup og = OptionGroup.loadOptionGroup(file, getOptionGroupId(),
-                                                     getSpecification());
-        if (og == null) return false;
+        OptionGroup og = group;
+        if (og == null) {
+            og = OptionGroup.loadOptionGroup(file, getOptionGroupId(), getSpecification());
+        } else {
+            group.load(file);
+        }
+        
+        if (og == null) {
+            return false;
+        }
         set(og);
         return true;
     }
@@ -248,21 +263,46 @@ public abstract class OptionsDialog extends FreeColDialog<OptionGroup> {
         File f = FreeColDirectories.getOptionsFile(getDefaultFileName());
         return save(f);
     }
+   
 
-
-    // Override FreeColDialog
+    /**
+     * Resets so that the option with preview (volume)
+     * gets restored on cancel.
+     */
+    public void cancelOptionsDialog() {
+        getOptionUI().reset();
+        
+        getGUI().removeComponent(this);
+        if (dialogHandler != null) {
+            dialogHandler.handle(null);
+        }
+    }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public OptionGroup getResponse() {
-        OptionGroup value = super.getResponse();
-        if (value == null) {
-            ; // Cancelled, do nothing
-        } else {
+    public void actionPerformed(ActionEvent ae) {
+        final String command = ae.getActionCommand();
+        if (OK.equals(command)) {
+            if (!isEditable()) {
+                getGUI().removeComponent(this);
+                if (dialogHandler != null) {
+                    dialogHandler.handle(null);
+                }
+                return;
+            }
             getOptionUI().updateOption();
+            saveDefaultOptions();
+            
+            getGUI().removeComponent(this);
+            if (dialogHandler != null) {
+                dialogHandler.handle(group);
+            }
+        } else if (CANCEL.equals(command)) {
+            cancelOptionsDialog();
+        } else {
+            logger.warning("Bad event: " + command);
         }
-        return value;
     }
 }

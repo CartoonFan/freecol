@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,10 +21,9 @@ package net.sf.freecol.server.ai.mission;
 
 import net.sf.freecol.common.model.Ability;
 import net.sf.freecol.common.model.Colony;
-import net.sf.freecol.common.model.CombatModel.CombatResult;
+import net.sf.freecol.common.model.CombatModel.CombatEffectType;
 import net.sf.freecol.common.model.Direction;
 import net.sf.freecol.common.model.Europe;
-import net.sf.freecol.common.model.FreeColObject;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.Goods;
 import net.sf.freecol.common.model.GoodsType;
@@ -42,7 +41,6 @@ import net.sf.freecol.server.ai.AIMain;
 import net.sf.freecol.server.ai.AIPlayer;
 import net.sf.freecol.server.ai.AIUnit;
 import net.sf.freecol.server.ai.TransportableAIObject;
-import net.sf.freecol.server.ai.mission.TransportMission;
 import net.sf.freecol.server.control.InGameController;
 import net.sf.freecol.server.model.ServerPlayer;
 import net.sf.freecol.server.model.ServerUnit;
@@ -109,12 +107,12 @@ public class TransportMissionTest extends FreeColTestCase {
 
         // Simulate the combat
         igc.combat(dutch, privateer, galleon,
-                   fakeAttackResult(CombatResult.WIN, privateer, galleon));
+                   fakeAttackResult(CombatEffectType.WIN, privateer, galleon));
 
         // Verify that the outcome of the combat is a return to Europe
         // for repairs and also invalidation of the transport mission
         // as side effect.
-        assertTrue(galleon.isDamaged());
+        assertTrue(galleon.isDamagedAndUnderForcedRepair());
         assertFalse(aiUnit.getMission().isValid());
 
         // This will call AIPlayer.abortInvalidMissions() and change
@@ -126,7 +124,6 @@ public class TransportMissionTest extends FreeColTestCase {
     public void testGetNextStopAlreadyAtDestination() {
         Game game = ServerTestHelper.startServerGame(getCoastTestMap(plainsType));
         Map map = game.getMap();
-        InGameController igc = ServerTestHelper.getInGameController();
         AIMain aiMain = ServerTestHelper.getServer().getAIMain();
         assertNotNull(aiMain);
 
@@ -135,7 +132,7 @@ public class TransportMissionTest extends FreeColTestCase {
         
         // create a ship carrying a colonist
         Tile colonyTile = map.getTile(9, 9);
-        getStandardColony(1, colonyTile.getX(), colonyTile.getY());
+        createStandardColony(1, colonyTile.getX(), colonyTile.getY());
 
         Unit galleon = new ServerUnit(game, colonyTile, dutch, galleonType);
         AIUnit aiUnit = aiMain.getAIUnit(galleon);
@@ -159,7 +156,6 @@ public class TransportMissionTest extends FreeColTestCase {
     public void testGetNextStopIsEurope() {
         Game game = ServerTestHelper.startServerGame(getCoastTestMap(plainsType));
         Map map = game.getMap();
-        InGameController igc = ServerTestHelper.getInGameController();
         AIMain aiMain = ServerTestHelper.getServer().getAIMain();
         assertNotNull(aiMain);
 
@@ -170,7 +166,7 @@ public class TransportMissionTest extends FreeColTestCase {
 
         // create a ship carrying a colonist in a colony
         Tile colonyTile = map.getTile(9, 9);
-        getStandardColony(1, colonyTile.getX(), colonyTile.getY());
+        createStandardColony(1, colonyTile.getX(), colonyTile.getY());
 
         Unit galleon = new ServerUnit(game, colonyTile, dutch, galleonType);
         AIUnit aiUnit = aiMain.getAIUnit(galleon);
@@ -197,7 +193,6 @@ public class TransportMissionTest extends FreeColTestCase {
     public void testGetNextStopIsColony() {
         Game game = ServerTestHelper.startServerGame(getCoastTestMap(plainsType));
         Map map = game.getMap();
-        InGameController igc = ServerTestHelper.getInGameController();
         AIMain aiMain = ServerTestHelper.getServer().getAIMain();
         assertNotNull(aiMain);
 
@@ -207,7 +202,7 @@ public class TransportMissionTest extends FreeColTestCase {
 
         Tile colonyTile = map.getTile(9, 9);
         assertTrue(colonyTile.isLand());
-        getStandardColony(1, colonyTile.getX(), colonyTile.getY());
+        createStandardColony(1, colonyTile.getX(), colonyTile.getY());
 
         // create a ship
         Tile galleonTile = map.getTile(10, 9);
@@ -236,7 +231,6 @@ public class TransportMissionTest extends FreeColTestCase {
     public void testGetDefaultDestination() {
         Game game = ServerTestHelper.startServerGame(getCoastTestMap(plainsType));
         Map map = game.getMap();
-        InGameController igc = ServerTestHelper.getInGameController();
         AIMain aiMain = ServerTestHelper.getServer().getAIMain();
         assertNotNull(aiMain);
 
@@ -284,9 +278,9 @@ public class TransportMissionTest extends FreeColTestCase {
 
     public void testWagonTrain() {
         Game game = ServerTestHelper.startServerGame(getTestMap());
-        Colony one = getStandardColony(3, 3, 3);
+        Colony one = createStandardColony(3, 3, 3);
         one.setName("one");
-        Colony two = getStandardColony(3, 8, 8);
+        Colony two = createStandardColony(3, 8, 8);
         two.setName("two");
         assertEquals(one.getOwner(), two.getOwner());
 
@@ -298,7 +292,7 @@ public class TransportMissionTest extends FreeColTestCase {
         AIUnit wagon = aiMain.getAIUnit(wagonTrain);
         assertNotNull(wagon);
 
-        wagon.setMission(null);
+        wagon.changeMission(null);
         assertNull("Transport mission should be valid.",
                    TransportMission.invalidMissionReason(wagon));
         TransportMission mission = new TransportMission(aiMain, wagon);

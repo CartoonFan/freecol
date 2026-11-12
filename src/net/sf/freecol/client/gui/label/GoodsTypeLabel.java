@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,7 +21,6 @@ package net.sf.freecol.client.gui.label;
 
 
 import javax.swing.ImageIcon;
-import javax.swing.JLabel;
 
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.ImageLibrary;
@@ -50,6 +49,10 @@ public class GoodsTypeLabel extends FreeColLabel {
      */
     public GoodsTypeLabel(FreeColClient freeColClient, GoodsType goodsType) {
         this(freeColClient.getGUI().getFixedImageLibrary(), goodsType);
+    }
+    
+    public GoodsTypeLabel(GoodsTypeLabel goodsTypeLabel) {
+        this(goodsTypeLabel.getImageLibrary(), goodsTypeLabel.getType());
     }
 
     /**

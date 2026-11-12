@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -31,24 +31,22 @@ import java.util.logging.Logger;
 import javax.swing.JComponent;
 
 import net.sf.freecol.client.FreeColClient;
+import net.sf.freecol.client.control.FreeColClientHolder;
 import net.sf.freecol.client.control.MapEditorController;
-import net.sf.freecol.client.gui.GUI.ViewMode;
 import net.sf.freecol.client.gui.panel.MapEditorTransformPanel.TileTypeTransform;
-import net.sf.freecol.client.gui.dialog.RiverStyleDialog;
-import net.sf.freecol.common.model.Map;
 import net.sf.freecol.common.model.Tile;
-import net.sf.freecol.common.model.TileImprovement;
 import net.sf.freecol.server.generator.TerrainGenerator;
 
 
 /**
  * Listens to the mouse being moved at the level of the Canvas.
  */
-public final class CanvasMapEditorMouseListener extends AbstractCanvasListener
+public final class CanvasMapEditorMouseListener extends FreeColClientHolder
     implements MouseListener, MouseMotionListener {
 
     private static final Logger logger = Logger.getLogger(CanvasMapEditorMouseListener.class.getName());
 
+    private final Scrolling scrolling;
     private Point endPoint;
     private Point startPoint;
 
@@ -58,8 +56,10 @@ public final class CanvasMapEditorMouseListener extends AbstractCanvasListener
      *
      * @param freeColClient The enclosing {@code FreeColClient}.
      */
-    public CanvasMapEditorMouseListener(FreeColClient freeColClient) {
+    public CanvasMapEditorMouseListener(FreeColClient freeColClient, Scrolling scrolling) {
         super(freeColClient);
+        
+        this.scrolling = scrolling;
     }
 
 
@@ -232,9 +232,9 @@ public final class CanvasMapEditorMouseListener extends AbstractCanvasListener
         endPoint = e.getPoint();
         drawBox(component, startPoint, endPoint);
 
-        performDragScrollIfActive(e);
+        scrolling.performDragScrollIfActive(e);
 
-        getGUI().refresh();
+        getGUI().repaint();
     }
 
     /**
@@ -244,6 +244,6 @@ public final class CanvasMapEditorMouseListener extends AbstractCanvasListener
     public void mouseMoved(MouseEvent e) {
         if (getMap() == null) return;
 
-        performAutoScrollIfActive(e, true);
+        scrolling.performAutoScrollIfActive(e);
     }
 }

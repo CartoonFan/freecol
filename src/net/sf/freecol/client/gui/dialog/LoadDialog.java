@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -29,14 +29,13 @@ import javax.swing.filechooser.FileFilter;
 
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.ChoiceItem;
-import net.sf.freecol.client.gui.dialog.*;
 import net.sf.freecol.common.i18n.Messages;
 
 
 /**
  * A dialog for choosing a file to load.
  */
-public final class LoadDialog extends FreeColDialog<File> {
+public final class LoadDialog extends DeprecatedFreeColDialog<File> {
 
     /** Fake file for the cancel selection. */
     private static final File cancelFile = new File("");

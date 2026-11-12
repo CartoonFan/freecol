@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,7 +21,6 @@ package net.sf.freecol.common.option;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.logging.Logger;
 
 import javax.xml.stream.XMLStreamException;
 
@@ -30,9 +29,6 @@ import net.sf.freecol.common.io.FreeColXMLWriter;
 import net.sf.freecol.common.model.AbstractUnit;
 import net.sf.freecol.common.model.NationType;
 import net.sf.freecol.common.model.Specification;
-import net.sf.freecol.common.model.Role;
-import net.sf.freecol.common.option.UnitTypeOption.TypeSelector;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 
 
 /**
@@ -40,11 +36,7 @@ import static net.sf.freecol.common.util.CollectionUtils.*;
  */
 public class AbstractUnitOption extends AbstractOption<AbstractUnit> {
 
-    private static final Logger logger = Logger.getLogger(AbstractUnitOption.class.getName());
-
     public static final String TAG = "unitOption";
-
-    private static final TypeSelector DEFAULT_SELECTOR = TypeSelector.UNITS;
     
     /** The value of this option. */
     private AbstractUnit value = null;

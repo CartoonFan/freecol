@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,6 +19,8 @@
 
 package net.sf.freecol.server.ai.mission;
 
+import static net.sf.freecol.common.util.CollectionUtils.count;
+
 import java.util.logging.Logger;
 
 import javax.xml.stream.XMLStreamException;
@@ -28,19 +30,20 @@ import net.sf.freecol.common.io.FreeColXMLWriter;
 import net.sf.freecol.common.model.Ability;
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.CombatModel;
-import net.sf.freecol.common.model.Location;
 import net.sf.freecol.common.model.Direction;
+import net.sf.freecol.common.model.IndianSettlement;
+import net.sf.freecol.common.model.Location;
 import net.sf.freecol.common.model.PathNode;
 import net.sf.freecol.common.model.Settlement;
 import net.sf.freecol.common.model.Tile;
 import net.sf.freecol.common.model.Unit;
 import net.sf.freecol.common.model.pathfinding.CostDeciders;
 import net.sf.freecol.common.model.pathfinding.GoalDecider;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.common.util.LogBuilder;
 import net.sf.freecol.server.ai.AIMain;
 import net.sf.freecol.server.ai.AIMessage;
 import net.sf.freecol.server.ai.AIUnit;
+import net.sf.freecol.server.ai.EuropeanAIPlayer;
 import net.sf.freecol.server.ai.MissionAIPlayer;
 
 
@@ -175,7 +178,7 @@ public final class UnitSeekAndDestroyMission extends Mission {
         if (tile == null || off <= 0) return Integer.MIN_VALUE;
 
         int value = 1020 - turns * 100;
-        value += 100 * (off - def);
+        value += (int)(100 * (off - def));
 
         // Add a big bonus for treasure trains on the tile.
         // Do not cheat and look at the value.
@@ -200,13 +203,22 @@ public final class UnitSeekAndDestroyMission extends Mission {
      * @param path A {@code PathNode} to take to the target.
      * @return A score for the proposed mission.
      */
-    public static int scorePath(AIUnit aiUnit, PathNode path) {
+    public static int scorePath(AIUnit aiUnit, PathNode path, boolean onlySettlements, boolean noNativeSettlements) {
         Location loc = extractTarget(aiUnit, path);
-        return (loc instanceof Settlement)
-            ? scoreSettlementPath(aiUnit, path, (Settlement)loc)
-            : (loc instanceof Unit)
-            ? scoreUnitPath(aiUnit, path, (Unit)loc)
-            : Integer.MIN_VALUE;
+        if (loc instanceof Settlement) {
+            if (noNativeSettlements && (loc instanceof IndianSettlement)) {
+                return Integer.MIN_VALUE;
+            }
+            return scoreSettlementPath(aiUnit, path, (Settlement) loc);
+        }
+        if (onlySettlements) {
+            return Integer.MIN_VALUE;
+        }
+        if (loc instanceof Unit) {
+            scoreUnitPath(aiUnit, path, (Unit) loc);
+        }
+        
+        return Integer.MIN_VALUE;
     }
 
     /**
@@ -214,11 +226,10 @@ public final class UnitSeekAndDestroyMission extends Mission {
      * {@code Tile}, optionally falling back to the nearest colony.
      *
      * @param aiUnit The {@code AIUnit} that is searching.
-     * @param deferOK Not used in this mission.
+     * @param onlySettlements Only have settlements as targets.
      * @return A suitable {@code GoalDecider}.
      */
-    private static GoalDecider getGoalDecider(final AIUnit aiUnit,
-        @SuppressWarnings("unused") boolean deferOK) {
+    private static GoalDecider getGoalDecider(final AIUnit aiUnit, boolean onlySettlements, boolean noNativeSettlements) {
         return new GoalDecider() {
                 private PathNode bestPath = null;
                 private int bestValue = Integer.MIN_VALUE;
@@ -229,7 +240,7 @@ public final class UnitSeekAndDestroyMission extends Mission {
                 public boolean hasSubGoals() { return true; }
                 @Override
                 public boolean check(Unit u, PathNode path) {
-                    int value = scorePath(aiUnit, path);
+                    int value = scorePath(aiUnit, path, onlySettlements, noNativeSettlements);
                     if (bestValue < value) {
                         bestValue = value;
                         bestPath = path;
@@ -245,18 +256,17 @@ public final class UnitSeekAndDestroyMission extends Mission {
      *
      * @param aiUnit The {@code AIUnit} to find a target for.
      * @param range An upper bound on the number of moves.
-     * @param deferOK Not implemented in this mission.
+     * @param onlySettlements Only have settlements as targets.
      * @return A path to the target, or null if none found.
      */
-    private static PathNode findTargetPath(AIUnit aiUnit, int range,
-        @SuppressWarnings("unused") boolean deferOK) {
+    private static PathNode findTargetPath(AIUnit aiUnit, int range, boolean onlySettlements, boolean noNativeSettlements) {
         if (invalidAIUnitReason(aiUnit) != null) return null;
         final Unit unit = aiUnit.getUnit();
         final Location start = unit.getPathStartLocation();
 
         // Can the unit legally reach a valid target from where it
         // currently is?
-        return unit.search(start, getGoalDecider(aiUnit, false),
+        return unit.search(start, getGoalDecider(aiUnit, onlySettlements, noNativeSettlements),
             CostDeciders.avoidIllegal(), range, unit.getCarrier());
     }
 
@@ -265,12 +275,13 @@ public final class UnitSeekAndDestroyMission extends Mission {
      *
      * @param aiUnit The {@code AIUnit} to find a target for.
      * @param range An upper bound on the number of moves.
-     * @param deferOK Not implemented in this mission.
+     * @param onlySettlements Only have settlements as targets.
      * @return A suitable target, or null if none found.
      */
     public static Location findMissionTarget(AIUnit aiUnit, int range,
-                                             boolean deferOK) {
-        PathNode path = findTargetPath(aiUnit, range, deferOK);
+                                             boolean onlySettlements,
+                                             boolean noNativeSettlements) {
+        PathNode path = findTargetPath(aiUnit, range, onlySettlements, noNativeSettlements);
         return (path != null) ? extractTarget(aiUnit, path)
             : null;
     }
@@ -428,7 +439,7 @@ public final class UnitSeekAndDestroyMission extends Mission {
      */
     @Override
     public Location findTarget() {
-        return findMissionTarget(getAIUnit(), 4, false);
+        return findMissionTarget(getAIUnit(), 4, false, false);
     }
 
     /**
@@ -449,24 +460,26 @@ public final class UnitSeekAndDestroyMission extends Mission {
         String reason = invalidReason();
         if (isTargetReason(reason)) {
             Colony colony;
-            Mission m;
             if (Mission.TARGETOWNERSHIP.equals(reason)
                 && getTarget() instanceof Colony
                 && (colony = (Colony)getTarget()) != null
                 && getPlayer().owns(colony)
-                && (m = getAIPlayer().getDefendSettlementMission(aiUnit,
-                        colony)) != null) {
+                && getAIPlayer().getDefendSettlementMission(aiUnit, colony) != null) {
                 return lbDone(lb, true, " capturing colony ", colony.getName());
             }            
             return retargetMission(reason, lb);
         } else if (reason != null) {
             return lbFail(lb, false, reason);
         }
+        
+        final boolean noNativeSettlementsAttack = getAIPlayer() != null
+                && (getAIPlayer() instanceof EuropeanAIPlayer)
+                && !((EuropeanAIPlayer) getAIPlayer()).isLikesAttackingNatives();
 
         // Is there a target-of-opportunity?
         final Unit unit = getUnit();
         Location nearbyTarget = (unit.isOnCarrier()) ? null
-            : findMissionTarget(aiUnit, 1, false);
+            : findMissionTarget(aiUnit, 1, false, noNativeSettlementsAttack);
         if (nearbyTarget != null) {
             if (getTarget() == null) {
                 setTarget(nearbyTarget);

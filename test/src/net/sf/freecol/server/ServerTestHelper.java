@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -18,8 +18,10 @@
  */
 package net.sf.freecol.server;
 
-import junit.framework.*;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -27,14 +29,12 @@ import java.util.Random;
 
 import net.sf.freecol.common.FreeColException;
 import net.sf.freecol.common.io.FreeColSavegameFile;
-import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.Map;
 import net.sf.freecol.common.model.Specification;
 import net.sf.freecol.common.networking.ChangeSet;
 import net.sf.freecol.common.util.LogBuilder;
 import net.sf.freecol.server.control.Controller;
 import net.sf.freecol.server.control.InGameController;
-import net.sf.freecol.server.control.PreGameController;
 import net.sf.freecol.server.model.ServerGame;
 import net.sf.freecol.util.test.FreeColTestCase;
 import net.sf.freecol.util.test.MockMapGenerator;
@@ -96,7 +96,7 @@ public final class ServerTestHelper {
         try {
             // FIXME: Pass tc
             server = new FreeColServer(publicServer, singlePlayer,
-                                       spec, port, name);
+                                       spec, null, port, name);
         } catch (IOException ex) {
             fail(ex.getMessage());
         }
@@ -118,7 +118,7 @@ public final class ServerTestHelper {
         stopServer();
         try {
             server = new FreeColServer(new FreeColSavegameFile(file), 
-                                       null, port, name);
+                                       null, null, port, name);
         } catch (Exception e) {
             fail(e.getMessage());
         }

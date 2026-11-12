@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -256,8 +256,7 @@ public abstract class NationType extends FreeColSpecObjectType {
 
         final Specification spec = getSpecification();
 
-        NationType parent = xr.getType(spec, EXTENDS_TAG,
-                                       NationType.class, this);
+        NationType parent = xr.getAlreadyInitializedType(spec, EXTENDS_TAG, NationType.class, this);
 
         numberOfSettlements = xr.getAttribute(NUMBER_OF_SETTLEMENTS_TAG,
             SettlementNumber.class, parent.numberOfSettlements);
@@ -265,20 +264,23 @@ public abstract class NationType extends FreeColSpecObjectType {
         aggression = xr.getAttribute(AGGRESSION_TAG,
                                      AggressionLevel.class, parent.aggression);
     }
+    
+    /**
+    * {@inheritDoc}
+    */
+    @Override
+    protected void clearContainers(FreeColXMLReader xr) throws XMLStreamException {
+        super.clearContainers(xr);
+        settlementTypes = null;
+    }
 
     /**
      * {@inheritDoc}
      */
     @Override
     protected void readChildren(FreeColXMLReader xr) throws XMLStreamException {
-        // Clear containers.
-        if (xr.shouldClearContainers()) {
-            settlementTypes = null;
-        }
-
         final Specification spec = getSpecification();
-        NationType parent = xr.getType(spec, EXTENDS_TAG,
-                                       NationType.class, this);
+        NationType parent = xr.getAlreadyInitializedType(spec, EXTENDS_TAG, NationType.class, this);
         if (parent != this) {
             if (parent.settlementTypes != null) {
                 addSettlementTypes(parent.settlementTypes);

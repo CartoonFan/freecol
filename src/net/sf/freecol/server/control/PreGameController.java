@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -22,12 +22,12 @@ package net.sf.freecol.server.control;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import net.sf.freecol.common.FreeColException;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.Nation;
-import net.sf.freecol.common.model.NationOptions.Advantages;
 import net.sf.freecol.common.model.NationOptions.NationState;
 import net.sf.freecol.common.model.NationType;
 import net.sf.freecol.common.model.Player;
@@ -146,7 +146,8 @@ public final class PreGameController extends Controller {
         }
         try {
             freeColServer.startGame();
-        } catch (FreeColException fce) {
+        } catch (FreeColException|RuntimeException fce) {
+            logger.log(Level.WARNING, "Exception while trying to start the game", fce);
             return serverPlayer.clientError(fce.getMessage());
         }
 

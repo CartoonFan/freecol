@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,6 +19,8 @@
 
 package net.sf.freecol.client.gui.panel.report;
 
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+
 import java.awt.Color;
 import java.util.Collection;
 import java.util.List;
@@ -26,16 +28,14 @@ import java.util.List;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.border.Border;
 import javax.swing.border.EmptyBorder;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.ImageLibrary;
-import net.sf.freecol.client.gui.label.GoodsLabel;
 import net.sf.freecol.client.gui.label.MarketLabel;
-import net.sf.freecol.client.gui.panel.*;
+import net.sf.freecol.client.gui.panel.MigPanel;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Ability;
 import net.sf.freecol.common.model.Colony;
@@ -48,7 +48,6 @@ import net.sf.freecol.common.model.Specification;
 import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.model.TypeCountMap;
 import net.sf.freecol.common.model.Unit;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 
 
 /**
@@ -169,7 +168,7 @@ public final class ReportTradePanel extends ReportPanel {
                 goodsLabel.setBorder((first) ? Utility.getTopCellBorder()
                     : Utility.getCellBorder());
                 goodsLabel.setForeground(ImageLibrary.getGoodsColor(goodsType, amount,
-                                                             colony));
+                                                             colony, false));
                 ExportData ed = colony.getExportData(goodsType);
                 if (ed.getExported()) {
                     goodsLabel.setToolTipText(Messages.message(StringTemplate
@@ -182,7 +181,7 @@ public final class ReportTradePanel extends ReportPanel {
                 int production = colony.getNetProductionOf(goodsType);
                 JLabel productionLabel = createNumberLabel(production, true);
                 productionLabel.setForeground(ImageLibrary.getGoodsColor(goodsType,
-                        production, colony));
+                        production, colony, false));
                 Collection<StringTemplate> warnings
                     = colony.getProductionWarnings(goodsType);
                 if (!warnings.isEmpty()) {

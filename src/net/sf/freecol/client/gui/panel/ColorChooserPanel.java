@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,8 +21,10 @@
 package net.sf.freecol.client.gui.panel;
 
 import java.awt.Color;
+import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
+import javax.swing.AbstractAction;
 import javax.swing.JButton;
 import javax.swing.JColorChooser;
 
@@ -60,10 +62,16 @@ public final class ColorChooserPanel extends FreeColPanel {
         add(cancelButton, "tag cancel");
         cancelButton.setActionCommand(CANCEL);
         cancelButton.addActionListener(l);
-        setCancelComponent(cancelButton);
 
         setOpaque(true);
         setSize(getPreferredSize());
+        
+        setEscapeAction(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                cancelButton.doClick();
+            }
+        });
     }
 
 

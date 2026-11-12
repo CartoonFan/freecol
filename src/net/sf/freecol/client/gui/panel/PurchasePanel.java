@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -39,6 +39,6 @@ public final class PurchasePanel extends NewUnitPanel {
         super(freeColClient, new MigLayout("wrap 2", "[sg]", ""),
             Messages.message("purchasePanel.clickOn"),
             freeColClient.getGame().getSpecification()
-                .getUnitTypesPurchasedInEurope());
+                .getUnitTypesPurchasedInEurope(freeColClient.getMyPlayer()));
     }
 }

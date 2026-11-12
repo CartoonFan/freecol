@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,8 +21,10 @@ package net.sf.freecol.client.gui.panel;
 
 import java.awt.Font;
 import java.awt.Image;
+import java.awt.event.ActionEvent;
 import java.util.List;
 
+import javax.swing.AbstractAction;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 
@@ -110,7 +112,7 @@ public class WorkProductionPanel extends FreeColPanel {
             result = 0.0f;
         }
 
-        Font bigFont = FontLibrary.getUnscaledFont("normal-bold-smaller");
+        Font bigFont = lib.getScaledFont("normal-bold-smaller", null);
         JLabel finalLabel = Utility.localizedLabel("finalResult");
         finalLabel.setFont(bigFont);
         add(finalLabel, "newline");
@@ -137,6 +139,13 @@ public class WorkProductionPanel extends FreeColPanel {
 
         add(okButton, "newline, span, tag ok");
         setSize(getPreferredSize());
+        
+        setEscapeAction(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                okButton.doClick();
+            }
+        });
     }
 
     private void output(List<Modifier> modifiers, UnitType unitType) {

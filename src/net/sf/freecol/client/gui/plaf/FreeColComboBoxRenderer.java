@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -25,18 +25,20 @@ import java.awt.Component;
 import java.awt.Composite;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.net.InetAddress;
+import java.util.logging.Logger;
 
-import javax.swing.plaf.UIResource;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.ListCellRenderer;
-
-import java.util.logging.Logger;
+import javax.swing.plaf.UIResource;
 
 import net.sf.freecol.common.ObjectWithId;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Nameable;
 import net.sf.freecol.common.model.Named;
+import net.sf.freecol.common.option.AudioMixerOption.MixerWrapper;
+import net.sf.freecol.common.option.FullscreenDisplayModeOption.FullscreenDisplayModeWrapper;
 import net.sf.freecol.common.option.LanguageOption.Language;
 
 
@@ -150,6 +152,15 @@ public class FreeColComboBoxRenderer<T>
             }
             c.setText(nd[0]);
             if (nd[1] != null) c.setToolTipText(nd[1]);
+        } else if (value instanceof InetAddress) {
+            final InetAddress address = (InetAddress) value;
+            c.setText(address.getHostAddress());
+        } else if (value instanceof MixerWrapper) {
+            final MixerWrapper mw = (MixerWrapper) value;
+            c.setText(mw.getKey());
+        } else if (value instanceof FullscreenDisplayModeWrapper) {
+            final FullscreenDisplayModeWrapper fdw = (FullscreenDisplayModeWrapper) value;
+            c.setText(fdw.getName());
         } else {
             logger.warning("What is this?: " + value
                 + " (" + value.getClass() + ")");

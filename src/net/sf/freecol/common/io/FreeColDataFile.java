@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -35,7 +35,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -45,15 +45,16 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
+import net.sf.freecol.common.MemoryManager;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.resources.ImageResource;
 import net.sf.freecol.common.resources.Resource;
 import net.sf.freecol.common.resources.ResourceFactory;
-import net.sf.freecol.common.resources.ResourceMapper;
 import net.sf.freecol.common.resources.ResourceMapping;
 import net.sf.freecol.common.util.LogBuilder;
 
@@ -204,8 +205,9 @@ public class FreeColDataFile {
      *      data files.
      */
     private List<String> handleResources(final Properties properties, ResourceMapping rc) {
-        List<String> virtualResources = new ArrayList<>();
-        Enumeration<?> pn = properties.propertyNames();
+        final ResourceFactory resourceFactory = new ResourceFactory();
+        final List<String> virtualResources = new ArrayList<>();
+        final Enumeration<?> pn = properties.propertyNames();
         while (pn.hasMoreElements()) {
             final String key = (String) pn.nextElement();
             
@@ -220,20 +222,27 @@ public class FreeColDataFile {
             if (value.startsWith(resourceScheme)) {
                 virtualResources.add(updatedKey);
             } else {
-                handleNormalResource(rc, key, value);
+                handleNormalResource(resourceFactory, rc, key, value);
             }
         }
         return virtualResources;
     }
 
-    private void handleNormalResource(ResourceMapping rc, final String key, final String value) {
+    private void handleNormalResource(ResourceFactory resourceFactory, ResourceMapping rc, final String key, final String value) {
         final URI uri = getURI(value);
         if (uri == null) {
             return;
         }
-        final ResourceMapper rm = new ResourceMapper(rc);
-        rm.setKey(key);
-        final Resource resource = ResourceFactory.createResource(uri, rm);
+        
+        /*
+         * The caching key should be (and only be) the same when it's the
+         * same actual resource data (for example, the same image file).
+         * 
+         * Please note that the key is not suitable for a caching key,
+         * since the resource might get replaced by a mod.
+         */
+        final String cachingKey = uri.toString();
+        final Resource resource = resourceFactory.createResource(key, cachingKey, uri);
         
         /*
          * Rivers need new keys in order to support variations.
@@ -242,7 +251,11 @@ public class FreeColDataFile {
         
         if (resource instanceof ImageResource && supportsVariations) {
             final ImageResource imageResource = (ImageResource) resource;
-            extendWithAdditionalSizesAndVariations(imageResource, rm, value);
+            extendWithAdditionalSizesAndVariations(resourceFactory, imageResource, value);
+        }
+        
+        if (resource != null) {
+            rc.add(key, resource);
         }
     }
 
@@ -308,15 +321,15 @@ public class FreeColDataFile {
         return (key.endsWith(ending)) ? key.substring(0, key.length() - 3) : key;
     }
     
-    private void extendWithAdditionalSizesAndVariations(ImageResource imageResource, ResourceMapper rm, String value) {
-        Map<URI, List<URI>> alternativeSizes = findAlternativeSizes(value);
-        imageResource.addAlternativeResourceLocators(alternativeSizes.get(null));
+    private void extendWithAdditionalSizesAndVariations(ResourceFactory resourceFactory, ImageResource imageResource, String value) {
+        Map<URI, List<URI>> variationsWithAlternateSizes = findVariationsWithAlternateSizes(value);
+        imageResource.addAlternativeResourceLocators(variationsWithAlternateSizes.get(null));
         
-        alternativeSizes.entrySet()
+        variationsWithAlternateSizes.entrySet()
             .stream()
             .filter(entry -> entry.getKey() != null)
             .forEach(entry -> {
-                final ImageResource variationResource = (ImageResource) ResourceFactory.createResource(entry.getKey(), rm);
+                final ImageResource variationResource = (ImageResource) resourceFactory.createResource("", imageResource.getCachingKey(), entry.getKey());
                 if (variationResource != null) {
                     variationResource.addAlternativeResourceLocators(entry.getValue());
                     imageResource.addVariation(variationResource);
@@ -324,7 +337,7 @@ public class FreeColDataFile {
             });
     }
 
-    private Map<URI, List<URI>> findAlternativeSizes(String name) {
+    private Map<URI, List<URI>> findVariationsWithAlternateSizes(String name) {
         if (name.indexOf(".") <= 0) {
             return Map.of();
         }
@@ -342,19 +355,27 @@ public class FreeColDataFile {
                 filePath = fileSystem.getPath(jarDirectory + name);
             }
             
-            final Map<URI, List<URI>> result = new HashMap<>();
-            result.put(null, findFilesWithRegexBeforeSuffixAsUri(filePath, false));
-            
-            final List<Path> variations = findFilesWithRegexBeforeSuffix(filePath, true);
-            for (Path variationPath : variations) {
-                result.put(variationPath.toUri(), findFilesWithRegexBeforeSuffixAsUri(variationPath, false));
+            /*
+             * Using LinkedHashMap to ensure we keep the variations in order.
+             */
+            final Map<URI, List<URI>> result = new LinkedHashMap<>();
+            if (MemoryManager.isHighQualityGraphicsEnabled()) {
+                result.put(null, findFilesWithVariationOrAlternativeSizeAsUri(filePath, false));
+            } else {
+                result.put(null, List.of());
             }
             
+            final List<Path> variations = findFilesWithVariationOrAlternativeSize(filePath, true);
+            for (Path variationPath : variations) {
+                if (MemoryManager.isHighQualityGraphicsEnabled()) {
+                    result.put(variationPath.toUri(), findFilesWithVariationOrAlternativeSizeAsUri(variationPath, false));
+                } else {
+                    result.put(variationPath.toUri(), List.of());
+                }
+            } 
+            
             return result;
-        } catch (IOException e) {
-            logger.log(Level.WARNING, "Failed to read directory from jar/zip file: " + file + " jarDirectory" + jarDirectory, e);
-            return Map.of();
-        } catch (URISyntaxException e) {
+        } catch (IOException | URISyntaxException e) {
             logger.log(Level.WARNING, "Failed to read directory from jar/zip file: " + file + " jarDirectory" + jarDirectory, e);
             return Map.of();
         } finally {
@@ -366,15 +387,17 @@ public class FreeColDataFile {
         }
     }
 
-    private List<URI> findFilesWithRegexBeforeSuffixAsUri(final Path filePath, boolean findVariation) throws IOException {
-        return findFilesWithRegexBeforeSuffix(filePath, findVariation)
-                .stream()
+    private List<URI> findFilesWithVariationOrAlternativeSizeAsUri(final Path filePath, boolean findVariation) throws IOException {
+        return toUris(findFilesWithVariationOrAlternativeSize(filePath, findVariation));
+    }
+    
+    private List<URI> toUris(List<Path> paths) {
+        return paths.stream()
                 .map(p -> p.toUri())
                 .collect(Collectors.toList());
     }
     
-    private List<Path> findFilesWithRegexBeforeSuffix(final Path filePath, boolean findVariation) throws IOException {
-        //final String variationFileRegex = "\\.var[0-9][0-9]*";
+    private List<Path> findFilesWithVariationOrAlternativeSize(final Path filePath, boolean findVariation) throws IOException {
         final String variationFileRegex = "[0-9][0-9]?";
         final String sizeFileRegex = "\\.size[0-9][0-9]*";
         
@@ -387,8 +410,12 @@ public class FreeColDataFile {
         final String suffix = resourceFilename.substring(resourceFilename.lastIndexOf("."));
         final String completeRegex = Pattern.quote(prefix) + regex + Pattern.quote(suffix);
         
-        final List<Path> alternativeSizes = Files.list(filePath.getParent()).filter(p -> p.getFileName().toString().matches(completeRegex)).collect(Collectors.toList());
-        return alternativeSizes;
+        try (Stream<Path> pathStream = Files.list(filePath.getParent())) {
+            return pathStream
+                    .sorted()
+                    .filter(p -> p.getFileName().toString().matches(completeRegex) && (!findVariation || !p.equals(filePath)))
+                    .collect(Collectors.toList());
+        }
     }
 
     /**
@@ -411,6 +438,19 @@ public class FreeColDataFile {
      */
     public static FileFilter getFileFilter(String extension) {
         String s = Messages.message("filter." + extension);
+        if (extension.equals("*")) {
+            return new FileFilter() {
+                @Override
+                public boolean accept(File f) {
+                    return true;
+                }
+                
+                @Override
+                public String getDescription() {
+                    return s;
+                }
+            };
+        }
         return new FileNameExtensionFilter(s, extension);
     }
 }

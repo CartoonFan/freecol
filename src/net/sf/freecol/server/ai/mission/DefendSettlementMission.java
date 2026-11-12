@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -25,6 +25,7 @@ import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
+import net.sf.freecol.common.model.Ability;
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.CombatModel;
 import net.sf.freecol.common.model.Location;
@@ -54,10 +55,6 @@ public final class DefendSettlementMission extends Mission {
 
     /** The tag for this mission. */
     private final String tag = "AI defender";
-
-    // FIXME: This is unused, delete?
-    /** Maximum number of turns to travel to the settlement. */
-    private static final int MAX_TURNS = 20;
 
     /** The settlement to be protected. */
     private Location target;
@@ -226,12 +223,24 @@ public final class DefendSettlementMission extends Mission {
      * @return A reason for mission invalidity, or null if none found.
      */
     public static String invalidMissionReason(AIUnit aiUnit) {
-        String reason = invalidUnitReason(aiUnit);
-        return (reason != null)
-            ? reason
-            : (!aiUnit.getUnit().getOwner().hasSettlements())
-            ? Mission.TARGETNOTFOUND
-            : null;
+        final String reason = invalidUnitReason(aiUnit);
+        if (reason != null) {
+            return reason;
+        }
+        if (!aiUnit.getUnit().getOwner().hasSettlements()) {
+            return Mission.TARGETNOTFOUND;
+        }
+        
+        if (aiUnit.getUnit().getOwner().isIndian()) {
+            return null;
+        }
+        
+        if (!aiUnit.getUnit().isDefensiveUnit()
+                || aiUnit.getUnit().hasAbility(Ability.SPEAK_WITH_CHIEF)) {
+            return Mission.UNITNOTOFREQUIREDTYPE;
+        }
+        
+        return null;
     }
 
     /**
@@ -259,8 +268,7 @@ public final class DefendSettlementMission extends Mission {
      */
     @Override
     public int getBaseTransportPriority() {
-        return (getTransportDestination() == null) ? 0
-            : NORMAL_TRANSPORT_PRIORITY + 5;
+        return NORMAL_TRANSPORT_PRIORITY + 5;
     }
 
     /**

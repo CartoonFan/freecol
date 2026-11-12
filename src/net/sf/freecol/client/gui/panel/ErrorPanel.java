@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -20,9 +20,9 @@
 package net.sf.freecol.client.gui.panel;
 
 import java.awt.event.ActionEvent;
-import java.io.File;
 import java.util.logging.Logger;
 
+import javax.swing.AbstractAction;
 import javax.swing.JButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -33,7 +33,6 @@ import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.io.FreeColDirectories;
 import net.sf.freecol.common.model.StringTemplate;
-import net.sf.freecol.common.util.Utils;
 
 
 /**
@@ -59,7 +58,7 @@ public final class ErrorPanel extends FreeColPanel {
      * @param message The error message to display in this error panel.
      */
     public ErrorPanel(FreeColClient freeColClient, String message) {
-        super(freeColClient, null, new MigLayout());
+        super(freeColClient, null, new MigLayout("wrap 1"));
 
         JButton showButton = Utility.localizedButton(StringTemplate
             .template("errorPanel.showLogFile")
@@ -67,9 +66,16 @@ public final class ErrorPanel extends FreeColPanel {
         showButton.setActionCommand(SHOW);
         showButton.addActionListener(this);
 
-        add(Utility.getDefaultTextArea(message, columnWidth), "wrap 20");
+        add(Utility.getDefaultTextArea(message, columnWidth));
         add(okButton, "split 2, tag ok");
         add(showButton);
+        
+        setEscapeAction(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                okButton.doClick();
+            }
+        });
     }
 
     /**
@@ -78,7 +84,7 @@ public final class ErrorPanel extends FreeColPanel {
      * @param freeColClient The {@code FreeColClient} for the game.
      */
     public ErrorPanel(FreeColClient freeColClient) {
-        super(freeColClient, null, new MigLayout());
+        super(freeColClient, null, new MigLayout("wrap 1, fill", "[]", "[fill, grow][]"));
 
         String message = FreeColDirectories.getLogFileContents();
         if (message == null) message = Messages.message("errorPanel.loadError");
@@ -92,10 +98,10 @@ public final class ErrorPanel extends FreeColPanel {
             JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.getViewport().setOpaque(false);
 
-        add(scrollPane, "height 200:200:, wrap 20");
+        add(scrollPane, "height :200:, grow");
         add(okButton, "tag ok");
     }
-
+    
 
     // Interface ActionListener
 

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,10 +21,10 @@ package net.sf.freecol.client.gui.panel;
 
 import java.awt.Dimension;
 import java.awt.Graphics;
-import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.image.BufferedImage;
 
+import javax.swing.AbstractAction;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -33,13 +33,10 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.common.model.FreeColObject;
 import net.sf.freecol.common.model.Location;
-import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.model.Tile;
 import net.sf.freecol.common.model.Unit;
@@ -78,8 +75,6 @@ public class InformationPanel extends FreeColPanel {
      * @param texts The texts to be displayed in the panel.
      * @param fcos The source {@code FreeColObject}s for the text.
      * @param images The images to be displayed in the panel.
-     *
-     * @see #createLayout(FreeColClient) For the outer layout
      */
     public InformationPanel(FreeColClient freeColClient, String[] texts,
                             FreeColObject[] fcos, ImageIcon[] images) {
@@ -92,7 +87,7 @@ public class InformationPanel extends FreeColPanel {
         final float scaleFactor = fixedImageLibrary.getScaleFactor();
         final int topInset = fixedImageLibrary.getInformationPanelSkinTopInset(freeColClient.getMyPlayer());
         final int scaledTopInset = (int) (topInset * scaleFactor);
-        final int gap = (int) (10 * scaleFactor);
+        final int gap = 10;
         
         getMigLayout().setLayoutConstraints("fill, wrap 1, insets 0 0 0 0");
         getMigLayout().setColumnConstraints(gap + "[grow]" + gap);
@@ -108,6 +103,13 @@ public class InformationPanel extends FreeColPanel {
         add(okButton, "tag ok");
         setPreferredSize(new Dimension(skin.getWidth(), skin.getHeight()));
         setBorder(null);
+        
+        setEscapeAction(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                okButton.doClick();
+            }
+        });
     }
 
     private JPanel createPanelWithAllContent(String[] texts, FreeColObject[] fcos, ImageIcon[] images, final int gap) {

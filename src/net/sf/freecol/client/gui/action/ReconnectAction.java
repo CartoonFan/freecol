@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -22,7 +22,6 @@ package net.sf.freecol.client.gui.action;
 import java.awt.event.ActionEvent;
 
 import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.common.model.Game.LogoutReason;
 
 
 /**
@@ -50,6 +49,6 @@ public class ReconnectAction extends FreeColAction {
      */
     @Override
     public void actionPerformed(ActionEvent ae) {
-        getFreeColClient().getConnectController().requestLogout(LogoutReason.RECONNECT);
+        igc().reconnect();
     }
 }

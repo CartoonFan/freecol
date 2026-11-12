@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -22,9 +22,6 @@ package net.sf.freecol.common.model;
 import java.util.List;
 import java.util.stream.Stream;
 
-import javax.swing.ImageIcon;
-
-import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.common.ObjectWithId;
 
 

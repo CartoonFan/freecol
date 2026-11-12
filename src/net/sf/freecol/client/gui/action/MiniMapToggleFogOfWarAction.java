@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -65,6 +65,16 @@ public class MiniMapToggleFogOfWarAction extends MapboardAction {
     public void actionPerformed(ActionEvent ae) {
         getGUI().miniMapToggleFogOfWarControls();
 
+        updateIcons();
+    }
+    
+    @Override
+    public void update() {
+        super.update();
+        updateIcons();
+    }
+
+    private void updateIcons() {
         if (freeColClient.getClientOptions().getBoolean(ClientOptions.MINIMAP_TOGGLE_FOG_OF_WAR)) {
             addImageIcons("toggle_fog_of_war");
         } else {

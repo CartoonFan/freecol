@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -25,14 +25,21 @@ import java.awt.Dimension;
 import java.awt.Rectangle;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GraphicsConfiguration;
+import java.awt.GraphicsEnvironment;
 import java.awt.Image;
 import java.awt.image.ColorConvertOp;
 import java.awt.image.BufferedImage;
 import java.awt.image.RescaleOp;
 import java.awt.Insets;
+import java.awt.Paint;
 import java.awt.RenderingHints;
 import java.awt.TexturePaint;
+import java.awt.Transparency;
+
 import javax.swing.JComponent;
+
+import net.sf.freecol.common.resources.ImageResource;
 
 
 /**
@@ -49,14 +56,30 @@ public class ImageUtils {
      * @return The new {@code BufferedImage}.
      */
     public static BufferedImage createBufferedImage(Image image) {
-        if (image == null) return null;
-        BufferedImage result
-            = new BufferedImage(image.getWidth(null), image.getHeight(null),
-                                BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2d = result.createGraphics();
+        if (image == null) {
+            return null;
+        }
+        final BufferedImage result = createBufferedImage(image.getWidth(null), image.getHeight(null));
+        final Graphics2D g2d = result.createGraphics();
         g2d.drawImage(image, 0, 0, null);
         g2d.dispose();
         return result;
+    }
+    
+    /**
+     * Creates a buffered image with the given size.
+     * 
+     * @param width The desired width.
+     * @param height The desired height.
+     * @return The new {@code BufferedImage}.
+     */
+    public static BufferedImage createBufferedImage(int width, int height) {
+        final GraphicsConfiguration dc = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration();
+        if (ImageResource.isForceLowestQuality()) {
+            return dc.createCompatibleImage(width, height, Transparency.BITMASK);
+        } else {
+            return dc.createCompatibleImage(width, height, Transparency.TRANSLUCENT);
+        }
     }
 
     /**
@@ -66,15 +89,16 @@ public class ImageUtils {
      * @return The new halved {@code BufferedImage}.
      */ 
     public static BufferedImage createGrayscaleImage(Image image) {
-        if (image == null) return null;
+        if (image == null) {
+            return null;
+        }
         final int width = image.getWidth(null), height = image.getHeight(null);
-        BufferedImage result = new BufferedImage(width, height,
-                                                 BufferedImage.TYPE_INT_ARGB);
+        final BufferedImage result = createBufferedImage(width, height);
         Graphics2D g2d = result.createGraphics();
         g2d.drawImage(image, 0, 0, null);
         g2d.dispose();
-        ColorConvertOp filter
-            = new ColorConvertOp(ColorSpace.getInstance(ColorSpace.CS_GRAY), null);
+        
+        final ColorConvertOp filter = new ColorConvertOp(ColorSpace.getInstance(ColorSpace.CS_GRAY), null);
         return filter.filter(result, null);
     }
 
@@ -88,13 +112,14 @@ public class ImageUtils {
      * @return The new halved {@code BufferedImage}.
      */ 
     public static BufferedImage createHalvedImage(Image image) {
-        if (image == null) return null;
+        if (image == null) {
+            return null;
+        }
         final int width = image.getWidth(null), height = image.getHeight(null);
-        int w = (width + 1) / 2, h = (height + 1) / 2;
-        BufferedImage result = new BufferedImage(w, h,
-                                                 BufferedImage.TYPE_INT_ARGB);
+        final int w = (width + 1) / 2, h = (height + 1) / 2;
+        final BufferedImage result = createBufferedImage(w, h);
         // For halving bilinear should most correctly average 2x2 pixels.
-        Graphics2D g2d = result.createGraphics();
+        final Graphics2D g2d = result.createGraphics();
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g2d.drawImage(image, 0, 0, w, h, null);
         g2d.dispose();
@@ -108,12 +133,13 @@ public class ImageUtils {
      * @return The new mirrored {@code BufferedImage} object.
      */ 
     public static BufferedImage createMirroredImage(Image image) {
-        if (image == null) return null;
+        if (image == null) {
+            return null;
+        }
         final int width = image.getWidth(null);
         final int height = image.getHeight(null);
-        BufferedImage result = new BufferedImage(width, height,
-                                                 BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2d = result.createGraphics();
+        final BufferedImage result = createBufferedImage(width, height);
+        final Graphics2D g2d = result.createGraphics();
         g2d.drawImage(image, width, 0, -width, height, null);
         g2d.dispose();
         return result;
@@ -130,19 +156,29 @@ public class ImageUtils {
      * @param height The desired height.
      * @return The new resized {@code BufferedImage} object.
      */ 
-    public static BufferedImage createResizedImage(Image image,
-                                                   int width, int height) {
-        BufferedImage result = new BufferedImage(width, height,
-            BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2d = result.createGraphics();
-        /*
-         * Tileable images should not be scaled with interpolation, as this will produce
-         * partially transparent pixels. These pixels will overlap and make visible
-         * seams when tiling images.
-         * 
-         * Do NOT use:
-         * g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-         */
+    public static BufferedImage createResizedImage(Image image, int width, int height) {
+        return createResizedImage(image, width, height, false);
+    }
+                                                   
+    /**
+     * Create a buffered image resized from a plain {@code Image}.
+     *
+     * Note that while the result will fit in width x height, it
+     * tends to retain its original aspect ratio.
+     *
+     * @param image The {@code Image} object.
+     * @param width The desired width.
+     * @param height The desired height.
+     * @param interpolation Use interpolation while resizing.
+     * @return The new resized {@code BufferedImage} object.
+     */ 
+    public static BufferedImage createResizedImage(Image image, int width, int height, boolean interpolation) {
+        final BufferedImage result = createBufferedImage(width, height);
+        final Graphics2D g2d = result.createGraphics();
+        
+        if (interpolation) {
+            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        }
 
         g2d.drawImage(image, 0, 0, width, height, null);
         g2d.dispose();
@@ -204,11 +240,44 @@ public class ImageUtils {
      */
     public static void fillTexture(Graphics2D g2d, BufferedImage img,
                                    int x, int y, int width, int height) {
-        Rectangle anchor = new Rectangle(x, y,
-                                         img.getWidth(), img.getHeight());
+        final Rectangle anchor = new Rectangle(x, y, img.getWidth(), img.getHeight());
+        final Paint oldPaint = g2d.getPaint();
         TexturePaint paint = new TexturePaint(img, anchor);
         g2d.setPaint(paint);
         g2d.fillRect(x, y, width, height);
+        g2d.setPaint(oldPaint);
+    }
+    
+    /**
+     * Creates a new image of the given size with the provided image centered.
+     * 
+     * @param image The image to be drawn in the center (both vertically and horizontally) of
+     *      the new image. 
+     * @param size The size of the new image.
+     * @return A new image. 
+     */
+    public static BufferedImage createCenteredImage(BufferedImage image, Dimension size) {
+        return createCenteredImage(image, size.width, size.height);
+    }
+    
+    /**
+     * Creates a new image of the given size with the provided image centered.
+     * 
+     * @param image The image to be drawn in the center (both vertically and horizontally) of
+     *      the new image. 
+     * @param width The width of the new image.
+     * @param height The height of the new image.
+     * @return A new image. 
+     */
+    public static BufferedImage createCenteredImage(BufferedImage image, int width, int height) {
+        final int x = (width - image.getWidth(null)) / 2;
+        final int y = (height - image.getHeight(null)) / 2;
+        
+        final BufferedImage centeredImage = createBufferedImage(width, height);
+        final Graphics2D g = centeredImage.createGraphics();
+        g.drawImage(image, x, y, null);
+        g.dispose();
+        return centeredImage;
     }
 
     /**
@@ -250,8 +319,8 @@ public class ImageUtils {
     public static BufferedImage fadeImage(Image img, float fade, float target) {
         int w = img.getWidth(null);
         int h = img.getHeight(null);
-        BufferedImage bi = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g = bi.createGraphics();
+        final BufferedImage bi = createBufferedImage(w, h);;
+        final Graphics2D g = bi.createGraphics();
         g.drawImage(img, 0, 0, null);
 
         float offset = target * (1.0f - fade);
@@ -271,7 +340,7 @@ public class ImageUtils {
      * @return An image with the opacity from the mask.
      */
     public static BufferedImage imageWithAlphaFromMask(BufferedImage image, BufferedImage mask) {
-        final BufferedImage result = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        final BufferedImage result = createBufferedImage(image.getWidth(), image.getHeight());
         final Graphics2D g2d = result.createGraphics();
         g2d.drawImage(image, 0, 0, null);
         g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.DST_IN, 1.0F));

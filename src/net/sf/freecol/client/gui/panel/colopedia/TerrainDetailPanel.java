@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,8 +19,10 @@
 
 package net.sf.freecol.client.gui.panel.colopedia;
 
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+
 import java.awt.Dimension;
-import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.image.BufferedImage;
 import java.util.List;
@@ -32,18 +34,17 @@ import javax.swing.JPanel;
 import javax.swing.tree.DefaultMutableTreeNode;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.client.gui.*;
+import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.client.gui.ModifierFormat;
 import net.sf.freecol.client.gui.action.ColopediaAction.PanelType;
-import net.sf.freecol.client.gui.panel.*;
-import net.sf.freecol.client.gui.Size;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.AbstractGoods;
 import net.sf.freecol.common.model.Modifier;
 import net.sf.freecol.common.model.ResourceType;
 import net.sf.freecol.common.model.TileType;
-import static net.sf.freecol.common.util.CollectionUtils.*;
+import net.sf.freecol.common.util.ImageUtils;
 
 
 /**
@@ -75,17 +76,9 @@ public class TerrainDetailPanel
             = new DefaultMutableTreeNode(new ColopediaTreeItem(this, getId(),
                                          getName(), null));
         for (TileType t : getSpecification().getTileTypeList()) {
-            BufferedImage tileImage
-                = getImageLibrary().getTileImageWithOverlayAndForest(t,
-                    new Dimension(-1, ImageLibrary.ICON_SIZE.height));
-            BufferedImage image = new BufferedImage(tileImage.getWidth(null),
-                ImageLibrary.ICON_SIZE.height, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g = image.createGraphics();
-            g.drawImage(tileImage, 0,
-                (ImageLibrary.ICON_SIZE.height - tileImage.getHeight(null)) / 2,
-                null);
-            g.dispose();
-            ImageIcon icon = new ImageIcon(image);
+            final Dimension size = getListItemIconSize();
+            final BufferedImage tileImage = getImageLibrary().getTileImageWithOverlayAndForest(t, new Dimension(-1, size.height));
+            final ImageIcon icon = new ImageIcon(ImageUtils.createCenteredImage(tileImage, size));
             node.add(buildItem(t, icon));
         }
         root.add(node);

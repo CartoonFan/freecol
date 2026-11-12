@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -35,11 +35,12 @@ public class StringResource extends Resource {
     /**
      * Do not use directly.
      *
+     * @param cachingKey The caching key.
      * @param resourceLocator The {@code URI} used when loading this
      *      resource.
      */
-    public StringResource(URI resourceLocator) {
-        super(resourceLocator);
+    public StringResource(String cachingKey, URI resourceLocator) {
+        super(cachingKey, resourceLocator);
 
         this.data = resourceLocator.getPath();
         if (this.data.endsWith("\"")) { // Should always be true

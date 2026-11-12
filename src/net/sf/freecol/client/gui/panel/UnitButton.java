@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,18 +19,18 @@
 
 package net.sf.freecol.client.gui.panel;
 
+import java.awt.Dimension;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.util.logging.Logger;
 
 import javax.swing.AbstractButton;
 import javax.swing.Action;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
-import javax.swing.JButton;
 
 import net.sf.freecol.client.gui.action.ActionManager;
 import net.sf.freecol.client.gui.action.FreeColAction;
-import net.sf.freecol.client.gui.ImageLibrary;
 
 
 /**
@@ -41,7 +41,9 @@ import net.sf.freecol.client.gui.ImageLibrary;
  * The UnitButton is useless by itself, this object needs to
  * be placed on a JComponent in order to be useable.
  */
-public final class UnitButton extends JButton {
+public final class UnitButton extends FreeColButton {
+
+    private static final Logger logger = Logger.getLogger(UnitButton.class.getName());
 
     private final String actionId;
     private final ActionManager am;
@@ -53,7 +55,7 @@ public final class UnitButton extends JButton {
      * @param actionId The key for the action to be used with this button
      */
     public UnitButton(ActionManager am, String actionId) {
-        super(am.getFreeColAction(actionId));
+        super(ButtonStyle.TRANSPARENT, am.getFreeColAction(actionId));
         this.actionId = actionId;
         this.am = am;
     }
@@ -64,7 +66,9 @@ public final class UnitButton extends JButton {
      */
     public void refreshAction() {
         setAction(null);
-        setAction(am.getFreeColAction(actionId));
+        final FreeColAction freeColAction = am.getFreeColAction(actionId);
+        freeColAction.update();
+        setAction(freeColAction);
     }
 
 
@@ -85,7 +89,13 @@ public final class UnitButton extends JButton {
             setContentAreaFilled(false);
             setBorderPainted(false);
 
-            setSize(bi.getIconWidth(), bi.getIconHeight());
+            if (bi != null) {
+                setSize(bi.getIconWidth(), bi.getIconHeight());
+                setPreferredSize(new Dimension(bi.getIconWidth(), bi.getIconHeight()));
+                setMinimumSize(new Dimension(bi.getIconWidth(), bi.getIconHeight()));
+            } else {
+                logger.warning("Action " + a + " has no BUTTON_IMAGE");
+            }
         }
     }
 
@@ -117,20 +127,22 @@ public final class UnitButton extends JButton {
                 button.setIcon(icon);
                 button.repaint();
             } else if (FreeColAction.BUTTON_IMAGE.equals(e.getPropertyName())) {
-                String key = (String) e.getNewValue();
-                button.setIcon(new ImageIcon(ImageLibrary.getUnscaledImage(key)));
+                final ImageIcon bi = (ImageIcon) e.getNewValue();
+                button.setIcon(bi);
+                if (bi != null) {
+                    button.setSize(new Dimension(bi.getIconWidth(), bi.getIconHeight()));
+                    button.setMinimumSize(new Dimension(bi.getIconWidth(), bi.getIconHeight()));
+                    button.setPreferredSize(new Dimension(bi.getIconWidth(), bi.getIconHeight()));
+                }
                 button.repaint();
             } else if (FreeColAction.BUTTON_ROLLOVER_IMAGE.equals(e.getPropertyName())) {
-                String key = (String) e.getNewValue();
-                button.setRolloverIcon(new ImageIcon(ImageLibrary.getUnscaledImage(key)));
+                button.setRolloverIcon((ImageIcon) e.getNewValue());
                 button.repaint();
             } else if (FreeColAction.BUTTON_PRESSED_IMAGE.equals(e.getPropertyName())) {
-                String key = (String) e.getNewValue();
-                button.setPressedIcon(new ImageIcon(ImageLibrary.getUnscaledImage(key)));
+                button.setPressedIcon((ImageIcon) e.getNewValue());
                 button.repaint();
             } else if (FreeColAction.BUTTON_DISABLED_IMAGE.equals(e.getPropertyName())) {
-                String key = (String) e.getNewValue();
-                button.setDisabledIcon(new ImageIcon(ImageLibrary.getUnscaledImage(key)));
+                button.setDisabledIcon((ImageIcon) e.getNewValue());
                 button.repaint();
             } else if (Action.MNEMONIC_KEY.equals(e.getPropertyName())) {
                 Integer mn = (Integer) e.getNewValue();

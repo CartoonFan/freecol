@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,26 +19,25 @@
 
 package net.sf.freecol.common.model;
 
-import java.awt.Dimension;
+import static net.sf.freecol.common.util.CollectionUtils.concat;
+import static net.sf.freecol.common.util.CollectionUtils.count;
+import static net.sf.freecol.common.util.CollectionUtils.sort;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.logging.Logger;
 import java.util.stream.Stream;
 
-import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.FreeColException;
-import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
 import net.sf.freecol.common.model.Unit.UnitState;
 import net.sf.freecol.common.option.GameOptions;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 
 
 /**
@@ -48,10 +47,7 @@ import static net.sf.freecol.common.util.CollectionUtils.*;
  * In Europe, you can recruit, train and purchase new units.  You can
  * also equip units, as well as sell and buy goods.
  */
-public class Europe extends UnitLocation
-    implements Ownable, Named, TradeLocation {
-
-    private static final Logger logger = Logger.getLogger(Europe.class.getName());
+public class Europe extends UnitLocation implements Ownable, Named, TradeLocation {
 
     /** Class index for Europe. */
     private static final int EUROPE_CLASS_INDEX = 30;
@@ -229,7 +225,7 @@ public class Europe extends UnitLocation
      *
      * @param recruitables The new list of recruitables {@code AbstractUnit}s.
      */
-    protected void setRecruitables(List<AbstractUnit> recruitables) {
+    private void setRecruitables(List<AbstractUnit> recruitables) {
         this.recruitables.clear();
         this.recruitables.addAll(recruitables);
     }

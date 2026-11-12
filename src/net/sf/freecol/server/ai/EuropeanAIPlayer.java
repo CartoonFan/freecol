@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -18,6 +18,29 @@
  */
 
 package net.sf.freecol.server.ai;
+
+import static net.sf.freecol.common.model.Constants.INFINITY;
+import static net.sf.freecol.common.model.Constants.UNDEFINED;
+import static net.sf.freecol.common.util.CollectionUtils.any;
+import static net.sf.freecol.common.util.CollectionUtils.appendToMapList;
+import static net.sf.freecol.common.util.CollectionUtils.ascendingIntegerComparator;
+import static net.sf.freecol.common.util.CollectionUtils.cacheDouble;
+import static net.sf.freecol.common.util.CollectionUtils.cachingDoubleComparator;
+import static net.sf.freecol.common.util.CollectionUtils.count;
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.flatten;
+import static net.sf.freecol.common.util.CollectionUtils.forEachMapEntry;
+import static net.sf.freecol.common.util.CollectionUtils.isNotNull;
+import static net.sf.freecol.common.util.CollectionUtils.map;
+import static net.sf.freecol.common.util.CollectionUtils.mapEntriesByValue;
+import static net.sf.freecol.common.util.CollectionUtils.matchKey;
+import static net.sf.freecol.common.util.CollectionUtils.maximize;
+import static net.sf.freecol.common.util.CollectionUtils.sort;
+import static net.sf.freecol.common.util.CollectionUtils.sum;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+import static net.sf.freecol.common.util.RandomUtils.getRandomMember;
+import static net.sf.freecol.common.util.RandomUtils.randomInt;
+import static net.sf.freecol.common.util.RandomUtils.randomInts;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,19 +68,17 @@ import net.sf.freecol.common.model.AbstractUnit;
 import net.sf.freecol.common.model.Building;
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.ColonyTradeItem;
-import static net.sf.freecol.common.model.Constants.*;
+import net.sf.freecol.common.model.Constants.IndianDemandAction;
 import net.sf.freecol.common.model.DiplomaticTrade;
 import net.sf.freecol.common.model.DiplomaticTrade.TradeContext;
 import net.sf.freecol.common.model.DiplomaticTrade.TradeStatus;
 import net.sf.freecol.common.model.Europe;
-import net.sf.freecol.common.model.FeatureContainer;
 import net.sf.freecol.common.model.FoundingFather;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.GoldTradeItem;
 import net.sf.freecol.common.model.Goods;
 import net.sf.freecol.common.model.GoodsType;
 import net.sf.freecol.common.model.HistoryEvent;
-import net.sf.freecol.common.model.IndianSettlement;
 import net.sf.freecol.common.model.Location;
 import net.sf.freecol.common.model.Map;
 import net.sf.freecol.common.model.Market;
@@ -68,10 +89,10 @@ import net.sf.freecol.common.model.NativeTrade.NativeTradeAction;
 import net.sf.freecol.common.model.PathNode;
 import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.Player.PlayerType;
-import net.sf.freecol.common.model.Stance;
 import net.sf.freecol.common.model.Role;
 import net.sf.freecol.common.model.Settlement;
 import net.sf.freecol.common.model.Specification;
+import net.sf.freecol.common.model.Stance;
 import net.sf.freecol.common.model.StanceTradeItem;
 import net.sf.freecol.common.model.Tension;
 import net.sf.freecol.common.model.Tile;
@@ -84,12 +105,9 @@ import net.sf.freecol.common.model.pathfinding.CostDeciders;
 import net.sf.freecol.common.model.pathfinding.GoalDeciders;
 import net.sf.freecol.common.option.GameOptions;
 import net.sf.freecol.common.util.CachingFunction;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.common.util.LogBuilder;
 import net.sf.freecol.common.util.RandomChoice;
-import static net.sf.freecol.common.util.RandomUtils.*;
-
-import net.sf.freecol.server.ai.GoodsWish;
+import net.sf.freecol.server.ai.military.MilitaryCoordinator;
 import net.sf.freecol.server.ai.mission.BuildColonyMission;
 import net.sf.freecol.server.ai.mission.CashInTreasureTrainMission;
 import net.sf.freecol.server.ai.mission.DefendSettlementMission;
@@ -104,8 +122,6 @@ import net.sf.freecol.server.ai.mission.UnitSeekAndDestroyMission;
 import net.sf.freecol.server.ai.mission.UnitWanderHostileMission;
 import net.sf.freecol.server.ai.mission.WishRealizationMission;
 import net.sf.freecol.server.ai.mission.WorkInsideColonyMission;
-import net.sf.freecol.server.ai.ValuedAIObject;
-import net.sf.freecol.server.ai.WorkerWish;
 import net.sf.freecol.server.model.ServerPlayer;
 
 
@@ -284,6 +300,30 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
         super(aiMain, xr);
     }
 
+    
+    /**
+     * Checks if this player should use military units more aggressively.
+     * 
+     * @return {@code true} if attacking other units and settlements are
+     *      preferred above defending its own colonies.
+     */
+    public boolean isAggressive() {
+        /*
+         * TODO: We need to decide where to put AI behavior parameters so that mod
+         *       authors can customize the AI feel. Perhaps just in the specification?
+         */
+        return getPlayer().getNation().getType().getId().equals("model.nationType.conquest")
+                || getPlayer().getNation().getType().getId().equals("model.nationType.immigration");
+    }
+    
+    /**
+     * Checks if this player should be attacking the natives.
+     * 
+     * @return {@code true} if native settlements should be targeted by this player.
+     */
+    public boolean isLikesAttackingNatives() {
+        return getPlayer().getNation().getType().getId().equals("model.nationType.conquest");
+    }
 
     /**
      * {@inheritDoc}
@@ -1089,11 +1129,21 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
     }
 
     /**
+     * Gets all transportables sorted by values.
+     *
+     * @return The transportables in descending order.
+     */
+    public List<TransportableAIObject> getTransportables() {
+        return sort(transportSupply, ValuedAIObject.descendingValueComparator);
+    }
+    
+    /**
      * Gets the most urgent transportables.
      *
-     * @return The most urgent 10% of the available transportables.
+     * @return The most urgent of the available transportables.
      */
     public List<TransportableAIObject> getUrgentTransportables() {
+        /*
         List<TransportableAIObject> urgent
             = sort(transportSupply, ValuedAIObject.descendingValueComparator);
         // Do not let the list exceed 10% of all transports
@@ -1101,6 +1151,18 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
         urge = Math.max(2, (urge + 5) / 10);
         while (urgent.size() > urge) urgent.remove(urge);
         return urgent;
+        */
+
+        /*
+         * Deactived the code above for now since I cannot detect any difference
+         * when activated ... and if we activate it again, please use something
+         * like this instead::
+         * 
+         * final int urgentNumber = Math.max(2, (urgent.size() + 5) / 10;
+         * return urgent.subList(0, Math.min(urgent.size(), urgentNumber));
+         */
+        
+        return List.of();
     }
 
     /**
@@ -1376,28 +1438,30 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
         Player player = getPlayer();
         if (!player.canBuildColonies()) return 0;
 
-        int nColonies = 0, nPorts = 0, nWorkers = 0, nEuropean = 0;
+        int nColonies = 0, nPorts = 0, nColonySize1 = 0;
         for (Settlement settlement : player.getSettlementList()) {
             nColonies++;
             if (settlement.isConnectedPort()) nPorts++;
-            nWorkers += count(settlement.getAllUnitsList(), Unit::isPerson);
+            final int colonySize = settlement.getUnitList().size();
+            if (colonySize == 1) {
+                nColonySize1++;
+            }
         }
-        Europe europe = player.getEurope();
-        nEuropean = (europe == null) ? 0
-            : count(europe.getUnits(), Unit::isPerson);
-            
-        // If would be good to have at least two colonies, and at least
-        // one port.  After that, determine the ratio of workers to colonies
-        // (which should be the average colony size), and if that is above
-        // a threshold, send out another colonist.
-        // The threshold probably should be configurable.  2 is too
-        // low IMHO as it makes a lot of brittle colonies, 3 is too
-        // high at least initially as it makes it hard for the initial
-        // colonies to become substantial.  For now, arbitrarily choose e.
-        return (nColonies == 0 || nPorts == 0) ? 2
-            : ((nPorts <= 1) && (nWorkers + nEuropean) >= 3) ? 1
-            : ((double)(nWorkers + nEuropean) / nColonies > Math.E) ? 1
-            : 0;
+        
+        if (nPorts == 0) {
+            return 2;
+        }
+        if (nPorts == 1) {
+            return 1;
+        }
+        if (nColonies < 3) {
+            return 1;
+        }
+        if (nColonySize1 < 2) {
+            return 1;
+        }
+        
+        return 0;
     }
 
 
@@ -1615,7 +1679,7 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
      *
      * @param lb A {@code LogBuilder} to log to.
      */
-    protected void giveNormalMissions(LogBuilder lb) {
+    protected void giveNormalMissions(LogBuilder lb, List<AIUnit> aiUnits) {
         final AIMain aiMain = getAIMain();
         final Player player = getPlayer();
         BuildColonyMission bcm = null;
@@ -1625,7 +1689,6 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
         nPioneers = pioneersNeeded();
         nScouts = scoutsNeeded();
 
-        List<AIUnit> aiUnits = getAIUnits();
         List<AIUnit> navalUnits = new ArrayList<>(aiUnits.size()/2);
         List<AIUnit> done = new ArrayList<>(aiUnits.size());
         List<TransportMission> transportMissions = new ArrayList<>(aiUnits.size()/2);
@@ -1739,7 +1802,22 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
             done.clear();
         }
         if (nBuilders > 0) {
+            /*
+             * Temporary fix for endless amount of colonists not being assigned
+             * any mission. See BR#3322
+             */
+            final int MAX_BUILDING_MISSION_TRIES = 50;
+            
+            int tries = 0;
             for (AIUnit aiUnit : sort(aiUnits, builderComparator)) {
+                if (aiUnit.getUnit().isArmed() && getGame().getTurn().getNumber() > 20) {
+                    // Quickfix to avoid having all soldies being given a BuildColonyMission.
+                    continue;
+                }
+                tries++;
+                if (tries > MAX_BUILDING_MISSION_TRIES) {
+                    break;
+                }
                 final Location oldTarget = ((m = aiUnit.getMission()) == null)
                     ? null : m.getTarget();
                 if ((m = getBuildColonyMission(aiUnit, null)) == null)
@@ -1857,9 +1935,8 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
                     lb.add(", ", m);
                     updateTransport(aiUnit, oldTarget, lb);
                     reasons.put(unit, "To-work");
-                    ports.add(c);
                 }
-
+                ports.add(c);
             } else if (m instanceof IdleAtSettlementMission) {
                 reasons.put(unit, "Idle"); // already idle
             } else {
@@ -1912,9 +1989,10 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
 
         if (unit.isNaval()) {
             ret = (old instanceof PrivateerMission) ? old
-                : ((m = getPrivateerMission(aiUnit, null)) != null) ? m
+                : (!unit.isInEurope() && (m = getPrivateerMission(aiUnit, null)) != null) ? m
                 : (old instanceof TransportMission) ? old
                 : ((m = getTransportMission(aiUnit)) != null) ? m
+                : ((m = getPrivateerMission(aiUnit, null)) != null) ? m
                 : (old instanceof UnitSeekAndDestroyMission) ? old
                 : ((m = getSeekAndDestroyMission(aiUnit, 8)) != null) ? m
                 : (old instanceof UnitWanderHostileMission) ? old
@@ -1933,9 +2011,9 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
                     && old instanceof WorkInsideColonyMission) ? old
                 : (unit.isInColony()
                     && (m = getWorkInsideColonyMission(aiUnit, null)) != null) ? m
-
+                            
                 // Try to maintain local defence
-                : (old instanceof DefendSettlementMission) ? old
+                : (old instanceof DefendSettlementMission && old.getTarget() instanceof Colony && !((Colony) old.getTarget()).isVeryWellDefended()) ? old
                 : ((m = getDefendCurrentSettlementMission(aiUnit)) != null) ? m
 
                 // REF override
@@ -1951,7 +2029,7 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
                     && (m = getWishRealizationMission(aiUnit, null)) != null) ? m
 
                 // Ordinary defence
-                : ((m = getDefendSettlementMission(aiUnit, false)) != null) ? m
+                : ((m = getDefendSettlementMission(aiUnit, false, false)) != null) ? m
 
                 // Try nearby offence
                 : (old instanceof UnitSeekAndDestroyMission) ? old
@@ -1966,10 +2044,13 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
                 : ((m = getWishRealizationMission(aiUnit, null)) != null) ? m
 
                 // Another try to defend, with relaxed cost decider
-                : ((m = getDefendSettlementMission(aiUnit, true)) != null) ? m
+                : ((m = getDefendSettlementMission(aiUnit, true, false)) != null) ? m
 
                 // Another try to attack, at longer range
                 : ((m = getSeekAndDestroyMission(aiUnit, 16)) != null) ? m
+                        
+                // Try again, even for well defended colonies.
+                : ((m = getDefendSettlementMission(aiUnit, true, true)) != null) ? m
 
                 // Leftover offensive units should go out looking for trouble
                 : (old instanceof UnitWanderHostileMission) ? old
@@ -2024,17 +2105,19 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
      *
      * @param aiUnit The {@code AIUnit} to check.
      * @param relaxed Use a relaxed cost decider to choose the target.
+     * @param includeWellDefendedSettlements If {@code true}, then colonies that
+     *      are already well defended can get a DefendSettlementMission.
      * @return A new mission, or null if impossible.
      */
-    private Mission getDefendSettlementMission(AIUnit aiUnit, boolean relaxed) {
+    public Mission getDefendSettlementMission(AIUnit aiUnit, boolean relaxed, boolean includeWellDefendedSettlements) {
         if (DefendSettlementMission.invalidMissionReason(aiUnit) != null) return null;
         final Unit unit = aiUnit.getUnit();
         final Location loc = unit.getLocation();
-        double worstValue = 1000000.0;
+        double worstValue = Double.MAX_VALUE;
         Colony worstColony = null;
         for (AIColony aic : getAIColonies()) {
             Colony colony = aic.getColony();
-            if (aic.isBadlyDefended()) {
+            if (aic.isBadlyDefended() || includeWellDefendedSettlements) {
                 if (unit.isAtLocation(colony.getTile())) {
                     worstColony = colony;
                     break;
@@ -2043,8 +2126,8 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
                     unit.getCarrier(),
                     ((relaxed) ? CostDeciders.numberOfTiles() : null));
                 if (ttr >= Unit.MANY_TURNS) continue;
-                double value = colony.getDefenceRatio() * 100.0 / ttr;
-                if (worstValue > value) {
+                double value = colony.getDefenceRatio() * 10 + ttr;
+                if (value < worstValue) {
                     worstValue = value;
                     worstColony = colony;
                 }
@@ -2170,9 +2253,11 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
      */
     public Mission getWorkInsideColonyMission(AIUnit aiUnit,
                                               AIColony aiColony) {
-        if (WorkInsideColonyMission.invalidMissionReason(aiUnit) != null) return null;
         if (aiColony == null) {
             aiColony = getAIColony(aiUnit.getUnit().getColony());
+        }
+        if (WorkInsideColonyMission.invalidMissionReason(aiUnit, aiColony.getColony()) != null) {
+            return null;
         }
         return (aiColony == null) ? null
             : new WorkInsideColonyMission(getAIMain(), aiUnit, aiColony);
@@ -2232,6 +2317,16 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
                " v-land-REF=", player.getRebelStrengthRatio(false),
                " v-naval-REF=", player.getRebelStrengthRatio(true));
         if (turn.isFirstTurn()) initializeMissions(lb);
+        
+        if (isLikesAttackingNatives() && getGame().getTurn().getNumber() > 100) {
+            for (Player p : getGame().getLivePlayerList(player)) {
+                if (!p.isIndian()) {
+                    continue;
+                }
+                player.getTension(p).setValue(Tension.TENSION_MAX);
+            }
+        }
+        
         determineStances(lb);
 
         if (colonyCount > 0) {
@@ -2250,20 +2345,34 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
             buildWishMaps(lb);
         }
         cheat(lb);
-        buildTransportMaps(lb);
+        buyUnitsInEurope(lb);
 
         // Note order of operations below.  We allow rearrange et al to run
         // even when there are no movable units left because this expedites
         // mission assignment.
         List<AIUnit> aiUnits = getAIUnits();
+        final Set<AIUnit> militaryUnits = getAIUnits().stream()
+                .filter(MilitaryCoordinator.isUnitHandledByMilitaryCoordinator())
+                .collect(Collectors.toSet());
+        
+        final MilitaryCoordinator militaryCoordinator = new MilitaryCoordinator(this, militaryUnits);
+        militaryCoordinator.determineMissions();
+        
+        buildTransportMaps(lb);
+        
+        final List<AIUnit> normalAiUnits = getAIUnits().stream()
+                .filter(MilitaryCoordinator.isUnitHandledByMilitaryCoordinator().negate())
+                .collect(Collectors.toList());
         for (int i = 0; i < 3; i++) {
             rearrangeColonies(lb);
-            giveNormalMissions(lb);
+            giveNormalMissions(lb, normalAiUnits);
             bringGifts(lb);
             demandTribute(lb);
             if (aiUnits.isEmpty()) break;
             aiUnits = doMissions(aiUnits, lb);
         }
+        
+        
         lb.log(logger, Level.FINE);
 
         clearAIUnits();
@@ -2273,6 +2382,220 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
         wagonsNeeded.clear();
         goodsWishes.clear();
         workerWishes.clear();
+    }
+
+    private void buyUnitsInEurope(LogBuilder lb) {
+        /*
+         * It seems that training/recruiting units, in other cases than cheating,
+         * was removed from the code in 2012. This prevents the AI from actually
+         * using the money it's gaining. This happened in commit:
+         * 9e68ade8d2876c8135524c5b396c93d6c4d5ed1f.
+         * 
+         * The code has changed a lot since then, so I have just added the quickfix
+         * below for buying units. This code does not prioritize wishes based on
+         * multiple units going to the same location, does not support recruiting etc.
+         * 
+         * A better implementation will be added some point in the future.
+         */
+                
+        final Player player = getPlayer();
+        final Europe europe = player.getEurope();
+        
+        if (player.getEurope() == null) {
+            return;
+        }
+        
+        final long numberOfUnitsInDock = player.getEurope().getUnits().filter(unit -> !unit.isNaval()).count();
+        final long numberOfShips = getAIUnits().stream().filter(au -> au.getUnit().isNaval()).count();
+        
+        if (player.getEurope() != null
+                && numberOfUnitsInDock > 6
+                && numberOfShips < 15) {            
+            if (!buyShip()) {
+                return;
+            }
+        }
+        
+        if (numberOfUnitsInDock > 30) {
+            return;
+        }
+                
+        boolean militaryUnitBought = numberOfUnitsInDock >= 18;
+        if (!militaryUnitBought) {
+            if (reallyNeedsMoreArtillery() || isLikesAttackingNatives() && needsMoreArtillery()) {
+                final Unit unitBought = buyArtillery();
+                if (unitBought == null) {
+                    return;
+                }
+                militaryUnitBought = true;
+            }
+            if (reallyNeedsMoreDragoons() || isLikesAttackingNatives() && needsMoreDragoons()) {
+                final Unit unitBought = buyDragoon();
+                if (unitBought == null) {
+                    return;
+                }
+                militaryUnitBought = true;
+            }
+        }
+        
+        for (Wish w : getWishes()) {
+            if (!(w instanceof WorkerWish)) {
+                continue;
+            }
+            if (w.getTransportable() != null) {
+                continue;
+            }
+            
+            final WorkerWish workerWish = (WorkerWish) w;
+            final UnitType unitType = workerWish.getUnitType();
+            if (!unitType.isAvailableTo(player) ) {
+                continue;
+            }
+            
+            final int unitPrice = europe.getUnitPrice(unitType);
+            
+            if (unitPrice <= 0) {
+                continue;
+            }
+            
+            if (unitPrice > player.getGold()) {
+                return;
+            }
+            
+            final AIUnit newUnit = trainAIUnitInEurope(unitType);
+            if (newUnit != null) {
+                getWishRealizationMission(newUnit, workerWish);
+            }
+            
+            if (!militaryUnitBought) {
+                militaryUnitBought = true;
+                final Unit unitBought = buyDragoon();
+                if (unitBought == null) {
+                    return;
+                }
+            }
+        }
+        
+        for (int i=0; i<6; i++) {
+            final Unit unitBought = buyDragoon();
+            if (unitBought == null) {
+                return;
+            }
+        }
+    }
+
+    private boolean buyShip() {
+        final List<UnitType> unitTypes = new ArrayList<>(transform(getSpecification().getUnitTypeList(),
+                ut -> ut.hasAbility(Ability.NAVAL_UNIT)
+                    && ut.isAvailableTo(getPlayer())
+                    && ut.hasPrice()
+                    && ut.getSpace() > 0));
+        Collections.shuffle(unitTypes);
+        if (unitTypes.isEmpty()) {
+            return false;
+        }
+
+        final AbstractUnit au = new AbstractUnit(unitTypes.get(0), Specification.DEFAULT_ROLE_ID, 1);
+        final int purchasePrice = getPlayer().getEuropeanPurchasePrice(au);
+        if (purchasePrice <= 0 || purchasePrice == INFINITY) {
+            return false;
+        }
+        if (purchasePrice > getPlayer().getGold()) {
+            return false;
+        }
+        
+        getPlayer().modifyGold(-purchasePrice);
+        final ServerPlayer serverPlayer = (ServerPlayer) getPlayer();
+        serverPlayer.createUnits(List.of(au), getPlayer().getEurope(), getAIRandom());
+        
+        return true;
+    }
+
+    private boolean needsMoreDragoons() {
+        return 2 * (getAIColonies().size() + 1) > getAIUnits().stream().filter(au -> au.getUnit().isMounted() && au.getUnit().isArmed()).count();
+    }
+    
+    private boolean reallyNeedsMoreDragoons() {
+        return getAIColonies().size() + 1 > getAIUnits().stream().filter(au -> au.getUnit().isMounted() && au.getUnit().isArmed()).count();
+    }
+    
+    public boolean reallyNeedsMoreArtillery() {
+        return getAIColonies().size() / 2 + 1 > getAIUnits().stream().filter(au -> au.getUnit().hasAbility(Ability.BOMBARD)).count();
+    }
+    
+    public boolean needsMoreArtillery() {
+        return getAIColonies().size() + 1 > getAIUnits().stream().filter(au -> au.getUnit().hasAbility(Ability.BOMBARD)).count();
+    }
+    
+    private Unit buyDragoon() {
+        final Player player = getPlayer();
+        final Role dragoonRole = getSpecification().getMilitaryRolesList().stream()
+                .filter(r -> r.hasAbility(Ability.ARMED) && r.hasAbility(Ability.MOUNTED))
+                .findFirst()
+                .orElse(null);
+        
+        if (dragoonRole == null) {
+            return null;
+        }
+        
+        final UnitType cheapestUnitType = getSpecification().getUnitTypesTrainedInEurope(getPlayer())
+            .stream()
+            .filter(ut -> ut.getPrice() > 0 && ut.getPrice() != INFINITY)
+            .sorted((a, b) -> Integer.compare(a.getPrice(), b.getPrice()))
+            .findFirst()
+            .orElse(null);
+        
+        if (cheapestUnitType == null) {
+            return null;
+        }
+        
+        final AbstractUnit au = new AbstractUnit(cheapestUnitType, dragoonRole.getId(), 1);
+        final int purchasePrice = player.getEuropeanPurchasePrice(au);
+        if (purchasePrice <= 0 || purchasePrice == INFINITY) {
+            return null;
+        }
+        if (purchasePrice > getPlayer().getGold()) {
+            return null;
+        }
+        
+        player.modifyGold(-purchasePrice);
+        
+        final AbstractUnit auForCreation = new AbstractUnit(getSpecification().getDefaultUnitType(),
+                dragoonRole.getId(), 1);                
+        final List<Unit> createdUnit = ((ServerPlayer) player).createUnits(List.of(auForCreation), player.getEurope(), getAIRandom());
+        if (createdUnit.isEmpty()) {
+            return null;
+        }
+        return createdUnit.get(0);
+    }
+    
+    private Unit buyArtillery() {
+        final Player player = getPlayer();
+        final Europe europe = player.getEurope();
+        final UnitType cheapestArtilleryUnitType = getSpecification().getUnitTypesPurchasedInEurope(getPlayer())
+            .stream()
+            .filter(ut -> ut.getPrice() > 0 && ut.getPrice() != INFINITY)
+            .filter(ut -> ut.hasAbility(Ability.BOMBARD))
+            .filter(ut -> ut.isAvailableTo(player))
+            .sorted((a, b) -> Integer.compare(a.getPrice(), b.getPrice()))
+            .findFirst()
+            .orElse(null);
+        
+        if (cheapestArtilleryUnitType == null) {
+            return null;
+        }
+        
+        final int unitPrice = europe.getUnitPrice(cheapestArtilleryUnitType);
+        if (unitPrice > player.getGold()) {
+            return null;
+        }
+        
+        final AIUnit newUnit = trainAIUnitInEurope(cheapestArtilleryUnitType);
+        if (newUnit == null) {
+            return null;
+        }
+        
+        return newUnit.getUnit();
     }
 
     /**
@@ -2353,8 +2676,7 @@ public class EuropeanAIPlayer extends MissionAIPlayer {
      * {@inheritDoc}
      */
     @Override
-    public int adjustMission(AIUnit aiUnit, PathNode path, Class type,
-                             int value) {
+    public int adjustMission(AIUnit aiUnit, PathNode path, Class<?> type, int value) {
         if (value > 0) {
             if (type == DefendSettlementMission.class) {
                 // Reduce value in proportion to the number of defenders.

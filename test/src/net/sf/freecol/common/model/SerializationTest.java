@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,9 +21,10 @@ package net.sf.freecol.common.model;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileReader;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.List;
@@ -34,16 +35,16 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 import javax.xml.validation.Validator;
 
+import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
+
+import net.sf.freecol.common.io.FreeColRules;
 import net.sf.freecol.common.io.FreeColSavegameFile;
-import net.sf.freecol.common.io.FreeColTcFile;
 import net.sf.freecol.common.io.FreeColXMLWriter;
 import net.sf.freecol.common.option.GameOptions;
 import net.sf.freecol.common.option.OptionGroup;
 import net.sf.freecol.server.ServerTestHelper;
 import net.sf.freecol.util.test.FreeColTestCase;
-
-import org.xml.sax.SAXException;
-import org.xml.sax.SAXParseException;
 
 
 public class SerializationTest extends FreeColTestCase {
@@ -66,7 +67,9 @@ public class SerializationTest extends FreeColTestCase {
 
             FreeColSavegameFile mapFile = new FreeColSavegameFile(new File(name));
 
-            mapValidator.validate(new StreamSource(mapFile.getSavegameInputStream()));
+            try (InputStream in = mapFile.getSavegameInputStream()) {
+                mapValidator.validate(new StreamSource(in));
+            }
         } catch (SAXParseException e) {
             String errMsg = e.getMessage()
                 + " at line=" + e.getLineNumber()
@@ -75,21 +78,8 @@ public class SerializationTest extends FreeColTestCase {
         }
     }
 
-    private void logParseFailure(SAXParseException e, String serialized) {
-        int col = e.getColumnNumber();
-        String errMsg = e.getMessage()
-            + "\nAt line=" + e.getLineNumber()
-            + ", column=" + col + ":\n"
-            + serialized.substring(Math.max(0, col - 100),
-                                   Math.min(col + 100, serialized.length()));
-        fail(errMsg);
-    }
-
     public void testValidation() throws Exception {
         Game game = ServerTestHelper.startServerGame(getTestMap(true));
-
-        Colony colony = getStandardColony(6);
-        Player player = game.getPlayerByNationId("model.nation.dutch");
 
         ServerTestHelper.newTurn();
         ServerTestHelper.newTurn();
@@ -129,8 +119,7 @@ public class SerializationTest extends FreeColTestCase {
             .addAmount("%amount%", 50)
             .addStringTemplate("%goods%", t1);
 
-        Game game = getGame();
-        Player player = game.getPlayerByNationId("model.nation.dutch");
+        getGame();
 
         try {
             Validator validator = buildValidator("schema/data/data-stringTemplate.xsd");
@@ -167,7 +156,7 @@ public class SerializationTest extends FreeColTestCase {
     public void testDifficulty() throws Exception {
         Specification spec1 = null;
         Specification spec2 = null;
-        spec1 = FreeColTcFile.getFreeColTcFile("classic").getSpecification();
+        spec1 = FreeColRules.getFreeColRulesFile("classic").getSpecification();
         spec1.applyDifficultyLevel("model.difficulty.veryEasy");
         StringWriter sw = new StringWriter();
         try (FreeColXMLWriter xw = new FreeColXMLWriter(sw,
@@ -199,7 +188,7 @@ public class SerializationTest extends FreeColTestCase {
     public void testGeneratedLists() throws Exception {
         Specification spec1 = null;
         Specification spec2 = null;
-        spec1 = FreeColTcFile.getFreeColTcFile("classic").getSpecification();
+        spec1 = FreeColRules.getFreeColRulesFile("classic").getSpecification();
         spec1.applyDifficultyLevel("model.difficulty.veryEasy");
         StringWriter sw = new StringWriter();
         try (FreeColXMLWriter xw = new FreeColXMLWriter(sw,

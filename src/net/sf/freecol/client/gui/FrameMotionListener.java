@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -23,7 +23,6 @@ import java.awt.Component;
 import java.awt.Point;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseMotionListener;
 
 import javax.swing.JInternalFrame;
 import javax.swing.SwingUtilities;
@@ -67,6 +66,8 @@ public class FrameMotionListener extends MouseAdapter {
         f.getDesktopPane().getDesktopManager()
             .dragFrame(f, f.getX() - moveX, f.getY() - moveY);
         loc = p;
+        
+        f.putClientProperty(Canvas.PROPERTY_POPUP_POSITION, null);
     }
 
     /**

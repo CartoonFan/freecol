@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -42,7 +42,7 @@ public class ModTest extends FreeColTestCase {
     public void testGetRuleSets() {
         // Check that all rule sets can be loaded
         Set<String> ids = new HashSet<String>();
-        for (FreeColTcFile tc : FreeColTcFile.getRulesList()) {
+        for (FreeColModFile tc : FreeColRules.getRulesList()) {
             assertNotNull("Null identifier for " + tc, tc.getId());
             ids.add(tc.getId());
         }

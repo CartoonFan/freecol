@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -244,21 +244,24 @@ public class IndianNationType extends NationType {
             xw.writeEndElement();
         }
     }
+    
+    /**
+    * {@inheritDoc}
+    */
+    @Override
+    protected void clearContainers(FreeColXMLReader xr) throws XMLStreamException {
+        super.clearContainers(xr);
+        skills = null;
+        regions = null;
+    }
 
     /**
      * {@inheritDoc}
      */
     @Override
     protected void readChildren(FreeColXMLReader xr) throws XMLStreamException {
-        // Clear containers.
-        if (xr.shouldClearContainers()) {
-            skills = null;
-            regions = null;
-        }
-
         final Specification spec = getSpecification();
-        IndianNationType parent = xr.getType(spec, EXTENDS_TAG,
-                                             IndianNationType.class, this);
+        IndianNationType parent = xr.getAlreadyInitializedType(spec, EXTENDS_TAG, IndianNationType.class, this);
         if (parent != this) {
             if (parent.skills != null && !parent.skills.isEmpty()) {
                 if (skills == null) skills = new ArrayList<>();

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,10 +19,13 @@
 
 package net.sf.freecol.client.gui.option;
 
+import static net.sf.freecol.common.util.CollectionUtils.first;
+
 import java.awt.event.ActionEvent;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -36,14 +39,11 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.panel.MigPanel;
 import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.option.AbstractOption;
 import net.sf.freecol.common.option.ListOption;
-import net.sf.freecol.common.option.Option;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 
 
 /**
@@ -65,6 +65,8 @@ public final class ListOptionUI<T> extends OptionUI<ListOption<T>>
     private final JButton removeButton = Utility.localizedButton("list.remove");
     private final JButton upButton = Utility.localizedButton("list.up");
     private final JButton downButton = Utility.localizedButton("list.down");
+    
+    private final Function<AbstractOption<?>, Boolean> choiceModifiableCheck;
 
 
     /**
@@ -74,11 +76,14 @@ public final class ListOptionUI<T> extends OptionUI<ListOption<T>>
      * @param gui The {@code GUI} to display on.
      * @param option The {@code ListOption} to display.
      * @param editable boolean whether user can modify the setting
+     * @param choiceModifiableCheck Checks if a specific option can
+     *      be added/modified in the list.
      */
     public ListOptionUI(final GUI gui, final ListOption<T> option,
-                        boolean editable) {
+                        boolean editable, Function<AbstractOption<?>, Boolean> choiceModifiableCheck) {
         super(option, editable);
 
+        this.choiceModifiableCheck = choiceModifiableCheck;
         this.panel = new MigPanel(new MigLayout("wrap 2, fill",
                                                 "[fill, grow]20[fill]"));
         this.panel.setBorder(Utility.localizedBorder(super.getJLabel().getText(),
@@ -104,8 +109,17 @@ public final class ListOptionUI<T> extends OptionUI<ListOption<T>>
         JScrollPane pane = new JScrollPane(this.list);
         this.panel.add(pane, "grow, spany 5");
         
+        if (option.getAllowDuplicates()) {
+            /*
+             * The edit option is not available since it it's confusing and
+             * can also produce duplicates.
+             */
+            editButton.setEnabled(editable);
+            this.panel.add(editButton);
+        }
+        
         for (JButton button : new JButton[] {
-                editButton, addButton, removeButton, upButton, downButton }) {
+                addButton, removeButton, upButton, downButton }) {
             button.setEnabled(editable);
             this.panel.add(button);
         }
@@ -117,6 +131,18 @@ public final class ListOptionUI<T> extends OptionUI<ListOption<T>>
                 try {
                     AbstractOption<T> ao = option.getTemplate().cloneOption();
                     if (gui.showEditOptionDialog(ao) && option.canAdd(ao)) {
+                        if (!option.getAllowDuplicates() && getValue().contains(ao)) {
+                            /*
+                             * Ignore when trying to add the same element twice. Note that
+                             * we need to check the list instead of just the option. The
+                             * reason being that the option is only updated when the
+                             * change is confirmed in the options dialog.
+                             */
+                            return;
+                        }
+                        if (!canModifyChoice(ao)) {
+                            return;
+                        }
                         this.model.addElement(ao);
                         this.list.setSelectedValue(ao, true);
                         this.list.repaint();
@@ -133,10 +159,18 @@ public final class ListOptionUI<T> extends OptionUI<ListOption<T>>
                 }
             });
         removeButton.addActionListener((ActionEvent ae) -> {
+                if (!canModifyChoice(this.list.getSelectedValue())) {
+                    return;
+                }
                 this.model.removeElementAt(this.list.getSelectedIndex());
             });
         upButton.addActionListener((ActionEvent ae) -> {
-                if (this.list.getSelectedIndex() == 0) return;
+                if (this.list.getSelectedIndex() == 0) {
+                    return;
+                }
+                if (!canModifyChoice(this.list.getSelectedValue())) {
+                    return;
+                }
                 final int index = this.list.getSelectedIndex();
                 final AbstractOption<T> temp = this.model.getElementAt(index);
                 this.model.setElementAt(this.model.getElementAt(index-1), index);
@@ -144,7 +178,12 @@ public final class ListOptionUI<T> extends OptionUI<ListOption<T>>
                 this.list.setSelectedIndex(index-1);
             });
         downButton.addActionListener((ActionEvent ae) -> {
-                if (this.list.getSelectedIndex() == this.model.getSize() - 1) return;
+                if (this.list.getSelectedIndex() == this.model.getSize() - 1) {
+                    return;
+                }
+                if (!canModifyChoice(this.list.getSelectedValue())) {
+                    return;
+                }
                 final int index = this.list.getSelectedIndex();
                 final AbstractOption<T> temp = this.model.getElementAt(index);
                 this.model.setElementAt(this.model.getElementAt(index+1), index);
@@ -155,11 +194,15 @@ public final class ListOptionUI<T> extends OptionUI<ListOption<T>>
         this.list.addListSelectionListener(this);
         initialize();
     }
+    
+    private boolean canModifyChoice(AbstractOption<T> choice) {
+        return choiceModifiableCheck.apply(choice);
+    }
 
     @SuppressWarnings("unchecked")
     private void setCellRenderer(GUI gui, AbstractOption<T> o,
                                  boolean editable) {
-        OptionUI ui = OptionUI.getOptionUI(gui, o, editable);
+        OptionUI<AbstractOption<T>> ui = (OptionUI<AbstractOption<T>>) OptionUI.getOptionUI(gui, o, editable);
         if (ui != null && ui.getListCellRenderer() != null) {
             this.list.setCellRenderer(ui.getListCellRenderer());
         }

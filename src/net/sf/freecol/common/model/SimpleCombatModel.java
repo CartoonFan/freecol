@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,6 +19,15 @@
 
 package net.sf.freecol.common.model;
 
+import static net.sf.freecol.common.util.CollectionUtils.alwaysTrue;
+import static net.sf.freecol.common.util.CollectionUtils.any;
+import static net.sf.freecol.common.util.CollectionUtils.matchKeyEquals;
+import static net.sf.freecol.common.util.CollectionUtils.sort;
+import static net.sf.freecol.common.util.CollectionUtils.sumDouble;
+import static net.sf.freecol.common.util.CollectionUtils.toList;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+import static net.sf.freecol.common.util.RandomUtils.randomDouble;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -28,10 +37,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import net.sf.freecol.common.model.Modifier.ModifierType;
-import net.sf.freecol.common.model.UnitTypeChange;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.common.util.LogBuilder;
-import static net.sf.freecol.common.util.RandomUtils.*;
 
 
 /**
@@ -85,7 +91,7 @@ public class SimpleCombatModel extends CombatModel {
      * @param lb An optional {@code LogBuilder} to log to.
      * @return The combat odds.
      */
-    private CombatOdds calculateCombatOdds(FreeColGameObject attacker,
+    protected CombatOdds calculateCombatOdds(FreeColGameObject attacker,
                                            FreeColGameObject defender,
                                            LogBuilder lb) {
         if (attacker == null || defender == null) {
@@ -315,7 +321,7 @@ public class SimpleCombatModel extends CombatModel {
      */
     private void addPopularSupportBonus(Colony colony, Unit attacker,
                                         Set<Modifier> result) {
-        int bonus = colony.getSoL();
+        int bonus = colony.getSonsOfLiberty();
         if (bonus >= 0) {
             if (attacker.getOwner().isREF()) bonus = 100 - bonus;
             if (bonus > 0) {
@@ -387,7 +393,7 @@ public class SimpleCombatModel extends CombatModel {
                     // Ambush bonus in the open = defender's defence
                     // bonus, if defender is REF, or attacker is indian.
                     if (isAmbush(attacker, defender)) {
-                        for (Modifier m : tile.getDefenceModifiers()) {
+                        for (Modifier m : tile.getType().getDefenceModifiers()) {
                             Modifier mod = Modifier.makeModifier(m);
                             mod.setId(Modifier.OFFENCE);
                             mod.setSource(Specification.AMBUSH_BONUS_SOURCE);
@@ -536,7 +542,8 @@ public class SimpleCombatModel extends CombatModel {
             if (settlement == null) {
                 // PF#73 demonstrated that tile modifiers do not apply
                 // for colonies
-                result.addAll(tile.getType().getDefenceModifiers());
+                if (!isAmbush(attacker, defender))
+                    result.addAll(tile.getType().getDefenceModifiers());
 
                 // Artillery in the Open penalty
                 if (defender.hasAbility(Ability.BOMBARD)
@@ -586,11 +593,11 @@ public class SimpleCombatModel extends CombatModel {
      * @return The results of the combat.
      */
     @Override
-    public List<CombatResult> generateAttackResult(Random random,
+    public CombatResult generateAttackResult(Random random,
         FreeColGameObject attacker, FreeColGameObject defender) {
         LogBuilder lb = new LogBuilder(256);
         lb.add("Combat");
-        ArrayList<CombatResult> crs = new ArrayList<>();
+        List<CombatEffectType> crs = new ArrayList<>();
         CombatOdds odds = calculateCombatOdds(attacker, defender, lb);
         double r = randomDouble(logger, "AttackResult", random);
         lb.add(" random(1.0)=", r);
@@ -619,17 +626,17 @@ public class SimpleCombatModel extends CombatModel {
             // ...and beached ships always lose.
             if (r < odds.win || defenderUnit.isBeached()) {
                 great = r < 0.1 * odds.win; // Great Win
-                crs.add(CombatResult.WIN);
+                crs.add(CombatEffectType.WIN);
                 resolveAttack(attackerUnit, defenderUnit, great,
                     // Rescale to 0 <= r < 1
                     r / (0.1 * odds.win), crs);
             } else if (r < 0.8 * odds.win + 0.2
                     && defenderUnit.hasAbility(Ability.EVADE_ATTACK)) {
-                crs.add(CombatResult.NO_RESULT);
-                crs.add(CombatResult.EVADE_ATTACK);
+                crs.add(CombatEffectType.NO_RESULT);
+                crs.add(CombatEffectType.EVADE_ATTACK);
             } else {
                 great = r >= 0.1 * odds.win + 0.9; // Great Loss
-                crs.add(CombatResult.LOSE);
+                crs.add(CombatEffectType.LOSE);
                 resolveAttack(defenderUnit, attackerUnit, great,
                     // Rescaling to 0 <= r < 1
                     // (rearrange: 0.8 * odds.win + 0.2 <= r < 1.0)
@@ -648,7 +655,7 @@ public class SimpleCombatModel extends CombatModel {
 
             // The bombard succeeds.
             if (r <= odds.win) {
-                crs.add(CombatResult.WIN);
+                crs.add(CombatEffectType.WIN);
 
                 // Great wins occur at most in 1 in 3 of successful bombards,
                 // Good defences reduce this proportion.
@@ -660,17 +667,17 @@ public class SimpleCombatModel extends CombatModel {
                 // Sink the defender on great wins or lack of repair
                 // location, otherwise just damage.
                 if (great || defenderUnit.getRepairLocation() == null) {
-                    crs.add(CombatResult.SINK_SHIP_BOMBARD);
+                    crs.add(CombatEffectType.SINK_SHIP_BOMBARD);
                 } else {
-                    crs.add(CombatResult.DAMAGE_SHIP_BOMBARD);
+                    crs.add(CombatEffectType.DAMAGE_SHIP_BOMBARD);
                 }
 
             // The bombard fails but this is not a win for the
             // defender, just an evasion, as it is not currently given
             // an opportunity to return fire.
             } else {
-                crs.add(CombatResult.NO_RESULT);
-                crs.add(CombatResult.EVADE_BOMBARD);
+                crs.add(CombatEffectType.NO_RESULT);
+                crs.add(CombatEffectType.EVADE_BOMBARD);
             }
 
         } else {
@@ -682,10 +689,10 @@ public class SimpleCombatModel extends CombatModel {
         // determinations for debugging and investigation of user
         // `I just lost N combats' complaints.
         lb.add(" great=", great, " ", action);
-        for (CombatResult cr : crs) lb.add(" ", cr);
+        for (CombatEffectType cr : crs) lb.add(" ", cr);
         lb.log(logger, Level.INFO);
 
-        return crs;
+        return new CombatResult(crs);
     }
 
     /**
@@ -697,12 +704,12 @@ public class SimpleCombatModel extends CombatModel {
      * @param r A "residual" random value (for convert/burn mission).
      * @param crs A list of {@code CombatResult}s to add to.
      */
-    private void resolveAttack(Unit winner, Unit loser, boolean great,
-                               double r, List<CombatResult> crs) {
+    protected void resolveAttack(Unit winner, Unit loser, boolean great,
+                               double r, List<CombatEffectType> crs) {
         Player loserPlayer = loser.getOwner();
         Tile tile = loser.getTile();
         Player winnerPlayer = winner.getOwner();
-        boolean attackerWon = crs.get(0) == CombatResult.WIN;
+        boolean attackerWon = crs.get(0) == CombatEffectType.WIN;
         boolean loserMustDie = loser.hasAbility(Ability.DISPOSE_ON_COMBAT_LOSS);
         UnitTypeChange uc;
         
@@ -712,20 +719,20 @@ public class SimpleCombatModel extends CombatModel {
             // beached.
             if (winner.isNaval() && winner.canCaptureGoods()
                 && !loser.getGoodsList().isEmpty()) {
-                crs.add(CombatResult.LOOT_SHIP);
+                crs.add(CombatEffectType.LOOT_SHIP);
             }
             if (great || loserMustDie
                 || loser.getRepairLocation() == null
                 || loser.isBeached()) {
-                crs.add(CombatResult.SINK_SHIP_ATTACK);
+                crs.add(CombatEffectType.SINK_SHIP_ATTACK);
             } else {
-                crs.add(CombatResult.DAMAGE_SHIP_ATTACK);
+                crs.add(CombatEffectType.DAMAGE_SHIP_ATTACK);
             }
 
         } else { // loser is land unit
             // Autoequip the defender?
             Role autoRole = (attackerWon) ? loser.getAutomaticRole() : null;
-            if (autoRole != null) crs.add(CombatResult.AUTOEQUIP_UNIT);
+            if (autoRole != null) crs.add(CombatEffectType.AUTOEQUIP_UNIT);
 
             // Special handling for settlements
             boolean done = false;
@@ -740,21 +747,21 @@ public class SimpleCombatModel extends CombatModel {
                 // if they have no repair location.
                 if (autoRole == null && !loser.isDefensiveUnit()) {
                     List<Unit> ships = colony.getTile().getNavalUnits();
-                    final CombatResult shipResult = (ships.isEmpty()) ? null
+                    final CombatEffectType shipResult = (ships.isEmpty()) ? null
                         : (ships.get(0).getRepairLocation() == null)
-                        ? CombatResult.SINK_COLONY_SHIPS
-                        : CombatResult.DAMAGE_COLONY_SHIPS;
+                        ? CombatEffectType.SINK_COLONY_SHIPS
+                        : CombatEffectType.DAMAGE_COLONY_SHIPS;
 
-                    if (winnerPlayer.isEuropean()) {
+                    if (winnerPlayer.isEuropean() || winnerPlayer.isUndead()) {
                         if (loserMustDie) {
-                            crs.add(CombatResult.SLAUGHTER_UNIT);
+                            crs.add(CombatEffectType.SLAUGHTER_UNIT);
                         }
                         if (shipResult != null) crs.add(shipResult);
-                        crs.add(CombatResult.CAPTURE_COLONY);
+                        crs.add(CombatEffectType.CAPTURE_COLONY);
                         done = true;
 
                     } else if (!great && colony.canBePillaged(winner)) {
-                        crs.add(CombatResult.PILLAGE_COLONY);
+                        crs.add(CombatEffectType.PILLAGE_COLONY);
                         done = true;
 
                     } else if (colony.getUnitCount() > 1
@@ -763,9 +770,9 @@ public class SimpleCombatModel extends CombatModel {
                         done = false; // Treat as ordinary combat
 
                     } else {
-                        crs.add(CombatResult.SLAUGHTER_UNIT);
+                        crs.add(CombatEffectType.SLAUGHTER_UNIT);
                         if (shipResult != null) crs.add(shipResult);
-                        crs.add(CombatResult.DESTROY_COLONY);
+                        crs.add(CombatEffectType.DESTROY_COLONY);
                         done = true;
                     }
                 }
@@ -783,7 +790,7 @@ public class SimpleCombatModel extends CombatModel {
                     // Add death of loser before any convert captures,
                     // or the RNG might randomly decide to convert the
                     // unit that is then slaughtered.
-                    crs.add(CombatResult.SLAUGHTER_UNIT);
+                    crs.add(CombatEffectType.SLAUGHTER_UNIT);
                     lose++;
                     // For now, no usual unit combat actions can proceed,
                     // which means we can not expect to capture equipment
@@ -795,18 +802,18 @@ public class SimpleCombatModel extends CombatModel {
                         if (is.getUnitCount() + tile.getUnitCount() > lose
                             && is.hasMissionary(winnerPlayer)
                             && !combatIsAmphibious(winner, loser)) {
-                            crs.add(CombatResult.CAPTURE_CONVERT);
+                            crs.add(CombatEffectType.CAPTURE_CONVERT);
                             lose++;
                         }
                     } else if (r >= 1.0 - winner.getBurnProbability()) {
                         if (any(transform(loserPlayer.getIndianSettlements(),
                                     s -> s.hasMissionary(winnerPlayer)))) {
-                            crs.add(CombatResult.BURN_MISSIONS);
+                            crs.add(CombatEffectType.BURN_MISSIONS);
                         }
                     }
                 }
                 if (settlement.getUnitCount() + tile.getUnitCount() <= lose) {
-                    crs.add(CombatResult.DESTROY_SETTLEMENT);
+                    crs.add(CombatEffectType.DESTROY_SETTLEMENT);
                     done = true;
                 }
             }
@@ -818,30 +825,30 @@ public class SimpleCombatModel extends CombatModel {
                 // which may kill or demote the loser.
                 if (autoRole != null) {
                     crs.add((winner.canCaptureEquipment(autoRole) != null)
-                        ? CombatResult.CAPTURE_AUTOEQUIP
-                        : CombatResult.LOSE_AUTOEQUIP);
+                        ? CombatEffectType.CAPTURE_AUTOEQUIP
+                        : CombatEffectType.LOSE_AUTOEQUIP);
                     if (loserMustDie) {
-                        crs.add(CombatResult.SLAUGHTER_UNIT);
+                        crs.add(CombatEffectType.SLAUGHTER_UNIT);
                     } else if (loser.hasAbility(Ability.DEMOTE_ON_ALL_EQUIPMENT_LOST)) {
-                        crs.add(CombatResult.DEMOTE_UNIT);
+                        crs.add(CombatEffectType.DEMOTE_UNIT);
                     }
 
                 // Some losers are just doomed (e.g. seasonedScout), do not
                 // check for capture/demote/lose-equipment.
                 } else if (loserMustDie) {
-                    crs.add(CombatResult.SLAUGHTER_UNIT);
+                    crs.add(CombatEffectType.SLAUGHTER_UNIT);
 
                 // Then check if the user had other offensive
                 // role-equipment, that can be captured or lost, which
                 // may kill or demote the loser.
                 } else if (loserRole.isOffensive()) {
                     crs.add((winner.canCaptureEquipment(loserRole) != null)
-                        ? CombatResult.CAPTURE_EQUIP
-                        : CombatResult.LOSE_EQUIP);
+                        ? CombatEffectType.CAPTURE_EQUIP
+                        : CombatEffectType.LOSE_EQUIP);
                     if (loser.losingEquipmentKillsUnit()) {
-                        crs.add(CombatResult.SLAUGHTER_UNIT);
+                        crs.add(CombatEffectType.SLAUGHTER_UNIT);
                     } else if (loser.losingEquipmentDemotesUnit()) {
-                        crs.add(CombatResult.DEMOTE_UNIT);
+                        crs.add(CombatEffectType.DEMOTE_UNIT);
                     }
 
                 // But some can be captured.
@@ -849,15 +856,18 @@ public class SimpleCombatModel extends CombatModel {
                     && winner.hasAbility(Ability.CAPTURE_UNITS)
                     && !combatIsAmphibious(winner, loser)) {
                     // Demotion on capture is handled by capture routine.
-                    crs.add(CombatResult.CAPTURE_UNIT);
+                    crs.add(CombatEffectType.CAPTURE_UNIT);
 
                 // Or losing just causes a demotion.
                 } else if (loser.getUnitChange(UnitChangeType.DEMOTION) != null) {
-                    crs.add(CombatResult.DEMOTE_UNIT);
+                    crs.add(CombatEffectType.DEMOTE_UNIT);
 
+                } else if (winner.isUndead() && !loser.isUndead() && loser.getUnitChange(UnitChangeType.UNDEAD, null, winner.getOwner()) != null) {
+                    crs.add(CombatEffectType.CAPTURE_UNIT);
+                    
                 // But finally, the default is to kill them.
                 } else {
-                    crs.add(CombatResult.SLAUGHTER_UNIT);
+                    crs.add(CombatEffectType.SLAUGHTER_UNIT);
                 }
             }
         }
@@ -868,7 +878,7 @@ public class SimpleCombatModel extends CombatModel {
             && (winner.hasAbility(Ability.AUTOMATIC_PROMOTION)
                 || (great
                     && (100 * (r - Math.floor(r)) <= uc.probability)))) {
-            crs.add(CombatResult.PROMOTE_UNIT);
+            crs.add(CombatEffectType.PROMOTE_UNIT);
         }
     }
 

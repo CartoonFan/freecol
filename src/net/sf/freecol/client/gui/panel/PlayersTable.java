@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -50,6 +50,7 @@ import javax.swing.table.TableColumnModel;
 
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.control.PreGameController;
+import net.sf.freecol.client.gui.FontLibrary;
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.action.ColopediaAction.PanelType;
 import net.sf.freecol.client.gui.plaf.FreeColComboBoxRenderer;
@@ -107,9 +108,10 @@ public final class PlayersTable extends JTable {
         /**
          * {@inheritDoc}
          */
+        @SuppressWarnings("unchecked")
         @Override
         public Object getCellEditorValue() {
-            return ((JComboBox)getComponent()).getSelectedItem();
+            return ((JComboBox<EuropeanNationType>) getComponent()).getSelectedItem();
         }
     }
 
@@ -144,11 +146,12 @@ public final class PlayersTable extends JTable {
             final NationType nationType = ((Nation)table.getValueAt(row,
                     PlayersTable.NATION_COLUMN)).getType();
             JLabel label;
-            switch (advantages) {
+            switch (this.advantages) {
             case SELECTABLE:
-                return Utility.localizedLabel(Messages.nameKey((player == null)
+                label = Utility.localizedLabel(Messages.nameKey((player == null)
                         ? nationType
                         : player.getNationType()));
+                break;
             case FIXED:
                 label = Utility.localizedLabel(Messages.nameKey(nationType));
                 break;
@@ -344,10 +347,8 @@ public final class PlayersTable extends JTable {
          */
         @Override
         public Component getListCellRendererComponent(JList<? extends NationState> list,
-                                                      NationState value,
-                                                      int index,
-                                                      boolean isSelected,
-                                                      boolean cellHasFocus) {
+            NationState value, int index, boolean isSelected,
+            boolean cellHasFocus) {
             setText(Messages.getName(value));
             return this;
         }
@@ -668,7 +669,8 @@ public final class PlayersTable extends JTable {
 
         setModel(new PlayersTableModel(freeColClient.getPreGameController(),
                  nationOptions, myPlayer));
-        setRowHeight(47);
+        setRowHeight((int) (FontLibrary.getFontScaling() * 47));
+        getTableHeader().setReorderingAllowed(false);
 
         JButton nationButton = Utility.localizedButton("nation");
         nationButton.addActionListener((ActionEvent ae) -> {
@@ -707,8 +709,7 @@ public final class PlayersTable extends JTable {
         TableColumn advantagesColumn = tcm.getColumn(ADVANTAGE_COLUMN);
         switch (nationOptions.getNationalAdvantages()) {
         case SELECTABLE:
-            advantagesColumn.setCellEditor(new AdvantageCellEditor(spec
-                    .getEuropeanNationTypes()));
+            advantagesColumn.setCellEditor(new AdvantageCellEditor(spec.getVisibleEuropeanNationTypes()));
             break;
         case FIXED:
             break; // Do nothing

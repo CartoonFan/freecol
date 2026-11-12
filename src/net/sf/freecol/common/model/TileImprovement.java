@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,6 +19,8 @@
 
 package net.sf.freecol.common.model;
 
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -31,10 +33,8 @@ import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
-import static net.sf.freecol.common.model.Constants.*;
+import net.sf.freecol.common.model.Constants.IntegrityType;
 import net.sf.freecol.common.model.Map.Layer;
-import net.sf.freecol.common.option.GameOptions;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.common.util.LogBuilder;
 import net.sf.freecol.common.util.RandomChoice;
 
@@ -319,7 +319,7 @@ public class TileImprovement extends TileItem {
      * @return A production {@code Modifier}, or null if none applicable.
      */
     private Modifier getProductionModifier(GoodsType goodsType) {
-        return (isComplete()) ? type.getProductionModifier(goodsType) : null;
+        return (isComplete()) ? type.getProductionModifier(goodsType, magnitude) : null;
     }
 
     /**
@@ -545,9 +545,18 @@ public class TileImprovement extends TileItem {
         // any goods, and don't apply bonuses for incomplete
         // improvements (such as roads)
         if (potential > 0 && isComplete()) {
-            result += type.getBonus(goodsType);
+            result += getBonus(goodsType);
         }
         return result;
+    }
+    
+    private int getBonus(GoodsType goodsType) {
+        final Modifier result = getProductionModifier(goodsType);
+        if (result == null) {
+            return 0;
+        } else {
+            return (int) result.getValue();
+        }
     }
 
     /**
@@ -564,17 +573,12 @@ public class TileImprovement extends TileItem {
      * {@inheritDoc}
      */
     @Override
-    public Stream<Modifier> getProductionModifiers(GoodsType goodsType,
-                                                   UnitType unitType) {
-        final Specification spec = getSpecification();
-        Modifier m;
-        return (goodsType != null && isComplete()
-            && !(/* unattended */ !isNatural() && unitType == null
-                && !goodsType.isFoodType()
-                && spec.getBoolean(GameOptions.ONLY_NATURAL_IMPROVEMENTS))
-            && (m = getProductionModifier(goodsType)) != null)
-            ? Stream.of(m)
-            : Stream.<Modifier>empty();
+    public Stream<Modifier> getProductionModifiers(GoodsType goodsType, UnitType unitType) {
+        if (goodsType == null || !isComplete()) {
+            return Stream.<Modifier>empty();
+        }
+        
+        return type.getProductionModifiers(goodsType, unitType, tile.getType(), magnitude);
     }
 
     /**
@@ -786,7 +790,8 @@ public class TileImprovement extends TileItem {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder(64);
-        sb.append('[').append(getType().getId());
+        TileImprovementType ty = getType();
+        sb.append('[').append((ty == null) ? "NOTYPE" : ty.getId());
         if (turnsToComplete > 0) {
             sb.append(" (").append(turnsToComplete).append(" turns left)");
         }

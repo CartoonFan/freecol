@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -33,9 +33,7 @@ import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
 import net.sf.freecol.common.model.Colony.NoBuildReason;
 import static net.sf.freecol.common.model.Constants.*;
-import net.sf.freecol.common.model.UnitTypeChange;
 import static net.sf.freecol.common.util.CollectionUtils.*;
-
 
 /**
  * The various types of units in FreeCol.
@@ -45,15 +43,13 @@ public final class UnitType extends BuildableType implements Consumer {
     public static final String TAG = "unit-type";
 
     /** Comparator for defence ability. */
-    public static final Comparator<UnitType> defenceComparator
-            = Comparator.comparingDouble(UnitType::getDefence);
+    public static final Comparator<UnitType> defenceComparator = Comparator.comparingDouble(UnitType::getDefence);
 
     /** The default offence value. */
     public static final int DEFAULT_OFFENCE = 0;
 
     /** The default offence value. */
     public static final int DEFAULT_DEFENCE = 1;
-
 
     /**
      * The offence of this UnitType. Only Units with an offence value
@@ -106,6 +102,8 @@ public final class UnitType extends BuildableType implements Consumer {
 
     /** The maximum experience a unit of this type can accumulate. */
     private int maximumExperience = 0;
+    
+    private int attackRange = 0;
 
     /**
      * The maximum attrition this UnitType can accumulate without
@@ -125,11 +123,10 @@ public final class UnitType extends BuildableType implements Consumer {
     /** The goods consumed per turn when in a settlement. */
     private TypeCountMap<GoodsType> consumption = null;
 
-
     /**
      * Creates a new {@code UnitType} instance.
      *
-     * @param id The object identifier.
+     * @param id            The object identifier.
      * @param specification The {@code Specification} to refer to.
      */
     public UnitType(String id, Specification specification) {
@@ -137,7 +134,6 @@ public final class UnitType extends BuildableType implements Consumer {
 
         this.defaultRole = specification.getDefaultRole();
     }
-
 
     /**
      * Get a key for the working as this unit type message.
@@ -164,6 +160,15 @@ public final class UnitType extends BuildableType implements Consumer {
      */
     public boolean canCarryGoods() {
         return hasAbility(Ability.CARRY_GOODS);
+    }
+
+    /**
+     * Can this unit type carry treasure?
+     * 
+     * @return True if unit can carry treasure
+     */
+    public boolean canCarryTreasure() {
+        return hasAbility(Ability.CARRY_TREASURE);
     }
 
     /**
@@ -224,7 +229,7 @@ public final class UnitType extends BuildableType implements Consumer {
      * Is this a defensive unit type?
      *
      * Default defence is 1, same a for colonists, thus to be defensive, a
-     * colonist must have a military role.  Artillery of all sorts has
+     * colonist must have a military role. Artillery of all sorts has
      * higher defense so they are automatically defensive.
      *
      * @return True if base defensive ability is greater than the default.
@@ -249,6 +254,13 @@ public final class UnitType extends BuildableType implements Consumer {
      */
     public int getLineOfSight() {
         return lineOfSight;
+    }
+    
+    /**
+     * Sets `line of sight' (used by Introspector).
+     */
+    public void setLineOfSight(int lineOfSight) {
+        this.lineOfSight = lineOfSight;
     }
 
     /**
@@ -277,6 +289,13 @@ public final class UnitType extends BuildableType implements Consumer {
      */
     public int getHitPoints() {
         return hitPoints;
+    }
+    
+    /**
+     * Sets `hit points' (used by Introspector).
+     */
+    public void setHitPoints(int hitPoints) {
+        this.hitPoints = hitPoints;
     }
 
     /**
@@ -367,7 +386,7 @@ public final class UnitType extends BuildableType implements Consumer {
         this.mercenaryPrice = price;
     }
     // end @compat 0.11.6
-    
+
     /**
      * Get the base movement of this unit type.
      *
@@ -459,27 +478,31 @@ public final class UnitType extends BuildableType implements Consumer {
      *
      * @param teacherType The {@code UnitType} of the teacher.
      * @return The {@code UnitType} that this unit type can be educated
-     *     to by the teacher unit type, or null if education is not possible.
+     *         to by the teacher unit type, or null if education is not possible.
      */
     public UnitType getTeachingType(UnitType teacherType) {
         final Specification spec = getSpecification();
         final UnitType taught = teacherType.getSkillTaught();
         final int taughtLevel = taught.getSkill();
-        if (getSkill() >= taughtLevel) return null; // Fail fast
+        if (getSkill() >= taughtLevel)
+            return null; // Fail fast
 
         // Is there an education change that gets this unit type to the
-        // type taught by the teacher type?  If so, the taught type is valid
-        // and should be returned at once.  Accumulate other intermediate
+        // type taught by the teacher type? If so, the taught type is valid
+        // and should be returned at once. Accumulate other intermediate
         // changes that do not reach the taught type level.
         List<UnitType> todo = new ArrayList<>();
         for (UnitTypeChange uc : spec.getUnitChanges(UnitChangeType.EDUCATION, this)) {
-            if (uc.to == taught) return taught;
-            if (uc.to.getSkill() < taughtLevel) todo.add(uc.to);
+            if (uc.to == taught)
+                return taught;
+            if (uc.to.getSkill() < taughtLevel)
+                todo.add(uc.to);
         }
-        // Can the teacher teach any of the intermediate changes?  If so,
-        // that change is valid.  Otherwise, education is not possible.
+        // Can the teacher teach any of the intermediate changes? If so,
+        // that change is valid. Otherwise, education is not possible.
         for (UnitType ut : todo) {
-            if (ut.getTeachingType(teacherType) != null) return ut;
+            if (ut.getTeachingType(teacherType) != null)
+                return ut;
         }
         return null;
     }
@@ -573,7 +596,7 @@ public final class UnitType extends BuildableType implements Consumer {
     /**
      * Add consumption.
      *
-     * @param type The {@code GoodsType} to consume.
+     * @param type   The {@code GoodsType} to consume.
      * @param amount The amount of goods to consume.
      */
     private void addConsumption(GoodsType type, int amount) {
@@ -587,11 +610,11 @@ public final class UnitType extends BuildableType implements Consumer {
      * {@inheritDoc}
      */
     public NoBuildReason canBeBuiltInColony(Colony colony,
-                                            List<BuildableType> assumeBuilt) {
+            List<BuildableType> assumeBuilt) {
         // Non-person units need a BUILD ability, present or assumed.
         if (!hasAbility(Ability.PERSON)
-            && !colony.hasAbility(Ability.BUILD, this)
-            && none(assumeBuilt, bt -> bt.hasAbility(Ability.BUILD, this))) {
+                && !colony.hasAbility(Ability.BUILD, this)
+                && none(assumeBuilt, bt -> bt.hasAbility(Ability.BUILD, this))) {
             return Colony.NoBuildReason.MISSING_BUILD_ABILITY;
         }
         return Colony.NoBuildReason.NONE;
@@ -600,9 +623,11 @@ public final class UnitType extends BuildableType implements Consumer {
     @Override
     public int getMinimumIndex(Colony colony, JList<BuildableType> buildQueueList, int UNABLE_TO_BUILD) {
         ListModel<BuildableType> buildQueue = buildQueueList.getModel();
-        if (colony.canBuild(this)) return 0;
+        if (colony.canBuild(this))
+            return 0;
         for (int index = 0; index < buildQueue.getSize(); index++) {
-            if (buildQueue.getElementAt(index).hasAbility(Ability.BUILD, this)) return index + 1;
+            if (buildQueue.getElementAt(index).hasAbility(Ability.BUILD, this))
+                return index + 1;
         }
         return UNABLE_TO_BUILD;
     }
@@ -619,18 +644,19 @@ public final class UnitType extends BuildableType implements Consumer {
 
         // does not depend on anything, nothing depends on it
         // can be built at any time
-        if (canBuild) return buildQueueLastPos;
+        if (canBuild)
+            return buildQueueLastPos;
         // check for building in queue that allows builting this unit
         for (int index = 0; index < buildQueue.getSize(); index++) {
             BuildableType toBuild = buildQueue.getElementAt(index);
-            if (toBuild == this) continue;
+            if (toBuild == this)
+                continue;
             if (toBuild.hasAbility(Ability.BUILD, this)) {
                 return buildQueueLastPos;
             }
         }
         return UNABLE_TO_BUILD;
     }
-
 
     // Interface Consumer
 
@@ -641,8 +667,8 @@ public final class UnitType extends BuildableType implements Consumer {
     public List<AbstractGoods> getConsumedGoods() {
         return (consumption == null) ? Collections.<AbstractGoods>emptyList()
                 : transform(consumption.keySet(),
-                gt -> consumption.getCount(gt) != 0,
-                gt -> new AbstractGoods(gt, consumption.getCount(gt)));
+                        gt -> consumption.getCount(gt) != 0,
+                        gt -> new AbstractGoods(gt, consumption.getCount(gt)));
     }
 
     /**
@@ -651,6 +677,18 @@ public final class UnitType extends BuildableType implements Consumer {
     @Override
     public int getPriority() {
         return priority;
+    }
+    
+    public int getAttackRange() {
+        return attackRange;
+    }
+    
+    
+    /**
+     * Sets attack range (used by Introspector).
+     */
+    public void setAttackRange(int attackRange) {
+        this.attackRange = attackRange;
     }
 
     /**
@@ -661,7 +699,6 @@ public final class UnitType extends BuildableType implements Consumer {
         return getModifiers(id);
     }
 
-
     // Override FreeColObject
 
     /**
@@ -670,7 +707,8 @@ public final class UnitType extends BuildableType implements Consumer {
     @Override
     public <T extends FreeColObject> boolean copyIn(T other) {
         UnitType o = copyInCast(other, UnitType.class);
-        if (o == null || !super.copyIn(o)) return false;
+        if (o == null || !super.copyIn(o))
+            return false;
         this.baseOffence = o.getBaseOffence();
         this.baseDefence = o.getBaseDefence();
         this.space = o.getSpace();
@@ -693,9 +731,9 @@ public final class UnitType extends BuildableType implements Consumer {
         return true;
     }
 
-
     // Serialization
-
+    
+    private static final String ATTACK_RANGE_TAG = "attack-range";
     private static final String CONSUMES_TAG = "consumes";
     private static final String DEFAULT_ROLE_TAG = "default-role";
     private static final String DEFAULT_UNIT_TAG = "default-unit";
@@ -716,7 +754,6 @@ public final class UnitType extends BuildableType implements Consumer {
     private static final String SKILL_TAUGHT_TAG = "skill-taught";
     private static final String SPACE_TAG = "space";
     private static final String SPACE_TAKEN_TAG = "space-taken";
-    private static final String UNIT_TAG = "unit";
     // @compat 0.11.0
     private static final String OLD_DEFAULT_EQUIPMENT_TAG = "default-equipment";
     // end @compat 0.11.0
@@ -760,6 +797,8 @@ public final class UnitType extends BuildableType implements Consumer {
         xw.writeAttribute(SPACE_TAKEN_TAG, spaceTaken);
 
         xw.writeAttribute(HIT_POINTS_TAG, hitPoints);
+        
+        xw.writeAttribute(ATTACK_RANGE_TAG, attackRange);
 
         xw.writeAttribute(MAXIMUM_EXPERIENCE_TAG, maximumExperience);
 
@@ -829,7 +868,7 @@ public final class UnitType extends BuildableType implements Consumer {
 
         final Specification spec = getSpecification();
 
-        UnitType parent = xr.getType(spec, EXTENDS_TAG, UnitType.class, this);
+        UnitType parent = xr.getAlreadyInitializedType(spec, EXTENDS_TAG, UnitType.class, this);
 
         this.baseOffence = xr.getAttribute(OFFENCE_TAG, parent.baseOffence);
 
@@ -866,6 +905,8 @@ public final class UnitType extends BuildableType implements Consumer {
         } else
             // end @compat 0.11.3
             hitPoints = xr.getAttribute(HIT_POINTS_TAG, parent.hitPoints);
+        
+        attackRange = xr.getAttribute(ATTACK_RANGE_TAG, parent.attackRange);
 
         // @compat 0.11.3
         if (xr.hasAttribute(OLD_SPACE_TAKEN_TAG)) {
@@ -916,8 +957,8 @@ public final class UnitType extends BuildableType implements Consumer {
         price = xr.getAttribute(PRICE_TAG, parent.price);
 
         mercenaryPrice = xr.getAttribute(MERCENARY_PRICE_TAG,
-                                         parent.mercenaryPrice);
-        
+                parent.mercenaryPrice);
+
         expertProduction = xr.getType(spec, EXPERT_PRODUCTION_TAG,
                 GoodsType.class, parent.expertProduction);
 
@@ -927,6 +968,15 @@ public final class UnitType extends BuildableType implements Consumer {
             }
         }
     }
+    
+    /**
+    * {@inheritDoc}
+    */
+    @Override
+    protected void clearContainers(FreeColXMLReader xr) throws XMLStreamException {
+        super.clearContainers(xr);
+        consumption = null;
+    }
 
     /**
      * {@inheritDoc}
@@ -934,19 +984,15 @@ public final class UnitType extends BuildableType implements Consumer {
     @Override
     protected void readChildren(FreeColXMLReader xr) throws XMLStreamException {
         final Specification spec = getSpecification();
-
-        // Clear containers.
-        if (xr.shouldClearContainers()) {
-            consumption = null;
-        }
         defaultRole = spec.getDefaultRole();
 
-        UnitType parent = xr.getType(spec, EXTENDS_TAG, UnitType.class, this);
+        UnitType parent = xr.getAlreadyInitializedType(spec, EXTENDS_TAG, UnitType.class, this);
         if (parent != this) {
             defaultRole = parent.defaultRole;
 
             if (parent.consumption != null) {
-                if (consumption == null) consumption = new TypeCountMap<>();
+                if (consumption == null)
+                    consumption = new TypeCountMap<>();
                 consumption.putAll(parent.consumption);
             }
 
@@ -969,24 +1015,24 @@ public final class UnitType extends BuildableType implements Consumer {
 
         if (CONSUMES_TAG.equals(tag)) {
             addConsumption(xr.getType(spec, ID_ATTRIBUTE_TAG,
-                    GoodsType.class, (GoodsType)null),
+                    GoodsType.class, (GoodsType) null),
                     xr.getAttribute(VALUE_TAG, UNDEFINED));
             xr.closeTag(CONSUMES_TAG);
 
-        // @compat 0.11.0
+            // @compat 0.11.0
         } else if (OLD_DEFAULT_EQUIPMENT_TAG.equals(tag)) {
             xr.swallowTag(OLD_DEFAULT_EQUIPMENT_TAG);
-        // end @compat 0.11.0
+            // end @compat 0.11.0
 
         } else if (DEFAULT_ROLE_TAG.equals(tag)) {
             defaultRole = xr.getType(spec, ID_ATTRIBUTE_TAG,
                     Role.class, spec.getDefaultRole());
             xr.closeTag(DEFAULT_ROLE_TAG);
 
-        // @compat 0.11.6
+            // @compat 0.11.6
         } else if (DOWNGRADE_TAG.equals(tag) || UPGRADE_TAG.equals(tag)) {
             xr.closeTag(tag, Scope.TAG);
-        // end @compat 0.11.6
+            // end @compat 0.11.6
 
         } else {
             super.readChild(xr);
@@ -996,8 +1042,9 @@ public final class UnitType extends BuildableType implements Consumer {
     /**
      * {@inheritDoc}
      */
-    public String getXMLTagName() { return TAG; }
-
+    public String getXMLTagName() {
+        return TAG;
+    }
 
     // Override Object
 

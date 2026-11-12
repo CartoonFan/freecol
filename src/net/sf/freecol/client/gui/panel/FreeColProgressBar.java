@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -32,7 +32,6 @@ import javax.swing.JPanel;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.FontLibrary;
 import net.sf.freecol.client.gui.ImageLibrary;
-import net.sf.freecol.client.gui.Size;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.GoodsType;
 import net.sf.freecol.common.model.StringTemplate;
@@ -58,12 +57,6 @@ public class FreeColProgressBar extends JPanel {
 
     /** The expected increase next turn. */
     private int step = 0;
-
-    /**
-     * The type of goods this progress bar is for.  The default value
-     * of null indicates no goods type.
-     */
-    private final GoodsType goodsType;
 
     /** An image for the goods type. */
     private final Image image;
@@ -109,21 +102,31 @@ public class FreeColProgressBar extends JPanel {
     public FreeColProgressBar(FreeColClient freeColClient,
                               GoodsType goodsType, int min, int max,
                               int value, int step) {
+        
+        final ImageLibrary lib = freeColClient.getGUI().getFixedImageLibrary();
+        final int iconHeight = (int) (ImageLibrary.ICON_SIZE.height * lib.getScaleFactor() / 2);
+        
         this.min = min;
         this.max = max;
         this.value = value;
         this.step = step;
-        this.goodsType = goodsType;
         this.image = (goodsType == null) ? null
-            : (freeColClient.getGUI().getFixedImageLibrary()
-                .getGoodsTypeImage(goodsType,
-                    new Dimension(-1, ImageLibrary.ICON_SIZE.height / 2)));
-        this.font = FontLibrary.getUnscaledFont("simple-plain-tiny");
+            : (lib.getGoodsTypeImage(goodsType,
+                    new Dimension(-1, iconHeight)));
+        
+        Font font = FontLibrary.getScaledFont("simple-plain-tiny");
+        final int maxFontSize = lib.scaleInt(17);
+        if (font.getSize() > maxFontSize) {
+            font = font.deriveFont((float) maxFontSize);
+        }
+        this.font = font;
 
+        final int padding = (int) (5 * lib.getScaleFactor());
+        final int width = (int) (200 * lib.getScaleFactor());
+        
         setBorder(Utility.PROGRESS_BORDER);
-        setPreferredSize(new Dimension(200, 20));
+        setPreferredSize(new Dimension(width, iconHeight + padding));
     }
-
 
     /**
      * Update the data of the progress bar.
@@ -225,18 +228,23 @@ public class FreeColProgressBar extends JPanel {
         int restWidth = getWidth() - stringWidth;
 
         int iconWidth = 0;
+        int iconHeight = 0;
         if (this.image != null) {
             iconWidth = this.image.getWidth(this);
+            iconHeight = this.image.getHeight(this);
+            restWidth -= iconWidth * 2;
+            
             g2d.drawImage(this.image, restWidth / 2,
-                (getHeight() - ImageLibrary.ICON_SIZE.height / 2) / 2,
+                (getHeight() - iconHeight) / 2,
                 null);
         }
 
         g2d.setColor(Color.BLACK);
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                              RenderingHints.VALUE_ANTIALIAS_ON);
+        
         g2d.drawString(progress.toString(),
-                       (restWidth - iconWidth) / 2 + (iconWidth + 8),
+                       (restWidth - iconWidth) / 2 + iconWidth * 2,
                        getHeight() / 2 + stringHeight / 4);
         g2d.dispose();
     }

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,15 +19,36 @@
 
 package net.sf.freecol.common.model;
 
-import java.awt.Color;
+import static net.sf.freecol.common.model.Constants.INFINITY;
+import static net.sf.freecol.common.util.CollectionUtils.alwaysTrue;
+import static net.sf.freecol.common.util.CollectionUtils.any;
+import static net.sf.freecol.common.util.CollectionUtils.count;
+import static net.sf.freecol.common.util.CollectionUtils.find;
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.flatten;
+import static net.sf.freecol.common.util.CollectionUtils.forEachMapEntry;
+import static net.sf.freecol.common.util.CollectionUtils.isNotNull;
+import static net.sf.freecol.common.util.CollectionUtils.mapEntriesByKey;
+import static net.sf.freecol.common.util.CollectionUtils.matchKey;
+import static net.sf.freecol.common.util.CollectionUtils.matchKeyEquals;
+import static net.sf.freecol.common.util.CollectionUtils.max;
+import static net.sf.freecol.common.util.CollectionUtils.maximize;
+import static net.sf.freecol.common.util.CollectionUtils.minimize;
+import static net.sf.freecol.common.util.CollectionUtils.removeInPlace;
+import static net.sf.freecol.common.util.CollectionUtils.sort;
+import static net.sf.freecol.common.util.CollectionUtils.sum;
+import static net.sf.freecol.common.util.CollectionUtils.sumDouble;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+import static net.sf.freecol.common.util.StringUtils.getEnumKey;
+import static net.sf.freecol.common.util.StringUtils.lastPart;
 
+import java.awt.Color;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Random;
@@ -45,14 +66,12 @@ import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.i18n.NameCache;
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
-import static net.sf.freecol.common.model.Constants.*;
+import net.sf.freecol.common.model.Constants.IntegrityType;
 import net.sf.freecol.common.networking.ChangeSet;
 import net.sf.freecol.common.networking.Connection;
 import net.sf.freecol.common.option.GameOptions;
 import net.sf.freecol.common.option.OptionGroup;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.common.util.LogBuilder;
-import static net.sf.freecol.common.util.StringUtils.*;
 import net.sf.freecol.common.util.Utils;
 
 
@@ -308,7 +327,7 @@ public class Player extends FreeColGameObject implements Nameable {
 
     /** An iterator for the player units that are still active this turn. */
     private final UnitIterator nextActiveUnitIterator
-        = new UnitIterator(this, Unit::couldMove);
+        = new UnitIterator(this, Unit::isCandidateForNextActiveUnit);
 
     /** An iterator for the player units that have a destination to go to. */
     private final UnitIterator nextGoingToUnitIterator
@@ -496,7 +515,7 @@ public class Player extends FreeColGameObject implements Nameable {
     public StringTemplate getCountryLabel() {
         return (playerType == PlayerType.REBEL
                 || playerType == PlayerType.INDEPENDENT)
-            ? StringTemplate.name(independentNationName)
+            ? StringTemplate.name(newLandName)
             : StringTemplate.template("countryName")
                 .addStringTemplate("%nation%", getNationLabel());
     }
@@ -1390,7 +1409,7 @@ public class Player extends FreeColGameObject implements Nameable {
     public int getSoL() {
         final List<Colony> colonies = getColonyList();
         return (colonies.isEmpty()) ? 0
-            : sum(colonies, Colony::getSoL) / colonies.size();
+            : sum(colonies, Colony::getSonsOfLiberty) / colonies.size();
     }
 
     /**
@@ -3653,7 +3672,6 @@ public class Player extends FreeColGameObject implements Nameable {
         // Applied once
         final double MOD_HAS_RESOURCE           = 0.75;
         final double MOD_FOOD_LOW               = 0.75;
-        final double MOD_INITIAL_FOOD           = 2.0;
         final double MOD_STEAL                  = 0.5;
         final double MOD_INLAND                 = 0.5;
 
@@ -3665,12 +3683,19 @@ public class Player extends FreeColGameObject implements Nameable {
         final double MOD_HIGH_PRODUCTION        = 1.2;
         final double MOD_GOOD_PRODUCTION        = 1.1;
 
-        // Applied per occurrence (own colony only one-time), range-dependent.
-        final int DISTANCE_MAX = 5;
-        final double[] MOD_OWN_COLONY     = {0.0, 0.0, 0.5, 1.50, 1.25};
-        final double[] MOD_ENEMY_COLONY   = {0.0, 0.0, 0.4, 0.50, 0.70};
-        final double[] MOD_NEUTRAL_COLONY = {0.0, 0.0, 0.7, 0.80, 1.00};
-        final double[] MOD_ENEMY_UNIT     = {0.4, 0.5, 0.6, 0.75, 0.90};
+        /* 
+         * Applied per occurrence (own colony only one-time), range-dependent.
+         * 
+         * Note that we should heavily prioritize having colonies placed at
+         * distance 3 between each other. This is the closest distance you
+         * can have without getting an overlap.
+         */
+        final double[] MOD_OWN_COLONY        = {0.0, 0.0, 0.0, 2.00, 0.75, 0.9, 1.50, 1, 1, 1.25};
+        final double[] MOD_ENEMY_COLONY      = {0.0, 0.0, 0.0, 0.70, 0.50, 0.9, 1.25, 1, 1, 1.10};
+        final double[] MOD_NEUTRAL_COLONY    = {0.0, 0.0, 0.0, 1.00, 0.80, 0.9, 1.25, 1, 1, 1.10};
+        final double[] MOD_INDIAN_SETTLEMENT = {0.0, 0.0, 0.9, 1.00, 1.00, 1.0, 1.00, 1, 1, 1.00};
+        final double[] MOD_ENEMY_UNIT        = {0.4, 0.5, 0.6, 0.75, 0.90, 0.0, 0.00, 0, 0, 0.00};
+        final int distanceMax = MOD_OWN_COLONY.length;
 
         // Goods production in excess of this on a tile counts as good/high
         final int GOOD_PRODUCTION = 4;
@@ -3686,6 +3711,7 @@ public class Player extends FreeColGameObject implements Nameable {
                                         alwaysTrue(), v -> 1.0);
 
         // Penalize certain problems more in the initial colonies.
+        // development starts at 1/LSC and rises to 1.0
         double development = Math.min(LOW_SETTLEMENT_NUMBER,
                                       getSettlementCount())
                 / (double)LOW_SETTLEMENT_NUMBER;
@@ -3823,7 +3849,9 @@ public class Player extends FreeColGameObject implements Nameable {
                 GoodsType type = ag.getType();
                 if (type.isFoodType()) type = foodType;
                 int amount = ag.getAmount();
-                if (!t.isLand()) amount *= development;
+                if (!t.isLand()) { // Penalize water early
+                    amount = (int)(amount * development);
+                }
                 values.set(ColonyValueCategory.A_PROD.ordinal(),
                            values.get(ColonyValueCategory.A_PROD.ordinal())
                            + amount * type.getProductionWeight() * pf);
@@ -3837,7 +3865,7 @@ public class Player extends FreeColGameObject implements Nameable {
                 }
             }
 
-            for (Unit u : transform(t.getUnits(),
+            for (@SuppressWarnings("unused") Unit u : transform(t.getUnits(),
                                     u -> !owns(u) && u.isOffensiveUnit()
                                         && atWarWith(u.getOwner()))) {
                 values.set(ColonyValueCategory.A_ADJACENT.ordinal(),
@@ -3864,22 +3892,19 @@ public class Player extends FreeColGameObject implements Nameable {
         }
 
         // Apply modifiers for other settlements and units at distance.
-        final Predicate<Unit> hostileUnitPred
-            = u -> !this.owns(u) && u.isOffensiveUnit()
-                && this.atWarWith(u.getOwner());
-        boolean supportingColony = false;
-        for (int radius = 2; radius < DISTANCE_MAX; radius++) {
+        for (int radius = 1; radius < distanceMax; radius++) {
             for (Tile t : getGame().getMap().getCircleTiles(tile, false,
                                                             radius)) {
                 Settlement settlement = t.getSettlement();
                 if (settlement != null) {
-                    if (owns(settlement)) {
-                        if (!supportingColony) {
-                            supportingColony = true;
-                            values.set(ColonyValueCategory.A_NEARBY.ordinal(),
+                    if (settlement instanceof IndianSettlement) {
+                        values.set(ColonyValueCategory.A_NEARBY.ordinal(),
                                 values.get(ColonyValueCategory.A_NEARBY.ordinal())
-                                * MOD_OWN_COLONY[radius]);
-                        }
+                                * MOD_INDIAN_SETTLEMENT[radius]);
+                    } else if (owns(settlement)) {
+                        values.set(ColonyValueCategory.A_NEARBY.ordinal(),
+                            values.get(ColonyValueCategory.A_NEARBY.ordinal())
+                            * MOD_OWN_COLONY[radius]);
                     } else if (atWarWith(settlement.getOwner())) {
                         values.set(ColonyValueCategory.A_NEARBY.ordinal(),
                             values.get(ColonyValueCategory.A_NEARBY.ordinal())
@@ -3891,10 +3916,17 @@ public class Player extends FreeColGameObject implements Nameable {
                     }
                 }
 
+                /* 
+                 * Commenting out for now, as this actually rewards building colonies
+                 * when there are many hostile units nearby. We should probably
+                 * just remove hostile units from the colony value calculation and
+                 * rather handle it in BuildColonyMission.
+                 * 
                 int hostiles = count(t.getUnits(), hostileUnitPred);
                 values.set(ColonyValueCategory.A_NEARBY.ordinal(),
                     values.get(ColonyValueCategory.A_NEARBY.ordinal())
                         + hostiles * MOD_ENEMY_UNIT[radius]);
+                 */
             }
         }
 

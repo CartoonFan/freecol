@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -258,7 +258,7 @@ public class EuropeanNationType extends NationType {
 
         final Specification spec = getSpecification();
 
-        EuropeanNationType parent = xr.getType(spec, EXTENDS_TAG,
+        EuropeanNationType parent = xr.getAlreadyInitializedType(spec, EXTENDS_TAG,
                                                EuropeanNationType.class, this);
 
         ref = xr.getAttribute(REF_TAG, parent.ref);
@@ -268,15 +268,18 @@ public class EuropeanNationType extends NationType {
      * {@inheritDoc}
      */
     @Override
+    protected void clearContainers(FreeColXMLReader xr) throws XMLStreamException {
+        super.clearContainers(xr);
+        startingUnitMap.clear();
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     protected void readChildren(FreeColXMLReader xr) throws XMLStreamException {
-        // Clear containers.
-        if (xr.shouldClearContainers()) {
-            startingUnitMap.clear();
-        }
-
         final Specification spec = getSpecification();
-        EuropeanNationType parent = xr.getType(spec, EXTENDS_TAG,
-                                               EuropeanNationType.class, this);
+        EuropeanNationType parent = xr.getAlreadyInitializedType(spec, EXTENDS_TAG, EuropeanNationType.class, this);
         if (parent != this) {
             forEachMapEntry(parent.startingUnitMap, e ->
                 startingUnitMap.put(e.getKey(), new HashMap<>(e.getValue())));

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,7 +19,6 @@
 
 package net.sf.freecol.common.logging;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.logging.Handler;
@@ -30,7 +29,6 @@ import net.sf.freecol.FreeCol;
 import net.sf.freecol.common.FreeColException;
 import net.sf.freecol.common.debug.FreeColDebugger;
 import net.sf.freecol.common.util.OSUtils;
-import net.sf.freecol.common.util.Utils;
 
 
 /**

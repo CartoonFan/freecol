@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -182,7 +182,8 @@ public class OggVorbisDecoderFactory {
                     bufCount = ret;
                     offset = 0;
                 }
-                long rd = (bufCount < n) ? bufCount : n;
+                int rd = (bufCount < n) ? bufCount
+                    : (int)n; // Safe as <= bufCount
                 bufCount -= rd;
                 offset += rd;
                 wr += rd;
@@ -312,7 +313,6 @@ public class OggVorbisDecoderFactory {
          */
         public int getBody(InputStream is) {
             String err;
-            int packet = 3;
 
             pcmi = new int[orbisInfo.channels];
             pcmData = new float[1][][];
@@ -328,7 +328,6 @@ public class OggVorbisDecoderFactory {
                         orbisDspState.synthesis_read(n);
                         return 2 * orbisInfo.channels * decodePacket(n);
                     }
-                    packet++;
                     break;
                 case 0:
                     if ((err = getPage()) != null) {
@@ -413,10 +412,6 @@ public class OggVorbisDecoderFactory {
         @Override
         public int read(byte[] buf) throws IOException {
             return os.read(buf);
-        }
-
-        public int read(byte[] buf, int n) throws IOException {
-            return os.read(buf, n);
         }
 
         @Override

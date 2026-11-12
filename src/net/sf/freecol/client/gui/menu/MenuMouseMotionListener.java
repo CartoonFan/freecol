@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -22,9 +22,7 @@ package net.sf.freecol.client.gui.menu;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionListener;
 
-import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.client.gui.AbstractCanvasListener;
-import net.sf.freecol.client.gui.Canvas;
+import net.sf.freecol.client.gui.Scrolling;
 
 
 /**
@@ -39,16 +37,17 @@ import net.sf.freecol.client.gui.Canvas;
  * compare the Y coordinate to the size of the entire canvas (which
  * should always be bigger).
  */
-public class MenuMouseMotionListener extends AbstractCanvasListener
-    implements MouseMotionListener {
+public class MenuMouseMotionListener implements MouseMotionListener {
 
+    private final Scrolling scrolling;
+    
     /**
      * Trivial constructor.
      *
      * @param freeColClient The enclosing {@code FreeColClient}.
      */
-    public MenuMouseMotionListener(FreeColClient freeColClient) {
-        super(freeColClient);
+    public MenuMouseMotionListener(Scrolling scrolling) {
+        this.scrolling = scrolling;
     }
 
 
@@ -65,6 +64,10 @@ public class MenuMouseMotionListener extends AbstractCanvasListener
      */
     @Override
     public void mouseMoved(MouseEvent e) {
-        performAutoScrollIfActive(e, false);
+        if (e.getY() <= 2) {
+            scrolling.performAutoScrollIfActive(e);
+        } else {
+            scrolling.stopScrollIfScrollIsActive();
+        }
     }
 }

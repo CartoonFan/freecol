@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,18 +19,31 @@
 
 package net.sf.freecol.client.gui.panel;
 
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.Insets;
+import java.awt.RenderingHints;
+import java.awt.Shape;
+import java.awt.Stroke;
+import java.awt.font.TextLayout;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBoxMenuItem;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
@@ -50,7 +63,8 @@ import javax.swing.text.StyleContext;
 
 import net.sf.freecol.client.gui.FontLibrary;
 import net.sf.freecol.client.gui.ImageLibrary;
-import net.sf.freecol.client.gui.Size;
+import net.sf.freecol.client.gui.panel.FreeColButton.ButtonStyle;
+import net.sf.freecol.client.gui.plaf.FreeColComboBoxRenderer;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.FreeColGameObject;
 import net.sf.freecol.common.model.FreeColSpecObjectType;
@@ -239,7 +253,7 @@ public final class Utility {
      * @return a {@code JButton} value
      */
     public static JButton getLinkButton(String text, Icon icon, String action) {
-        JButton button = new JButton(text, icon);
+        JButton button = new FreeColButton(text, icon).withButtonStyle(ButtonStyle.TRANSPARENT);
         button.setMargin(EMPTY_MARGIN);
         button.setOpaque(false);
         button.setForeground(getLinkColor());
@@ -267,14 +281,16 @@ public final class Utility {
     public static JButton getMessageButton(String key, String val,
         Player player, FreeColGameObject source) {
         FreeColGameObject link = null;
-        if ("%colony%".equals(key) || key.endsWith("Colony%")) {
+        if ("%colony%".equals(key) || key.endsWith("Colony%")
+            || "%settlement%".equals(key)) {
             Settlement settlement = player.getGame().getSettlementByName(val);
             link = (settlement == null) ? null
                 : (player.owns(settlement)) ? settlement
                 : settlement.getTile();
         } else if ("%europe%".equals(key) || "%market%".equals(key)) {
             link = player.getEurope();
-        } else if ("%location%".equals(key) || key.endsWith("Location%")) {
+        } else if ("%location%".equals(key)
+            || "%repairLocation%".equals(key)) {
             if (source instanceof Location) {
                 link = source.getLinkTarget(player);
             }
@@ -394,6 +410,31 @@ public final class Utility {
                 blankBorder(top, left, bottom, right),
                 component.getBorder()));
     }
+    
+    /**
+     * Returns a combo box for selecting a possible server address.
+     * @return The combo box.
+     */
+    public static JComboBox<InetAddress> createServerInetAddressBox() {
+        final List<InetAddress> serverAddresses = getPossibleServerAddresses();
+        final JComboBox<InetAddress> serverAddressBox = new JComboBox<>(serverAddresses.toArray(new InetAddress[0]));
+        serverAddressBox.setRenderer(new FreeColComboBoxRenderer<>());
+        return serverAddressBox;
+    }
+
+    private static List<InetAddress> getPossibleServerAddresses() {
+        List<InetAddress> serverAddresses;
+        try {
+            serverAddresses = NetworkInterface.networkInterfaces()
+                    .flatMap(NetworkInterface::inetAddresses)
+                    .filter(ia -> ia instanceof Inet4Address)
+                    .collect(Collectors.toList());
+        } catch (SocketException e) {
+            serverAddresses = List.of(Inet4Address.getLoopbackAddress());
+        }
+        return serverAddresses;
+    }
+
 
     /**
      * Localize the a titled border.
@@ -459,8 +500,8 @@ public final class Utility {
      * @param key The key to use.
      * @return The {@code JButton}.
      */
-    public static JButton localizedButton(String key) {
-        return new JButton(Messages.message(key));
+    public static FreeColButton localizedButton(String key) {
+        return new FreeColButton(Messages.message(key));
     }
 
     /**
@@ -511,7 +552,7 @@ public final class Utility {
                                               String fontSpec) {
         String text = Messages.message(key);
         JLabel header = new JLabel(text, alignment);
-        header.setFont(FontLibrary.getUnscaledFont(fontSpec, text));
+        header.setFont(FontLibrary.getScaledFont(fontSpec, text));
         header.setOpaque(false);
         return header;
     }
@@ -521,7 +562,7 @@ public final class Utility {
                                               String fontSpec) {
         String text = Messages.message(template);
         JLabel header = new JLabel(text, alignment);
-        header.setFont(FontLibrary.getUnscaledFont(fontSpec, text));
+        header.setFont(FontLibrary.getScaledFont(fontSpec, text));
         header.setOpaque(false);
         return header;
     }
@@ -734,4 +775,30 @@ public final class Utility {
         comp.setToolTipText(Messages.message(template));
     }
 
+    public static void drawGoldenText(final String text, Graphics2D g2d, final Font font, final int x, final int y) {
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        
+        final Shape textShape = new TextLayout(text, font, g2d.getFontRenderContext()).getOutline(null);
+        final float strokeScaling = FontLibrary.getFontScaling() / 2;
+        final Stroke oldStroke = g2d.getStroke();        
+        g2d.translate(x, y);
+        
+        g2d.setStroke(new BasicStroke(strokeScaling * 4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.setColor(Color.BLACK);
+        g2d.draw(textShape);
+        
+        g2d.setStroke(new BasicStroke(strokeScaling * 2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.setColor(new Color(162, 136, 105));
+        g2d.draw(textShape);
+        
+        g2d.setStroke(new BasicStroke(strokeScaling * 1f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.setColor(new Color(64, 31, 6));
+        g2d.draw(textShape);
+
+        g2d.setStroke(oldStroke);
+        g2d.setColor(new Color(222, 194, 161));
+        g2d.fill(textShape);
+        
+        g2d.translate(-x, -y);
+    }
 }

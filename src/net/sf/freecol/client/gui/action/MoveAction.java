@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -47,6 +47,8 @@ public class MoveAction extends MapboardAction {
         super(freeColClient, id + direction);
 
         this.direction = direction;
+        
+        setCanvasKeyBinding(true);
     }
 
     /**
@@ -61,6 +63,11 @@ public class MoveAction extends MapboardAction {
         super(freeColClient, id + direction + ".secondary");
 
         this.direction = direction;
+
+        // Canvas only installs input-map bindings for actions with
+        // isCanvasKeyBinding(); without this the secondary accelerators
+        // (the arrow keys) are never bound and do nothing.
+        setCanvasKeyBinding(true);
     }
 
 

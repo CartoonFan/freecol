@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -67,6 +67,14 @@ public interface Option<T> extends Cloneable, ObjectWithId {
      * @param value The new value of this {@code Option}.
      */
     public void setValue(T value);
+    
+    /**
+     * Gets the key of an {@code BooleanOption} that must be true for this
+     * option to be enabled.
+     * 
+     * @return The key of the {@code BooleanOption} that needs to be enabled.
+     */
+    public String getEnabledBy();
 
     /**
      * Initializes this object from an XML-representation of this object.

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -23,13 +23,13 @@ import java.awt.Dimension;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
+import java.net.InetAddress;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.swing.SwingUtilities;
 import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.FreeCol;
@@ -40,18 +40,16 @@ import net.sf.freecol.client.control.MapEditorController;
 import net.sf.freecol.client.control.PreGameController;
 import net.sf.freecol.client.control.SoundController;
 import net.sf.freecol.client.gui.GUI;
+import net.sf.freecol.client.gui.SplashScreen;
 import net.sf.freecol.client.gui.SwingGUI;
 import net.sf.freecol.client.gui.action.ActionManager;
 import net.sf.freecol.client.networking.UserServerAPI;
-import net.sf.freecol.common.FreeColSeed;
 import net.sf.freecol.common.debug.FreeColDebugger;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.io.FreeColDataFile;
 import net.sf.freecol.common.io.FreeColDirectories;
-import net.sf.freecol.common.io.FreeColModFile;
 import net.sf.freecol.common.io.FreeColSavegameFile;
 import net.sf.freecol.common.io.FreeColTcFile;
-import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.Game.LogoutReason;
 import net.sf.freecol.common.model.Player;
@@ -60,10 +58,8 @@ import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.model.Unit;
 import net.sf.freecol.common.networking.MessageHandler;
 import net.sf.freecol.common.networking.ServerAPI;
+import net.sf.freecol.common.resources.ImageResource;
 import net.sf.freecol.common.resources.ResourceManager;
-import net.sf.freecol.common.resources.ResourceMapping;
-import static net.sf.freecol.common.util.CollectionUtils.*;
-import net.sf.freecol.common.util.Utils;
 import net.sf.freecol.server.FreeColServer;
 import net.sf.freecol.server.FreeColServer.ServerState;
 
@@ -76,6 +72,9 @@ public final class FreeColClient {
 
     private static final Logger logger = Logger.getLogger(FreeColClient.class.getName());
 
+    @SuppressWarnings("unused")
+    private byte[] memoryToBeFreedOnOutOfMemory = new byte[10 * 1024 * 1024];
+    
     private final ConnectController connectController;
 
     private final PreGameController preGameController;
@@ -95,7 +94,7 @@ public final class FreeColClient {
     private final ServerAPI serverAPI;
 
     /** The GUI encapsulation. */
-    private final GUI gui;
+    private GUI gui;
 
     /** The encapsulation of the actions. */
     private final ActionManager actionManager;
@@ -140,9 +139,8 @@ public final class FreeColClient {
      * Creates a new {@code FreeColClient}.  Creates the control
      * objects.
      *
-     * @param splashStream A stream to read the splash image from.
+     * @param splashScreen An optional splash screen to display.
      * @param fontName An optional override of the main font.
-     * @param scale The scale factor for gui elements.
      * @param windowSize An optional window size.
      * @param userMsg An optional message key to be displayed early.
      * @param sound True if sounds should be played
@@ -151,18 +149,29 @@ public final class FreeColClient {
      * @param spec If non-null, a {@code Specification} to use to start
      *     a new game immediately.
      */
-    public FreeColClient(final InputStream splashStream,
+    public FreeColClient(final SplashScreen splashScreen,
                          final String fontName,
-                         final float scale,
                          final Dimension windowSize,
                          final String userMsg,
                          final boolean sound,
                          final boolean showOpeningVideo,
                          final File savedGame,
                          final Specification spec) {
+        String quitName = FreeCol.CLIENT_THREAD + "Quit Game";
+        Runtime.getRuntime().addShutdownHook(new Thread(quitName) {
+                /**
+                 * {@inheritDoc}
+                 */
+                @Override
+                public void run() {
+                    stopServer();
+                }
+            });
+        
         if (FreeCol.getHeadless() && savedGame == null && spec == null) {
             FreeCol.fatal(logger, Messages.message("client.headlessRequires"));
         }
+        
         mapEditor = false;
 
         // Look for base data directory and get base resources loaded.
@@ -183,15 +192,7 @@ public final class FreeColClient {
                     .addName("%dir%", baseDirectory.getName()))
                 + ((ioeMessage == null) ? "" : "\n" + ioeMessage));
         }
-        ResourceManager.addMapping("base", baseData.getResourceMapping());
 
-        // Now we have at least the base resources, get the GUI up (it
-        // needs font resources) and show the splash screen
-        gui = (FreeCol.getHeadless()) ? new GUI(this, scale)
-                                      : new SwingGUI(this, scale);
-        gui.displaySplashScreen(splashStream);
-
-        // Once the basic resources are in place construct other things.
         this.serverAPI = new UserServerAPI();
 
         // Control.  Controllers expect GUI to be available.
@@ -214,18 +215,11 @@ public final class FreeColClient {
         // Not so easy, since the ActionManager also creates tile
         // improvement actions, which depend on the specification.
         // However, this step could probably be delayed.
-        FreeColTcFile tcData = FreeColTcFile.getFreeColTcFile("classic");
-        ResourceManager.addMapping("tc", tcData.getResourceMapping());
+        ResourceManager.setBaseData(baseData);
+        
+        final FreeColTcFile tcData = FreeColTcFile.getFreeColTcFile(FreeCol.getTc());
+        ResourceManager.setTcData(tcData);
 
-        // Swing system and look-and-feel initialization.
-        if (!FreeCol.getHeadless()) {
-            try {
-                gui.installLookAndFeel(fontName, scale);
-            } catch (Exception e) {
-                FreeCol.fatal(logger,
-                    Messages.message("client.laf") + "\n" + e.getMessage());
-            }
-        }
         actionManager = new ActionManager(this);
         actionManager.initializeActions(inGameController, connectController);
 
@@ -235,21 +229,70 @@ public final class FreeColClient {
         this.clientOptions.fixClientOptions();
 
         // Reset the mod resources as a result of the client option update.
-        for (FreeColModFile f : this.clientOptions.getActiveMods()) {
-            ResourceManager.addMapping("mod " + f.getId(),
-                                       f.getResourceMapping());
+        ResourceManager.setMods(this.clientOptions.getActiveMods());
+        
+        if (this.clientOptions.getRange(ClientOptions.GRAPHICS_QUALITY) == ClientOptions.GRAPHICS_QUALITY_LOWEST) {
+            ImageResource.forceLowestQuality(true);
         }
+        
+        /*
+         * All mods are loaded, so the GUI can safely be created.
+         */
 
+        gui = (FreeCol.getHeadless()) ? new GUI(this)
+                : new SwingGUI(this);
+        
+        // Swing system and look-and-feel initialization.
+        if (!FreeCol.getHeadless()) {
+            try {
+                gui.installLookAndFeel(fontName);
+            } catch (Exception e) {
+                FreeCol.fatal(logger,
+                        Messages.message("client.laf") + "\n" + e.getMessage());
+            }
+        }
+        
         // Initialize Sound (depends on client options)
         this.soundController = new SoundController(this, sound);
-
-        // Start the GUI (headless-safe)
-        gui.hideSplashScreen();
-        gui.startGUI(windowSize);
-
-        // Update the actions with the running GUI, resources may have changed.
-        if (this.actionManager != null) updateActions();
         
+        overrideDefaultUncaughtExceptionHandler();
+        
+        /*
+         * Please do NOT move preloading before mods are loaded -- as that
+         * might cause some images to be loaded from base and other images
+         * to be loaded from mods.
+         */
+        ResourceManager.startPreloading(() -> {
+            /*
+             * We can allow the GUI to be displayed while the preloading is running.
+             * 
+             * In that case we need to add that preloading gets aborted before
+             * ResourceManager.addMapping is called (which is now performed when
+             * loading a game). 
+             */
+    
+            /*
+             * Run later on the EDT so that we ensure pending GUI actions have
+             * completed.
+             */
+            SwingUtilities.invokeLater(() -> {
+                if (splashScreen != null) {
+                    splashScreen.setVisible(false);
+                    splashScreen.dispose();
+                }
+                // Start the GUI (headless-safe)
+                gui.startGUI(windowSize);
+        
+                // Update the actions with the running GUI, resources may have changed.
+                if (this.actionManager != null) updateActions();
+                
+                startFirstTaskInGui(userMsg, showOpeningVideo, savedGame, spec);
+            });
+        });
+    }
+
+    private void startFirstTaskInGui(String userMsg, boolean showOpeningVideo, File savedGame,
+            Specification spec) {
         // Now the GUI is going, either:
         //   - load the saved game if one was supplied
         //   - use the debug shortcut to immediately start a new game with
@@ -260,59 +303,45 @@ public final class FreeColClient {
         //     do (which will often be to progress through the
         //     NewPanel to a call to the connect controller to start a game)
         //
-        Runnable start = null;
-        if (savedGame != null) { // Restore from saved
-            gui.invokeNowOrWait(() ->
-                gui.showStatusPanel(Messages.message("status.loadingGame")));
-            if (connectController.startSavedGame(savedGame)) {
-                start = () -> {
-                    gui.closeStatusPanel();
-                    if (userMsg != null) gui.showInformationPanel(userMsg);
-                };
-            } else {
-                start = () -> {
-                    gui.playSound("sound.intro.general");
-                    gui.closeStatusPanel();
-                    gui.showMainPanel(userMsg);
-                };
-            }
-        } else if (spec != null) { // Debug or fast start
-            start = () -> {
+                
+        SwingUtilities.invokeLater(() -> {
+            /*
+             * About "SwingUtilities.invokeLater"
+             * 
+             * Yes, we are on the EDT -- but this should still be executed
+             * AFTER the loading of Canvas etc.
+             */
+            
+            if (savedGame != null) { // Restore from saved
+                gui.showStatusPanel(Messages.message("status.loadingGame"));
+                SwingUtilities.invokeLater(() -> {
+                    if (connectController.startSavedGame(savedGame)) {
+                        gui.closeStatusPanel();
+                        if (userMsg != null) {
+                            gui.showInformationPanel(userMsg);
+                        }
+                    } else {
+                        gui.playSound("sound.intro.general");
+                        gui.closeStatusPanel();
+                        gui.showMainPanel(userMsg);
+                    }
+                });
+    
+            } else if (spec != null) { // Debug or fast start
                 gui.playSound("sound.intro.general");
                 if (!connectController.startSinglePlayerGame(spec)) {
                     gui.showMainPanel(userMsg);
                 }
-            };
-        } else if (showOpeningVideo) { // Video first
-            gui.showOpeningVideo(userMsg, () -> {
-                    gui.playSound("sound.intro.general");
-                    gui.showMainPanel(userMsg);
-                });
-        } else { // Start main panel
-            start = () -> {
+            } else if (showOpeningVideo) { // Video first
+                gui.showOpeningVideo(userMsg, () -> {
+                        gui.playSound("sound.intro.general");
+                        gui.showMainPanel(userMsg);
+                    });
+            } else { // Start main panel
                 gui.playSound("sound.intro.general");
                 gui.showMainPanel(userMsg);
-            };
-        }
-
-        // All resources mappings should be queued by now
-        // (startSavedGame above should be the last source of
-        // addMapping calls), so allow preload thread to die when it
-        // is done
-        ResourceManager.finishPreloading();
-        
-        if (start != null) gui.invokeNowOrLater(start);
-        
-        String quitName = FreeCol.CLIENT_THREAD + "Quit Game";
-        Runtime.getRuntime().addShutdownHook(new Thread(quitName) {
-                /**
-                 * {@inheritDoc}
-                 */
-                @Override
-                public void run() {
-                    stopServer();
-                }
-            });
+            }
+        });
     }
 
     /**
@@ -359,7 +388,7 @@ public final class FreeColClient {
         if (userOptions != null && userOptions.exists()) {
             logger.info("Merge client options from user options file: "
                 + userOptions.getPath());
-            clop.merge(userOptions);
+            clop.load(userOptions);
         }
 
         //logger.info("Final client options: " + clop.toString());
@@ -673,7 +702,14 @@ public final class FreeColClient {
      * @param specification The {@code Specification} to use.
      */
     public void addSpecificationActions(Specification specification) {
-        actionManager.addSpecificationActions(specification);
+        SwingUtilities.invokeLater(() -> {
+            actionManager.addSpecificationActions(specification);
+            // XXX: The actions are loaded asynchronously without a callback.
+            SwingUtilities.invokeLater(() -> {
+                getGUI().resetMenuBar();
+                getGUI().resetMapControls();
+            });
+        });
     }
 
 
@@ -780,10 +816,9 @@ public final class FreeColClient {
      */
     public boolean unblockServer(int port) {
         final FreeColServer freeColServer = getFreeColServer();
-        if (freeColServer != null
-            && freeColServer.getServer().getPort() == port) {
-            if (!getGUI().confirm("stopServer.text", "stopServer.yes",
-                                  "stopServer.no")) return false;
+        if (freeColServer != null ) {
+            if (!getGUI().modalConfirmDialog("stopServer.text", "stopServer.yes",
+                                  "stopServer.no", true)) return false;
             stopServer();
         }
         return true;
@@ -808,21 +843,24 @@ public final class FreeColClient {
      * @param publicServer If true, add to the meta-server.
      * @param singlePlayer True if this is a single player game.
      * @param spec The {@code Specification} to use in this game.
-     * @param port The TCP port to use for the public socket.
+     * @param address The address to use for the public socket.
+     * @param port The TCP port to use for the public socket. If null, try
+     *      ports until 
      * @return A new {@code FreeColServer} or null on error.
      */
     public FreeColServer startServer(boolean publicServer,
                                      boolean singlePlayer, Specification spec,
+                                     InetAddress address,
                                      int port) {
         final FreeColServer fcs;
         try {
-            fcs = new FreeColServer(publicServer, singlePlayer, spec,
-                                    port, null);
+            fcs = new FreeColServer(publicServer, singlePlayer, spec, address, port, null);
+            if (!fcs.registerWithMetaServer()) {
+                fcs.shutdown();
+                return failToMain(null, "server.noRouteToServer");
+            }
         } catch (IOException ioe) {
             return failToMain(ioe, "server.initialize");
-        }
-        if (publicServer && !fcs.getPublicServer()) {
-            return failToMain(null, "server.noRouteToServer");
         }
 
         setFreeColServer(fcs);
@@ -836,13 +874,15 @@ public final class FreeColClient {
      * @param publicServer If true, add to the meta-server.
      * @param singlePlayer True if this is a single player game.
      * @param saveFile The saved game {@code File}.
+     * @param address The TCP address to use for the public socket.
      * @param port The TCP port to use for the public socket.
      * @param name An optional name for the server.
      * @return A new {@code FreeColServer}, or null on error.
      */
     public FreeColServer startServer(boolean publicServer,
                                      boolean singlePlayer,
-                                     File saveFile, int port, String name) {
+                                     File saveFile, InetAddress address,
+                                     int port, String name) {
         final FreeColSavegameFile fsg;
         try {
             fsg = new FreeColSavegameFile(saveFile);
@@ -853,7 +893,11 @@ public final class FreeColClient {
         }
         final FreeColServer fcs;
         try {
-            fcs = new FreeColServer(fsg, (Specification)null, port, name);
+            fcs = new FreeColServer(fsg, (Specification)null, address, port, name);
+            fcs.setPublicServer(publicServer);
+            if (!fcs.registerWithMetaServer()) {
+                return failToMain(null, "server.noRouteToServer");
+            }
         } catch (XMLStreamException xse) {
             return failToMain(xse, FreeCol.badFile("error.couldNotLoad", saveFile));
         } catch (Exception ex) {
@@ -863,7 +907,7 @@ public final class FreeColClient {
         setFreeColServer(fcs);
         setSinglePlayer(singlePlayer);
         this.inGameController.setGameConnected();
-        ResourceManager.addMapping("game", fsg.getResourceMapping());
+        ResourceManager.setSavegameFile(fsg);
         return fcs;
     }
     
@@ -937,7 +981,7 @@ public final class FreeColClient {
      * Quits the application.
      */
     public void askToQuit() {
-        if (gui.confirm("quitDialog.areYouSure.text", "ok", "cancel")) {
+        if (gui.modalConfirmDialog("quitDialog.areYouSure.text", "ok", "cancel", false)) {
             Player player = getMyPlayer();
             if (player == null) { // If no player, must be already logged out
                 quit();
@@ -952,11 +996,11 @@ public final class FreeColClient {
      * Retire from the game.
      */
     public void retire() {
-        if (gui.confirm("retireDialog.areYouSure.text", "ok", "cancel")) {
+        if (gui.modalConfirmDialog("retireDialog.areYouSure.text", "ok", "cancel", false)) {
             final Player player = getMyPlayer();
             player.changePlayerType(Player.PlayerType.RETIRED);
-            getInGameController().highScore(null);
-            askServer().retire();
+            final boolean highScore = askServer().retire();
+            getInGameController().highScore(highScore);
         }
     }
 
@@ -983,5 +1027,32 @@ public final class FreeColClient {
             FreeCol.fatal(logger, "Failed to shutdown gui: " + e);
         }
         FreeCol.quit(0);
+    }
+    
+    private void overrideDefaultUncaughtExceptionHandler() {
+        // This overrides the handler in FreeCol:
+        Thread.setDefaultUncaughtExceptionHandler((Thread thread, Throwable e) -> {
+            // Free enough space to ensure we can perform the next operations.
+            if (e instanceof Error) {
+                memoryToBeFreedOnOutOfMemory = null;
+                gui.emergencyPurge();
+            }
+            
+            final boolean seriousError = (e instanceof Error);
+            try {
+                logger.log(Level.WARNING, "Uncaught exception from thread: " + thread, e);
+                
+                if (seriousError) {
+                    gui.showErrorPanel(Messages.message("error.seriousError"), () -> {
+                        System.exit(1);
+                    });
+                }
+            } catch (Throwable t) {
+                if (seriousError) {
+                    t.printStackTrace();
+                    System.exit(1);
+                }
+            }
+        });
     }
 }

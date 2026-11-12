@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -44,19 +44,21 @@ public class FontResource extends Resource {
     private Font font;
 
 
-    public FontResource(Font font) {
+    public FontResource(String primaryKey, Font font) {
+        super(primaryKey);
         this.font = font;
     }
 
     /**
      * Do not use directly.
      *
+     * @param cachingKey The caching key.
      * @param resourceLocator The {@code URI} used when loading this
      *     resource.
      * @exception IOException if unable to read the font.
      */
-    public FontResource(URI resourceLocator) throws IOException {
-        super(resourceLocator);
+    public FontResource(String cachingKey, URI resourceLocator) throws IOException {
+        super(cachingKey, resourceLocator);
         font = null;
         try {
             if (resourceLocator.getPath() != null

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,6 +19,14 @@
 
 package net.sf.freecol.client.gui.panel.colopedia;
 
+import static net.sf.freecol.common.util.CollectionUtils.alwaysTrue;
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.map;
+import static net.sf.freecol.common.util.CollectionUtils.toList;
+import static net.sf.freecol.common.util.CollectionUtils.toListNoNulls;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+import static net.sf.freecol.common.util.StringUtils.join;
+
 import java.awt.Font;
 import java.awt.GridLayout;
 import java.util.ArrayList;
@@ -32,22 +40,18 @@ import javax.swing.SwingConstants;
 import javax.swing.tree.DefaultMutableTreeNode;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.FontLibrary;
-import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.client.gui.action.ColopediaAction.PanelType;
-import net.sf.freecol.client.gui.panel.*;
-import net.sf.freecol.client.gui.Size;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.AbstractUnit;
 import net.sf.freecol.common.model.EuropeanNationType;
 import net.sf.freecol.common.model.IndianNationType;
 import net.sf.freecol.common.model.NationType;
 import net.sf.freecol.common.model.UnitType;
+import net.sf.freecol.common.util.ImageUtils;
 import net.sf.freecol.common.util.RandomChoice;
-import static net.sf.freecol.common.util.CollectionUtils.*;
-import static net.sf.freecol.common.util.StringUtils.*;
 
 
 /**
@@ -80,13 +84,11 @@ public class NationTypeDetailPanel
                     getName(), null));
 
         List<NationType> nations = new ArrayList<>();
-        nations.addAll(getSpecification().getEuropeanNationTypes());
+        nations.addAll(getSpecification().getVisibleEuropeanNationTypes());
         nations.addAll(getSpecification().getREFNationTypes());
         nations.addAll(getSpecification().getIndianNationTypes());
-        ImageIcon icon = new ImageIcon(getImageLibrary().getLibertyImage());
+        ImageIcon icon = new ImageIcon(ImageUtils.createCenteredImage(getImageLibrary().getLibertyImage(), getListItemIconSize()));
         for (NationType type : nations) {
-            // Suppress special case.  FIXME: This is a kludge
-            if ("model.nationType.optionOnly".equals(type.getId())) continue;
             parent.add(buildItem(type, icon));
         }
         root.add(parent);
@@ -116,7 +118,7 @@ public class NationTypeDetailPanel
      */
     private void buildEuropeanNationTypeDetail(EuropeanNationType nationType,
                                                JPanel panel) {
-        Font boldFont = FontLibrary.getUnscaledFont("simple-bold-smaller");
+        Font boldFont = FontLibrary.getScaledFont("simple-bold-smaller");
 
         panel.setLayout(new MigLayout("wrap 2, gapx 20"));
 

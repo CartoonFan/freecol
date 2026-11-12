@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -61,6 +61,18 @@ public class AIMessage {
     public static boolean askAttack(AIUnit aiUnit, Direction direction) {
         return aiUnit.getAIOwner().askServer()
             .attack(aiUnit.getUnit(), direction);
+    }
+    
+    /**
+     * An AIUnit attacks the given target with a ranged attack.
+     *
+     * @param aiUnit The {@code AIUnit} to attack with.
+     * @param target The target {@code Tile} of the attack. 
+     * @return True if the message was sent, and a non-error reply returned.
+     */
+    public static boolean askAttackRanged(AIUnit aiUnit, Tile target) {
+        return aiUnit.getAIOwner().askServer()
+            .attackRanged(aiUnit.getUnit(), target);
     }
 
     /**

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,26 +19,26 @@
 
 package net.sf.freecol.common.resources;
 
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+import static net.sf.freecol.common.util.StringUtils.join;
+
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.util.AbstractQueue;
 import java.util.ArrayList;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
-    
+import java.util.stream.Collectors;
+
+import javax.swing.SwingUtilities;
+
 import net.sf.freecol.FreeCol;
-import net.sf.freecol.client.FreeColClient;
+import net.sf.freecol.common.io.FreeColDataFile;
+import net.sf.freecol.common.io.FreeColSavegameFile;
 import net.sf.freecol.common.io.sza.SimpleZippedAnimation;
-import static net.sf.freecol.common.util.CollectionUtils.*;
-import static net.sf.freecol.common.util.StringUtils.*;
-import net.sf.freecol.common.util.Utils;
 
 
 /**
@@ -47,10 +47,6 @@ import net.sf.freecol.common.util.Utils;
 public class ResourceManager {
 
     private static final Logger logger = Logger.getLogger(ResourceManager.class.getName());
-
-    /** Thread-safe queue of mappings for the preload thread to process. */
-    private static final AbstractQueue<ResourceMapping> preloadQueue
-        = new ConcurrentLinkedQueue<>();
     
     /** The thread that handles preloading of resources. */
     private static Thread preloadThread = null;
@@ -61,21 +57,76 @@ public class ResourceManager {
     /**
      * All the mappings are merged in order into this single ResourceMapping.
      */
-    private static final ResourceMapping mergedContainer
-        = new ResourceMapping();
+    private static ResourceMapping mergedContainer = new ResourceMapping();
+    
+    private static FreeColDataFile baseDataFile = null;
+    private static ResourceMapping baseResourceMapping = new ResourceMapping();
+    private static FreeColDataFile tcDataFile = null;
+    private static ResourceMapping tcResourceMapping = new ResourceMapping();
+    private static List<? extends FreeColDataFile> mods = new ArrayList<>();
+    private static List<ResourceMapping> modResourceMappings = new ArrayList<>();
+    private static FreeColSavegameFile savegameFile = null;
+    private static ResourceMapping savegameResourceMapping = new ResourceMapping();
 
+    
+    public static void setBaseData(FreeColDataFile baseDataFile) {
+        ResourceManager.baseDataFile = baseDataFile;
+        baseResourceMapping = baseDataFile.getResourceMapping();
+    }
+    
+    public static void setTcData(FreeColDataFile tcDataFile) {
+        ResourceManager.tcDataFile = tcDataFile;
+        tcResourceMapping = (tcDataFile != null) ? tcDataFile.getResourceMapping() : new ResourceMapping();
+        prepare();
+    }
+    
+    public static <T extends FreeColDataFile> void setMods(List<T> mods) {
+        ResourceManager.mods = mods;
+        modResourceMappings =  mods.stream().map(FreeColDataFile::getResourceMapping).collect(Collectors.toList());
+        prepare();
+    }
+    
+    public static void setSavegameFile(FreeColSavegameFile savegameFile) {
+        ResourceManager.savegameFile = savegameFile;
+        savegameResourceMapping = (savegameFile != null) ? savegameFile.getResourceMapping() : new ResourceMapping();
+        prepare();
+    }
 
+    public static void prepare() {
+        finishPreloading();
+        
+        final ResourceMapping newMergedContainer = new ResourceMapping();
+        newMergedContainer.addAll(baseResourceMapping);
+        newMergedContainer.addAll(tcResourceMapping);
+        for (ResourceMapping modResourceMapping : modResourceMappings) {
+            newMergedContainer.addAll(modResourceMapping);
+        }
+        newMergedContainer.addAll(savegameResourceMapping);
+        
+        waitForPreloadingToStop();
+        mergedContainer = newMergedContainer;
+    }
+    
     /**
-     * Sets the mappings specified in the date/base-directory.
-     * Do not access the mapping after the call.
-     *
-     * @param name The name of the mapping, for logging purposes.
-     * @param mapping The mapping between IDs and files.
+     * Clear all caches and 
      */
-    public static void addMapping(String name, ResourceMapping mapping) {
-        logger.info("Resource manager adding mapping " + name);
-        preloadQueue.add(mapping); // thread-safe
-        startPreloading();
+    public static void reload() {
+        baseResourceMapping = baseDataFile.getResourceMapping();
+        tcResourceMapping = (tcDataFile != null) ? tcDataFile.getResourceMapping() : new ResourceMapping();
+        modResourceMappings = mods.stream().map(FreeColDataFile::getResourceMapping).collect(Collectors.toList());
+        savegameResourceMapping = (savegameFile != null) ? savegameFile.getResourceMapping() : new ResourceMapping();
+
+        prepare();
+    }
+
+    private static void waitForPreloadingToStop() {
+        try {
+            while (preloadThread != null) {
+                Thread.sleep(10);
+            }
+        } catch (InterruptedException e) {
+            logger.warning(e.getMessage());
+        }
     }
 
     /**
@@ -83,8 +134,10 @@ public class ResourceManager {
      *
      * Synchronization protects preloadThread.  The thread is the only place
      * mergedContainer is written.
+     *
+     * @param afterPreloadHasCompleted A {@code Runnable} to run when it says.
      */
-    private static synchronized void startPreloading() {
+    public static synchronized void startPreloading(Runnable afterPreloadHasCompleted) {
         if (FreeCol.getHeadless()) return; // Do not preload in headless mode
         if (preloadThread != null) return;
 
@@ -96,19 +149,12 @@ public class ResourceManager {
                 @Override
                 public void run() {
                     logger.info("Preload thread started");
-                    int n = 0;
-                    while (true) {
-                        ResourceMapping mapping = preloadQueue.poll();
-                        if (mapping == null) { // Quit if done, else wait
-                            if (preloadDone) break;
-                            Utils.delay(10, null);
-                        } else { // Preload the mapping found
-                            mergedContainer.addAll(mapping);
-                            n += mapping.preload();
-                        }
-                    }
-                    preloadThread = null;
+                    final int n = mergedContainer.preload(() -> !preloadDone);
                     logger.info("Preload done, " + n + " resources.");
+                    preloadThread = null;
+                    SwingUtilities.invokeLater(() -> {
+                        afterPreloadHasCompleted.run();
+                    });
                 }
             };
         preloadThread.start();
@@ -345,6 +391,34 @@ public class ResourceManager {
     public static String getString(final String key) {
         final StringResource r = getStringResource(key, true);
         return (r == null) ? StringResource.REPLACEMENT_STRING : r.getString();
+    }
+    
+    /**
+     * Gets a string resource with the given name and builds a
+     * {@code PropertyList} from it.
+     * 
+     * @param key The name of the resource to query.
+     * @return The string value.
+     */
+    public static PropertyList getPropertyList(final String key) {
+        final StringResource r = getStringResource(key, true);
+        if (r == null) {
+            return new PropertyList("");
+        }
+        return new PropertyList(r.getString());
+    }
+    
+    /**
+     * Gets a string resource with the given name, or returns the default value
+     * if the resource could not be found.
+     *
+     * @param key The name of the resource to query.
+     * @param defaultString The default value.
+     * @return The string value.
+     */
+    public static String getString(final String key, final String defaultString) {
+        final StringResource r = getStringResource(key, false);
+        return (r == null) ? defaultString : r.getString();
     }
 
     /**

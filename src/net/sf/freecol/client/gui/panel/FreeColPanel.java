@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -24,24 +24,25 @@ import java.awt.LayoutManager;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
-import java.awt.event.MouseListener;
 import java.awt.image.BufferedImage;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.util.logging.Logger;
 
-import javax.swing.AbstractButton;
-import javax.swing.Action;
+import javax.swing.AbstractAction;
 import javax.swing.InputMap;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.KeyStroke;
+import javax.swing.border.Border;
 
 import net.sf.freecol.client.ClientOptions;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.control.InGameController;
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.client.gui.SwingGUI.PopupPosition;
+import net.sf.freecol.client.gui.panel.FreeColButton.ButtonStyle;
 import net.sf.freecol.common.model.AbstractUnit;
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.Game;
@@ -62,6 +63,7 @@ public abstract class FreeColPanel extends MigPanel implements ActionListener {
     protected static final String CANCEL = "CANCEL";
     protected static final String OK = "OK";
     protected static final String HELP = "HELP";
+    protected static final String ESCAPE = "ESCAPE";
 
     // Create some constants that can be used for layout contraints
     protected static final String SPAN_SPLIT_2 = "span, split 2";
@@ -74,7 +76,8 @@ public abstract class FreeColPanel extends MigPanel implements ActionListener {
 
     protected boolean editable = true;
 
-    protected JButton okButton = Utility.localizedButton("ok");
+    protected JButton okButton = Utility.localizedButton("ok")
+        .withButtonStyle(ButtonStyle.IMPORTANT);
 
 
     /**
@@ -99,11 +102,15 @@ public abstract class FreeColPanel extends MigPanel implements ActionListener {
 
         this.freeColClient = freeColClient;
 
-        setBorder(FreeColImageBorder.imageBorder);
+        setBorder(FreeColImageBorder.panelBorder);
 
         okButton.setActionCommand(OK);
         okButton.addActionListener(this);
-        setCancelComponent(okButton);
+
+        // Default to ESCAPE removing the panel
+        InputMap inputMap = getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0, false),
+                     ESCAPE);
     }
 
 
@@ -168,6 +175,9 @@ public abstract class FreeColPanel extends MigPanel implements ActionListener {
      * @return The {@code Specification}.
      */
     protected Specification getSpecification() {
+        if (freeColClient.getGame() == null) {
+            return null;
+        }
         return freeColClient.getGame().getSpecification();
     }
 
@@ -213,23 +223,6 @@ public abstract class FreeColPanel extends MigPanel implements ActionListener {
     }
 
     /**
-     * Make the given button the CANCEL button.
-     *
-     * @param cancelButton an {@code AbstractButton} value
-     */
-    public final void setCancelComponent(AbstractButton cancelButton) {
-        if (cancelButton == null) throw new NullPointerException();
-
-        InputMap inputMap
-            = getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0, true),
-                     "release");
-
-        Action cancelAction = cancelButton.getAction();
-        getActionMap().put("release", cancelAction);
-    }
-
-    /**
      * Add a routine to be called when this panel closes.
      * Triggered by Canvas.notifyClose.
      *
@@ -256,6 +249,15 @@ public abstract class FreeColPanel extends MigPanel implements ActionListener {
     }
 
     /**
+     * Set the action in response to the escape key.
+     *
+     * @param aa The {@code AbstractAction} to take.
+     */
+    public void setEscapeAction(AbstractAction aa) {
+        getActionMap().put(ESCAPE, aa);
+    }
+
+    /**
      * Helper to get a small single abstract unit image.
      *
      * @param au The {@code AbstractUnit} to examine.
@@ -266,7 +268,55 @@ public abstract class FreeColPanel extends MigPanel implements ActionListener {
         return getImageLibrary().getSmallUnitTypeImage(au.getType(spec),
                                                        au.getRoleId(), false);
     }
-
+    
+    /**
+     * A border to be used around the frame containing this panel.
+     * @return The border, if any, or {@code null}.
+     */
+    public Border getFrameBorder() {
+        return null;
+    }
+    
+    /**
+     * Refreshes the layout after scaling and/or font changes.
+     * 
+     * Subclasses can extend this method to handle the change.
+     */
+    public void refreshLayout() {
+        
+    }
+    
+    /**
+     * Checks if this panel should be displayed in fullscreen mode.
+     * @return {@code false} unless overriden by a subclass.
+     */
+    public boolean isFullscreen() {
+        return false;
+    }
+    
+    /**
+     * Allows subclasses to define a frame title.
+     * @return The title, if defined by a subclass.
+     */
+    public String getFrameTitle() {
+       return null; 
+    }
+    
+    /**
+     * Allows subclasses to define a default frame popup position.
+     * @return The title, if defined by a subclass.
+     */
+    public PopupPosition getFramePopupPosition() {
+        return null;
+    }
+    
+    /**
+     * Allows subclasses to execute code when the frame is closed
+     * using the "X" button (in the map editor).
+     */
+    public void onFrameClosing() {
+        
+    }
 
     // Interface ActionListener
 
@@ -285,31 +335,6 @@ public abstract class FreeColPanel extends MigPanel implements ActionListener {
 
 
     // Override Component
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void removeNotify() {
-        super.removeNotify();
-
-        // removeNotify gets called when a JPanel has no parent any
-        // more, that is the best opportunity available for JPanels
-        // to be given a chance to remove leak generating references.
-
-        if (okButton == null) return; // Been here before
-
-        // We need to make sure the layout is cleared because some
-        // versions of MigLayout are leaky.
-        setLayout(null);
-
-        okButton.removeActionListener(this);
-        okButton = null;
-
-        for (MouseListener listener : getMouseListeners()) {
-            removeMouseListener(listener);
-        }
-    }
 
     /**
      * {@inheritDoc}

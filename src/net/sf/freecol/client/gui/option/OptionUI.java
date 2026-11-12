@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -26,10 +26,12 @@ import javax.swing.ListCellRenderer;
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.action.FreeColAction;
 import net.sf.freecol.common.i18n.Messages;
+import net.sf.freecol.common.io.FreeColModFile;
 import net.sf.freecol.common.option.AbstractUnitOption;
 import net.sf.freecol.common.option.AudioMixerOption;
 import net.sf.freecol.common.option.BooleanOption;
 import net.sf.freecol.common.option.FileOption;
+import net.sf.freecol.common.option.FullscreenDisplayModeOption;
 import net.sf.freecol.common.option.IntegerOption;
 import net.sf.freecol.common.option.LanguageOption;
 import net.sf.freecol.common.option.ModListOption;
@@ -56,6 +58,8 @@ public abstract class OptionUI<T extends Option<?>> implements OptionUpdater {
 
     /** The Option value itself. */
     private T option;
+    
+    private BooleanOptionUI enabler = null;
 
 
     /**
@@ -81,7 +85,7 @@ public abstract class OptionUI<T extends Option<?>> implements OptionUpdater {
     protected void initialize() {
         JComponent component = getComponent();
         component.setToolTipText(label.getToolTipText());
-        component.setEnabled(editable);
+        component.setEnabled(isEditable());
         component.setOpaque(false);
     }
 
@@ -94,13 +98,22 @@ public abstract class OptionUI<T extends Option<?>> implements OptionUpdater {
     }
 
     public final boolean isEditable() {
-        return this.editable;
+        return this.editable && isEnabled();
+    }
+
+    private boolean isEnabled() {
+        return enabler == null || enabler.getValue();
     }
 
     public final void setEditable(final boolean newEditable) {
         this.editable = newEditable;
     }
-
+    
+    public void setEnabler(BooleanOptionUI enabler) {
+        this.enabler = enabler;
+        JComponent component = getComponent();
+        component.setEnabled(isEditable());
+    }
 
     // Routines to be implemented/overridden
 
@@ -117,7 +130,7 @@ public abstract class OptionUI<T extends Option<?>> implements OptionUpdater {
      *
      * @return A suitable ListCellRenderer.
      */
-    public ListCellRenderer getListCellRenderer() {
+    public ListCellRenderer<T> getListCellRenderer() {
         return null;
     }
 
@@ -151,7 +164,7 @@ public abstract class OptionUI<T extends Option<?>> implements OptionUpdater {
      * @param editable Should the result be editable.
      * @return A suitable {@code OptionUI}, or null if none found.
      */
-    public static OptionUI getOptionUI(GUI gui, Option option, boolean editable) {
+    public static OptionUI<?> getOptionUI(GUI gui, Option<?> option, boolean editable) {
         if (option instanceof BooleanOption) {
             return new BooleanOptionUI((BooleanOption)option, editable);
         } else if (option instanceof FileOption) {
@@ -170,16 +183,24 @@ public abstract class OptionUI<T extends Option<?>> implements OptionUpdater {
             return new LanguageOptionUI((LanguageOption)option, editable);
         } else if (option instanceof AudioMixerOption) {
             return new AudioMixerOptionUI(gui, (AudioMixerOption)option, editable);
+        } else if (option instanceof FullscreenDisplayModeOption) {
+            return new FullscreenDisplayModeOptionUI(gui, (FullscreenDisplayModeOption)option, editable);
         } else if (option instanceof FreeColAction) {
             return new FreeColActionUI((FreeColAction)option, editable);
         } else if (option instanceof AbstractUnitOption) {
             return new AbstractUnitOptionUI((AbstractUnitOption)option, editable);
         } else if (option instanceof ModOption) {
-            return new ModOptionUI((ModOption)option, editable);
+            return new ModOptionUI(gui, (ModOption)option, editable);
         } else if (option instanceof UnitListOption) {
-            return new ListOptionUI<>(gui, (UnitListOption)option, editable);
+            return new ListOptionUI<>(gui, (UnitListOption)option, editable, choice -> true);
         } else if (option instanceof ModListOption) {
-            return new ListOptionUI<>(gui, (ModListOption)option, editable);
+            return new ListOptionUI<>(gui, (ModListOption)option, editable, choice -> {
+                if (gui.canGameChangingModsBeAdded()) {
+                    return true;
+                }
+                final FreeColModFile modFile = ((ModOption) choice).getValue();
+                return !modFile.hasSpecification();
+            });
         } else if (option instanceof TextOption) {
             return new TextOptionUI((TextOption)option, editable);
         } else {

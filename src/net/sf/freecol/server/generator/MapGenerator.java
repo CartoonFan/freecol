@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -46,8 +46,9 @@ public interface MapGenerator {
      *
      * @param game The {@code Game} to generate for.
      * @param importMap An optional {@code Map} to import.
+     * @param generateEuropeanPlayerUnits If {@code true}, then the european player units are generated.
      * @param lb A {@code LogBuilder} to log to.
      * @return The new {@code Map}.
      */
-    public abstract Map generateMap(Game game, Map importMap, LogBuilder lb);
+    public abstract Map generateMap(Game game, Map importMap, boolean generateEuropeanPlayerUnits, LogBuilder lb);
 }

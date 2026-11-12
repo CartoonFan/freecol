@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,7 +19,6 @@
 
 package net.sf.freecol.client.gui.panel.colopedia;
 
-import java.awt.Dimension;
 import java.awt.Image;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -30,23 +29,20 @@ import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
-import javax.swing.SwingConstants;
 import javax.swing.tree.DefaultMutableTreeNode;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.FontLibrary;
-import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.client.gui.action.ColopediaAction.PanelType;
-import net.sf.freecol.client.gui.panel.*;
-import net.sf.freecol.client.gui.Size;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.FoundingFather;
 import net.sf.freecol.common.model.FoundingFather.FoundingFatherType;
 import net.sf.freecol.common.model.Specification;
 import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.model.Turn;
+import net.sf.freecol.common.util.ImageUtils;
 
 
 /**
@@ -89,7 +85,7 @@ public class FatherDetailPanel
         for (FoundingFather foundingFather : spec.getFoundingFathers()) {
             fathersByType.get(foundingFather.getType()).add(foundingFather);
         }
-        ImageIcon icon = new ImageIcon(getImageLibrary().getLibertyImage());
+        ImageIcon icon = new ImageIcon(ImageUtils.createCenteredImage(getImageLibrary().getLibertyImage(), getListItemIconSize()));
         for (FoundingFatherType fatherType : FoundingFatherType.values()) {
             String id = fatherType.getTypeKey();
             String typeName = Messages.message(id);
@@ -130,7 +126,7 @@ public class FatherDetailPanel
         String type = Messages.message(father.getTypeKey());
         String text = name + " (" + type + ")";
         JLabel header = new JLabel(text);
-        header.setFont(FontLibrary.getUnscaledFont(Utility.FONTSPEC_SUBTITLE, text));
+        header.setFont(FontLibrary.getScaledFont(Utility.FONTSPEC_SUBTITLE, text));
 
         Image image = getImageLibrary().getFoundingFatherImage(father, false);
         JLabel label = new JLabel(new ImageIcon(image));
@@ -150,16 +146,9 @@ public class FatherDetailPanel
                 .addStringTemplate(turn.getLabel());
         }
 
-        panel.add(header, "span, align center, wrap 40");
+        panel.add(header, "span, align center, wrap");
         panel.add(label, "top");
         JTextArea description = Utility.localizedTextArea(template, 20);
-        panel.add(description, "top, growx");
-
-        Dimension hSize = header.getPreferredSize(),
-            lSize = label.getPreferredSize(),
-            dSize = description.getPreferredSize(), size = new Dimension();
-        size.setSize(lSize.getWidth() + dSize.getWidth() + 20,
-            hSize.getHeight() + lSize.getHeight() + 10);
-        panel.setPreferredSize(size);            
+        panel.add(description, "top, growx, wmin 0");
     }
 }

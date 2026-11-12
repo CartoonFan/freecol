@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -28,11 +28,12 @@ import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.ChoiceItem;
-import net.sf.freecol.client.gui.panel.*;
-import net.sf.freecol.client.gui.panel.colopedia.*;
+import net.sf.freecol.client.gui.panel.MigPanel;
+import net.sf.freecol.client.gui.panel.Utility;
+import net.sf.freecol.client.gui.panel.colopedia.ColopediaPanel;
+import net.sf.freecol.client.gui.panel.colopedia.FatherDetailPanel;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.FoundingFather;
 
@@ -44,7 +45,7 @@ import net.sf.freecol.common.model.FoundingFather;
  * @see FoundingFather
  */
 public final class ChooseFoundingFatherDialog
-    extends FreeColDialog<FoundingFather> {
+    extends DeprecatedFreeColDialog<FoundingFather> {
 
     @SuppressWarnings("unused")
     private static final Logger logger = Logger.getLogger(ChooseFoundingFatherDialog.class.getName());
@@ -90,7 +91,7 @@ public final class ChooseFoundingFatherDialog
         panel.add(Utility.localizedHeader("chooseFoundingFatherDialog.title",
                                           Utility.FONTSPEC_TITLE));
         panel.add(helpButton, "tag help");
-        panel.add(tb, "width 100%");
+        panel.add(tb, "width 100%, height 400!");
 
         List<ChoiceItem<FoundingFather>> c = choices();
         c.add(new ChoiceItem<>(Messages.message("ok"), (FoundingFather)null)

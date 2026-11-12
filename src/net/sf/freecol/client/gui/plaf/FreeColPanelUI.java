@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -44,7 +44,7 @@ public class FreeColPanelUI extends BasicPanelUI {
     @Override
     public void paint(java.awt.Graphics g, javax.swing.JComponent c) {
         if (c.isOpaque()) {
-            ImageUtils.drawTiledImage(ImageLibrary.getPanelBackground(),
+            ImageUtils.drawTiledImage(ImageLibrary.getPanelBackground(c.getClass()),
                                       g, c, null);
         }
     }

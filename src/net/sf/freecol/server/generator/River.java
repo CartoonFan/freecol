@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -30,6 +30,7 @@ import net.sf.freecol.common.model.Tile;
 import net.sf.freecol.common.model.TileImprovement;
 import net.sf.freecol.common.model.TileImprovementType;
 import net.sf.freecol.common.model.TileType;
+import net.sf.freecol.common.option.MapGeneratorOptions;
 import net.sf.freecol.server.model.ServerRegion;
 import static net.sf.freecol.common.util.CollectionUtils.*;
 import static net.sf.freecol.common.util.RandomUtils.*;
@@ -287,16 +288,15 @@ public class River {
      */
     private boolean flow(Tile source) {
         River other = this;
-        flow:
+flow:
         while (true) {
-
             if (other.sections.size() % 2 == 0) {
                 // get random new direction
                 int length = DirectionChange.values().length;
                 int index = randomInt(logger, "Flow", random, length);
                 DirectionChange change = DirectionChange.values()[index];
                 other.direction = change.getNewDirection(other.direction);
-                other.logger.fine("Direction is now " + other.direction);
+                logger.fine("Direction is now " + other.direction);
             }
 
             for (DirectionChange change : DirectionChange.values()) {
@@ -307,13 +307,13 @@ public class River {
                 // is the tile suitable for this river?
                 if (!other.riverType.isTileTypeAllowed(nextTile.getType())) {
                     // Mountains, ocean cannot have rivers
-                    other.logger.fine("Tile (" + nextTile + ") can not have a river.");
+                    logger.fine("Tile (" + nextTile + ") can not have a river.");
                     continue;
                 } else if (other.contains(nextTile)) {
-                    other.logger.fine("Tile (" + nextTile + ") is already in river.");
+                    logger.fine("Tile (" + nextTile + ") is already in river.");
                     continue;
                 } else if (other.isNextToSelf(nextTile)) {
-                    other.logger.fine("Tile (" + nextTile + ") is next to the river.");
+                    logger.fine("Tile (" + nextTile + ") is next to the river.");
                     continue;
                 } else {
                     // find out if an adjacent tile is next to water
@@ -329,7 +329,7 @@ public class River {
                         other.sections.add(lastSection);
 
                         if (t.hasRiver() && t.isLand()) {
-                            other.logger.fine("Tile (" + t + ") is next to another river.");
+                            logger.fine("Tile (" + t + ") is next to another river.");
                             // increase the size of the other river
                             other.nextRiver = other.riverMap.get(t);
                             other.nextRiver.grow(lastSection, t);
@@ -342,7 +342,7 @@ public class River {
                             other.drawToMap(sections);
                         } else {
                             // flow into the sea (or a lake)
-                            other.logger.fine("Tile (" + t + ") is next to water.");
+                            logger.fine("Tile (" + t + ") is next to water.");
                             River someRiver = other.riverMap.get(t);
                             if (someRiver == null) {
                                 other.sections.add(new RiverSection(t, lastDir.getReverseDirection()));
@@ -360,7 +360,7 @@ public class River {
                         return true;
                     }
                     // not next to water
-                    other.logger.fine("Tile (" + nextTile + ") is suitable.");
+                    logger.fine("Tile (" + nextTile + ") is suitable.");
                     other.sections.add(new RiverSection(source, dir));
                     source = nextTile;
                     continue flow;
@@ -407,6 +407,9 @@ public class River {
     private void drawToMap(List<RiverSection> sections) {
         RiverSection oldSection = null;
 
+        final boolean enableGreatRivers = map.getGame().getMapGeneratorOptions()
+                .getBoolean(MapGeneratorOptions.ENABLE_GREAT_RIVERS);
+        
         for (RiverSection section : sections) {
             riverMap.put(section.getTile(), this);
             if (oldSection != null) {
@@ -415,7 +418,7 @@ public class River {
             }
             Tile tile = section.getTile();
             if (tile.isLand()) {
-                if (section.getSize() >= TileImprovement.FJORD_RIVER) {
+                if (enableGreatRivers && section.getSize() >= TileImprovement.FJORD_RIVER) {
                     TileType greatRiver = map.getSpecification().getTileType("model.tile.greatRiver");
                     tile.changeType(greatRiver);
                     // changing the type resets the improvements
@@ -423,8 +426,9 @@ public class River {
                     logger.fine("Added fjord (magnitude: " + section.getSize() +
                                 ") to tile: " + section.getTile());
                 } else if (section.getSize() > TileImprovement.NO_RIVER) {
+                    final int magnitude = Math.min(section.getSize(), TileImprovement.LARGE_RIVER);
                     String style = section.encodeStyle();
-                    tile.addRiver(section.getSize(), style);
+                    tile.addRiver(magnitude, style);
                     logger.fine("Added river"
                         + "(magnitude: " + section.getSize()
                         + " style: " + style);

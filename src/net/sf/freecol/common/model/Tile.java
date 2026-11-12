@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -18,6 +18,24 @@
  */
 
 package net.sf.freecol.common.model;
+
+import static net.sf.freecol.common.model.Constants.INFINITY;
+import static net.sf.freecol.common.util.CollectionUtils.all;
+import static net.sf.freecol.common.util.CollectionUtils.any;
+import static net.sf.freecol.common.util.CollectionUtils.cacheInt;
+import static net.sf.freecol.common.util.CollectionUtils.cachingDoubleComparator;
+import static net.sf.freecol.common.util.CollectionUtils.concat;
+import static net.sf.freecol.common.util.CollectionUtils.count;
+import static net.sf.freecol.common.util.CollectionUtils.find;
+import static net.sf.freecol.common.util.CollectionUtils.flatten;
+import static net.sf.freecol.common.util.CollectionUtils.forEachMapEntry;
+import static net.sf.freecol.common.util.CollectionUtils.isNotNull;
+import static net.sf.freecol.common.util.CollectionUtils.matchKey;
+import static net.sf.freecol.common.util.CollectionUtils.maximize;
+import static net.sf.freecol.common.util.CollectionUtils.none;
+import static net.sf.freecol.common.util.CollectionUtils.sum;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+import static net.sf.freecol.common.util.RandomUtils.randomShuffle;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,13 +57,12 @@ import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
-import net.sf.freecol.common.model.Colony;
-import static net.sf.freecol.common.model.Constants.*;
-import net.sf.freecol.common.model.Direction;
-import static net.sf.freecol.common.util.CollectionUtils.*;
+import net.sf.freecol.common.model.Constants.IntegrityType;
+import net.sf.freecol.common.model.production.TileProductionCalculator;
+import net.sf.freecol.common.model.production.TileProductionCalculator.MaximumPotentialProduction;
+import net.sf.freecol.common.model.production.WorkerAssignment;
 import net.sf.freecol.common.util.LogBuilder;
 import net.sf.freecol.common.util.RandomChoice;
-import static net.sf.freecol.common.util.RandomUtils.*;
 
 
 /**
@@ -1266,10 +1283,10 @@ public final class Tile extends UnitLocation implements Named, Ownable {
      * @param mountains The mountain tile type.
      * @return True if this is a good potential elevated tile.
      */
-    public boolean isGoodMountainTile(TileType mountains) {
+    public boolean isGoodMountainTile() {
         return isGoodHillTile()
             // Not too close to an existing mountain range
-            && none(getSurroundingTiles(1, 3), t -> t.getType() == mountains);
+            && none(getSurroundingTiles(1, 3), t -> t.getType().isMountains());
     }
 
     /**
@@ -1283,7 +1300,7 @@ public final class Tile extends UnitLocation implements Named, Ownable {
     public boolean isGoodRiverTile(TileImprovementType riverType) {
         return riverType.isTileTypeAllowed(getType())
             // check the river source/spring is not too close to the ocean
-            && all(getSurroundingTiles(1, 2), Tile::isLand);
+            && all(getSurroundingTiles(1, 1), Tile::isLand);
     }
 
     /**
@@ -1714,12 +1731,23 @@ public final class Tile extends UnitLocation implements Named, Ownable {
      */
     public int getPotentialProduction(GoodsType goodsType,
                                       UnitType unitType) {
-        if (!canProduce(goodsType, unitType)) return 0;
 
-        int amount = getBaseProduction(null, goodsType, unitType);
-        amount = (int)applyModifiers(amount, getGame().getTurn(),
-                                     getProductionModifiers(goodsType, unitType));
-        return (amount < 0) ? 0 : amount;
+        final TileProductionCalculator tpc = new TileProductionCalculator(null, 0);
+        final ProductionType productionType = ProductionType.getBestProductionType(goodsType,
+                getType().getAvailableProductionTypes(unitType == null));
+        
+        final boolean colonyCenterTile = (unitType == null);
+        
+        final ProductionInfo pi = tpc.getBasicProductionInfo(this,
+                getGame().getTurn(),
+                new WorkerAssignment(unitType, productionType),
+                colonyCenterTile);
+        
+        return pi.getProduction().stream()
+                .filter(a -> a.getType().equals(goodsType))
+                .map(AbstractGoods::getAmount)
+                .findFirst()
+                .orElse(0);
     }
 
     /**
@@ -1738,38 +1766,6 @@ public final class Tile extends UnitLocation implements Named, Ownable {
 
     /**
      * Gets the maximum potential for producing the given type of
-     * goods with a given unit if this tile is (perhaps changed to)
-     * a given tile type.
-     *
-     * @param goodsType The {@code GoodsType} to check.
-     * @param unitType A {@code UnitType} to do the work.
-     * @param tileType A {@code TileType} to change to.
-     * @return The maximum potential.
-     */
-    private int getMaximumPotential(GoodsType goodsType, UnitType unitType,
-                                    TileType tileType) {
-        float potential = tileType.getPotentialProduction(goodsType, unitType);
-        if (tileType == getType()) { // Handle the resource in the noop case
-            Resource resource = (tileItemContainer == null) ? null
-                : tileItemContainer.getResource();
-            if (resource != null) {
-                potential = resource.applyBonus(goodsType, unitType,
-                                                (int)potential);
-            }
-        }
-        // Try applying all possible non-natural improvements.
-        final List<TileImprovementType> improvements
-            = getSpecification().getTileImprovementTypeList();
-        for (TileImprovementType ti : transform(improvements, ti ->
-                (!ti.isNatural() && ti.isTileTypeAllowed(tileType)
-                    && ti.getBonus(goodsType) > 0))) {
-            potential = ti.getProductionModifier(goodsType).applyTo(potential);
-        }
-        return (int)potential;
-    }
-
-    /**
-     * Gets the maximum potential for producing the given type of
      * goods.  The maximum potential is the potential of a tile after
      * the tile has been plowed/built road on.
      *
@@ -1778,32 +1774,27 @@ public final class Tile extends UnitLocation implements Named, Ownable {
      * @return The maximum potential.
      */
     public int getMaximumPotential(GoodsType goodsType, UnitType unitType) {
-        // If we consider maximum potential to the effect of having
-        // all possible improvements done, iterate through the
-        // improvements and get the bonuses of all related ones.  If
-        // there are options to change TileType using an improvement,
-        // consider that too.
-        final List<TileImprovementType> improvements
-            = getSpecification().getTileImprovementTypeList();
-
-        // Collect all the possible tile type changes.
-        List<TileType> tileTypes = transform(improvements,
-            ti -> !ti.isNatural() && ti.getChange(getType()) != null,
-            ti -> ti.getChange(getType()));
-        tileTypes.add(0, getType()); //...including the noop case.
-
-        // Find the maximum production under each tile type change.
-        return max(tileTypes, tt ->
-                   getMaximumPotential(goodsType, unitType, tt));
+        final TileProductionCalculator tpc = new TileProductionCalculator(null, 2);
+        final MaximumPotentialProduction maximumPotentialProduction = tpc.getMaximumPotentialProduction(goodsType, this, unitType);
+        return maximumPotentialProduction.getAmount(goodsType);
     }
 
     /**
-     * Sort possible goods types according to potential.
+     * Sort possible goods types according to potential of autoproduction.
+     *
+     * @return A list of goods, highest potential production first.
+     */
+    public List<AbstractGoods> getSortedAutoPotential() {
+        return getSortedPotential(null, null, false);
+    }
+    
+    /**
+     * Sort possible goods types according to potential with an expert working the tile.
      *
      * @return A list of goods, highest potential production first.
      */
     public List<AbstractGoods> getSortedPotential() {
-        return getSortedPotential(null, null);
+        return getSortedPotential(null, null, true);
     }
 
     /**
@@ -1813,7 +1804,7 @@ public final class Tile extends UnitLocation implements Named, Ownable {
      * @return A list of goods, highest potential production first.
      */
     public List<AbstractGoods> getSortedPotential(Unit unit) {
-        return getSortedPotential(unit.getType(), unit.getOwner());
+        return getSortedPotential(unit.getType(), unit.getOwner(), false);
     }
 
     /**
@@ -1821,15 +1812,27 @@ public final class Tile extends UnitLocation implements Named, Ownable {
      *
      * @param unitType The {@code UnitType} to do the work.
      * @param owner the {@code Player} owning the unit.
+     * @param useExperts Use the best expert for the given goods if
+     *      {@code unitType == null}.
      * @return A list of goods, highest potential production first.
      */
-    public List<AbstractGoods> getSortedPotential(UnitType unitType,
-                                                  Player owner) {
+    private List<AbstractGoods> getSortedPotential(UnitType unitType,
+                                                  Player owner,
+                                                  boolean useExperts) {
         // Defend against calls while partially read.
         if (getType() == null) return Collections.<AbstractGoods>emptyList();
         
-        final ToIntFunction<GoodsType> productionMapper = cacheInt(gt ->
-            getPotentialProduction(gt, unitType));
+        final ToIntFunction<GoodsType> productionMapper = cacheInt(gt -> {
+            final UnitType ut;
+            if (unitType != null) {
+                ut = unitType;
+            } else if (useExperts) {
+                ut = getSpecification().getExpertForProducing(gt);
+            } else {
+                ut = null;
+            }
+            return getPotentialProduction(gt, ut);
+        });
         final Predicate<GoodsType> productionPred = gt ->
             productionMapper.applyAsInt(gt) > 0;
         final Function<GoodsType, AbstractGoods> goodsMapper = gt ->
@@ -1852,11 +1855,31 @@ public final class Tile extends UnitLocation implements Named, Ownable {
      */
     public AbstractGoods getBestFoodProduction() {
         final Comparator<AbstractGoods> goodsComp
-            = Comparator.comparingInt(ag ->
-                getPotentialProduction(ag.getType(), null));
-        return maximize(flatten(getType().getAvailableProductionTypes(true),
-                                ProductionType::getOutputs),
-                        AbstractGoods::isFoodType, goodsComp);
+        = Comparator.comparingInt(ag ->
+            getPotentialProduction(ag.getType(), null));
+    return maximize(flatten(getType().getAvailableProductionTypes(true),
+                            ProductionType::getOutputs),
+                    AbstractGoods::isFoodType, goodsComp);
+    }
+    
+    /**
+     * Get the best food type to produce here with an appropriate expert.,
+     *
+     * @return The {@code AbstractGoods} to produce.
+     */
+    public AbstractGoods getMaximumPotentialFoodProductionWithExpert() {
+        return getSpecification().getFoodGoodsTypeList().stream()
+                .map(goodsType -> new AbstractGoods(goodsType,
+                        getMaximumPotential(goodsType, getSpecification().getExpertForProducing(goodsType))))
+                .max(Comparator.comparingInt(AbstractGoods::getAmount))
+                .orElse(null);
+    }
+    
+    public AbstractGoods getMaximumPotentialUnattendedFoodProduction() {
+        return getSpecification().getFoodGoodsTypeList().stream()
+                .map(goodsType -> new AbstractGoods(goodsType, getMaximumPotential(goodsType, null)))
+                .max(Comparator.comparingInt(AbstractGoods::getAmount))
+                .orElse(null);
     }
 
 
@@ -2449,7 +2472,21 @@ public final class Tile extends UnitLocation implements Named, Ownable {
         this.owner = game.updateRef(o.getOwner());
         // Allow settlement creation, might be first sight
         this.settlement = game.update(o.getSettlement(), true);
-        this.owningSettlement = game.updateRef(o.getOwningSettlement());
+        Settlement owning = null;
+        if (o.getOwningSettlement() != null) {
+            // There is an owning settlement for this tile.  Have we seen
+            // it before?  If so there will be a reference to it which we
+            // should use.
+            owning = game.updateRef(o.getOwningSettlement());
+            if (owning == null) {
+                // No, we have never seen it before.  In this case it
+                // is safe to create a skeleton settlement in the
+                // expectation that it will get filled in shortly in
+                // another part of the update we are processing.
+                owning = game.update(o.getOwningSettlement(), true);
+            }
+        }
+        this.owningSettlement = owning;
         // Allow TIC creation, might be the first time we see the tile
         this.tileItemContainer = game.update(o.getTileItemContainer(), true);
         this.region = game.updateRef(o.getRegion());

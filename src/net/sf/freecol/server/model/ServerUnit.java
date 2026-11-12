@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -69,7 +69,6 @@ import net.sf.freecol.common.model.WorkLocation;
 import net.sf.freecol.common.networking.ChangeSet;
 import net.sf.freecol.common.networking.ChangeSet.See;
 import net.sf.freecol.common.networking.FountainOfYouthMessage;
-import net.sf.freecol.common.networking.Message;
 import net.sf.freecol.common.networking.NewLandNameMessage;
 import net.sf.freecol.common.networking.NewRegionNameMessage;
 import net.sf.freecol.common.option.GameOptions;
@@ -339,7 +338,7 @@ public class ServerUnit extends Unit implements TurnTaker {
         final Player owner =  getOwner();
         setHitPoints(getHitPoints() + 1);
         if (!isDamaged()) {
-            Location loc = getLocation();
+            Location loc = Location.upLoc(getLocation());
             cs.addMessage(owner,
                 new ModelMessage(ModelMessage.MessageType.UNIT_REPAIRED,
                                  "model.unit.unitRepaired",
@@ -816,7 +815,6 @@ public class ServerUnit extends Unit implements TurnTaker {
 
         if (newTile.isLand()) {
             Settlement settlement;
-            Unit unit = null;
             int d;
             // Claim land for tribe?
             if ((newTile.getOwner() == null
@@ -1000,7 +998,8 @@ public class ServerUnit extends Unit implements TurnTaker {
             && (produce = getWorkType()) != null
             && (learn = spec.getExpertForProducing(produce)) != null
             && learn != getType()
-            && (uc = getUnitChange(UnitChangeType.EXPERIENCE,learn)) != null) {
+            && (uc = getUnitChange(UnitChangeType.EXPERIENCE,learn)) != null
+            && uc.probability > 0) {
             int maximumExperience = getType().getMaximumExperience();
             int maxValue = (100 * maximumExperience) / uc.probability;
             if (maxValue > 0
@@ -1023,7 +1022,7 @@ public class ServerUnit extends Unit implements TurnTaker {
         if (isInMission()) {
             getTile().updateIndianSettlement(owner);
             setMovesLeft(0);
-        } else if (isDamaged()) {
+        } else if (isDamagedAndUnderForcedRepair()) {
             setMovesLeft(0);
         } else {
             setMovesLeft(getInitialMovesLeft());

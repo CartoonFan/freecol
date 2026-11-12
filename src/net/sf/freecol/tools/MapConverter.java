@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -23,14 +23,15 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 
 import javax.imageio.ImageIO;
 import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.FreeCol;
 import net.sf.freecol.common.FreeColException;
+import net.sf.freecol.common.io.FreeColRules;
 import net.sf.freecol.common.io.FreeColSavegameFile;
-import net.sf.freecol.common.io.FreeColTcFile;
 import net.sf.freecol.common.model.Specification;
 import net.sf.freecol.server.FreeColServer;
 
@@ -42,8 +43,8 @@ public class MapConverter {
 
     public static void main(String[] args) throws Exception {
 
-        FreeColTcFile.loadTCs();
-        Specification specification = FreeColTcFile.getFreeColTcFile("freecol").getSpecification();
+        FreeColRules.loadRules();
+        Specification specification = FreeColRules.getFreeColRulesFile("freecol").getSpecification();
 
         for (String filename : args) {
             File out = new File(filename);
@@ -59,14 +60,15 @@ public class MapConverter {
                     System.out.println("Renamed " + filename + " to " + newName + ".");
                     FreeColSavegameFile savegame = new FreeColSavegameFile(in);
                     BufferedImage thumbnail = null;
-                    try {
-                        thumbnail = ImageIO.read(savegame.getInputStream(FreeColSavegameFile.THUMBNAIL_FILE));
+                    try (InputStream thumbnailIn = savegame.getInputStream(FreeColSavegameFile.THUMBNAIL_FILE)) {
+                        thumbnail = ImageIO.read(thumbnailIn);
                         System.out.println("Loaded thumbnail.");
                     } catch (FileNotFoundException e) {
                         System.err.println("No thumbnail present.");
                     }
                     FreeColServer server
                         = new FreeColServer(savegame, specification,
+                                            null,
                                             FreeCol.getServerPort(),
                                             "mapTransformer");
                     System.out.println("Started server.");

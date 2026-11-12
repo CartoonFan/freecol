@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -71,7 +71,6 @@ import net.sf.freecol.server.ai.mission.IndianDemandMission;
 import net.sf.freecol.server.ai.mission.Mission;
 import net.sf.freecol.server.ai.mission.UnitSeekAndDestroyMission;
 import net.sf.freecol.server.ai.mission.UnitWanderHostileMission;
-import net.sf.freecol.server.model.ServerPlayer;
 
 
 /**
@@ -678,7 +677,7 @@ public final class NativeAIPlayer extends MissionAIPlayer {
         for (AIUnit au : getAIUnits()) {
             Mission mission = au.getMission();
             String reason = (mission == null) ? null : mission.invalidReason();
-            if (reason != null) au.setMission(null);
+            if (reason != null) au.changeMission(null);
         }
     }
 
@@ -733,13 +732,15 @@ public final class NativeAIPlayer extends MissionAIPlayer {
         } else {
             int[] randoms;
             abortInvalidMissions();
-            randoms = randomInts(logger, "Trades", air,
-                                 nSettlements, nSettlements);
-            secureSettlements(randoms, lb);
-            randoms = randomInts(logger, "Gifts", air, 100, nSettlements);
-            bringGifts(randoms, lb);
-            randoms = randomInts(logger, "Tribute", air, 100, nSettlements);
-            demandTribute(randoms, lb);
+            if (nSettlements > 0) {
+                randoms = randomInts(logger, "Trades", air,
+                                     nSettlements, nSettlements);
+                secureSettlements(randoms, lb);
+                randoms = randomInts(logger, "Gifts", air, 100, nSettlements);
+                bringGifts(randoms, lb);
+                randoms = randomInts(logger, "Tribute", air, 100, nSettlements);
+                demandTribute(randoms, lb);
+            }
             giveNormalMissions(lb);
             more = doMissions(getAIUnits(), lb);
         }
@@ -757,8 +758,7 @@ public final class NativeAIPlayer extends MissionAIPlayer {
      * {@inheritDoc}
      */
     @Override
-    public int adjustMission(AIUnit aiUnit, PathNode path, Class type,
-                             int value) {
+    public int adjustMission(AIUnit aiUnit, PathNode path, Class<?> type, int value) {
         if (type == DefendSettlementMission.class) {
             // Reduce value in proportion to the number of active defenders.
             Settlement settlement = (Settlement)DefendSettlementMission

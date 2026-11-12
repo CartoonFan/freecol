@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,7 +19,23 @@
 
 package net.sf.freecol.common.model;
 
-import java.util.ArrayList;
+import static net.sf.freecol.common.model.Constants.INFINITY;
+import static net.sf.freecol.common.model.Constants.UNDEFINED;
+import static net.sf.freecol.common.util.CollectionUtils.alwaysTrue;
+import static net.sf.freecol.common.util.CollectionUtils.any;
+import static net.sf.freecol.common.util.CollectionUtils.cachingIntComparator;
+import static net.sf.freecol.common.util.CollectionUtils.concat;
+import static net.sf.freecol.common.util.CollectionUtils.find;
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.flatten;
+import static net.sf.freecol.common.util.CollectionUtils.minimize;
+import static net.sf.freecol.common.util.CollectionUtils.none;
+import static net.sf.freecol.common.util.CollectionUtils.rotate;
+import static net.sf.freecol.common.util.CollectionUtils.sum;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+import static net.sf.freecol.common.util.StringUtils.getEnumKey;
+import static net.sf.freecol.common.util.StringUtils.lastPart;
+
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -27,27 +43,22 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.logging.Logger;
 
 import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
-import net.sf.freecol.common.model.CombatModel;
-import static net.sf.freecol.common.model.Constants.*;
-import net.sf.freecol.common.model.Direction;
+import net.sf.freecol.common.model.Constants.IntegrityType;
 import net.sf.freecol.common.model.pathfinding.CostDecider;
 import net.sf.freecol.common.model.pathfinding.CostDeciders;
 import net.sf.freecol.common.model.pathfinding.GoalDecider;
 import net.sf.freecol.common.model.pathfinding.GoalDeciders;
-import net.sf.freecol.common.model.UnitTypeChange;
 import net.sf.freecol.common.option.GameOptions;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.common.util.LogBuilder;
-import static net.sf.freecol.common.util.StringUtils.*;
 
 
 /**
@@ -435,7 +446,6 @@ public class Unit extends GoodsLocation
                     extra = StringTemplate.template("goldAmount")
                         .addAmount("%amount%", getTreasureAmount());
                 } else {
-                    boolean noEquipment = false;
                     // unequipped expert has no-equipment label
                     List<Role> expertRoles = type.getExpertRoles();
                     for (Role someRole : expertRoles) {
@@ -581,11 +591,12 @@ public class Unit extends GoodsLocation
     public boolean changeType(UnitType unitType) {
         if (!unitType.isAvailableTo(owner)) return false;
 
+        final double health = ((double) getHitPoints()) / getMaximumHitPoints(); 
         setType(unitType);
         if (getMovesLeft() > getInitialMovesLeft()) {
             setMovesLeft(getInitialMovesLeft());
         }
-        this.hitPoints = unitType.getHitPoints();
+        this.hitPoints = (int) (unitType.getHitPoints() * health);
         if (getTeacher() != null) {
             if (!canBeStudent(getTeacher())) {
                 getTeacher().setStudent(null);
@@ -997,8 +1008,25 @@ public class Unit extends GoodsLocation
      * @return A military {@code Role}, or null if none found.
      */
     public Role getMilitaryRole() {
-        return first(transform(getSpecification().getMilitaryRoles(),
-                               r -> roleIsAvailable(r)));
+        final Role bestMilitaryRole = getSpecification().getMilitaryRoles()
+                .filter(r -> roleIsAvailable(r) && !r.hasAbility(Ability.SPEAK_WITH_CHIEF))
+                .sorted((a, b) -> Double.compare(b.getOffence(), a.getOffence()))
+                .findFirst().orElse(null);
+        
+        return bestMilitaryRole;
+    }
+    
+    /**
+     * Gets the military roles for this unit that is not a scout.
+     *
+     * @return A sorted list of military roles for this unit, with
+     *      the best roles first.
+     */
+    public List<Role> getSortedMilitaryRoles() {
+        return getSpecification().getMilitaryRoles()
+                .filter(r -> roleIsAvailable(r) && !r.hasAbility(Ability.SPEAK_WITH_CHIEF))
+                .sorted((a, b) -> Double.compare(b.getOffence(), a.getOffence()))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -1437,8 +1465,21 @@ public class Unit extends GoodsLocation
         if (student != null) {
             result = getSpecification()
                 .getNeededTurnsOfTraining(getType(), student.getType());
+            
+            /*
+             * Allows mod to apply modifiers to the number of turns:
+             */
+            final Turn turn = getGame().getTurn();
+            result = (int) FeatureContainer.applyModifiers(result, turn, concat(
+                    getModifiers(Modifier.EDUCATION_TEACHING_TURNS, getType(), turn),
+                    (getColony() != null) ? getColony().getModifiers(Modifier.EDUCATION_TEACHING_TURNS, getType(), turn) : Stream.of()
+                    ));
+            
             if (getColony() != null) {
                 result -= getColony().getProductionBonus();
+            }
+            if (result <= 0) {
+                result = 1;
             }
         }
         return result;
@@ -1497,7 +1538,7 @@ public class Unit extends GoodsLocation
         }
         UnitTypeChange uc = (uct == null || !uct.appliesTo(this)) ? null
             : uct.getUnitChange(getType(), toType);
-        return (uc == null || !uc.isAvailableTo(player)) ? null : uc;
+        return (uc == null || !uc.isAvailableTo(player) || !uc.appliesTo(this)) ? null : uc;
     }
 
     /**
@@ -1653,6 +1694,16 @@ public class Unit extends GoodsLocation
     public int getHitPoints() {
         return hitPoints;
     }
+    
+    /**
+     * Gets the maximum hitspoints for the unit.
+     *
+     * @return The hit points this {@code Unit} has at full health.
+     * @see UnitType#getHitPoints
+     */
+    public int getMaximumHitPoints() {
+        return type.getHitPoints();
+    }
 
     /**
      * Sets the hit points for this unit.
@@ -1668,8 +1719,12 @@ public class Unit extends GoodsLocation
      *
      * @return True if under repair.
      */
+    public boolean isDamagedAndUnderForcedRepair() {
+        return isDamaged() && !getSpecification().hasAbility(Ability.HITPOINTS_COMBAT_MODEL);
+    }
+    
     public boolean isDamaged() {
-        return hitPoints < this.type.getHitPoints();
+        return hitPoints < getMaximumHitPoints();
     }
 
     /**
@@ -1678,7 +1733,7 @@ public class Unit extends GoodsLocation
      * @return The number of turns left to be repaired.
      */
     public int getTurnsForRepair() {
-        return this.type.getHitPoints() - getHitPoints();
+        return getMaximumHitPoints() - getHitPoints();
     }
 
     /**
@@ -2312,7 +2367,7 @@ public class Unit extends GoodsLocation
         if (target == null) {
             return (getOwner().canMoveToEurope()) ? MoveType.MOVE_HIGH_SEAS
                 : MoveType.MOVE_NO_EUROPE;
-        } else if (isDamaged()) {
+        } else if (isDamagedAndUnderForcedRepair()) {
             return MoveType.MOVE_NO_REPAIR;
         }
 
@@ -2384,8 +2439,12 @@ public class Unit extends GoodsLocation
                     return (allowMoveFrom(from))
                         ? MoveType.ENTER_FOREIGN_COLONY_WITH_SCOUT
                         : MoveType.MOVE_NO_ACCESS_WATER;
-                } else if (settlement instanceof IndianSettlement
-                    && hasAbility(Ability.SPEAK_WITH_CHIEF)) {
+                } else if (settlement instanceof IndianSettlement && hasAbility(Ability.SPEAK_WITH_CHIEF)) {
+                    final IndianSettlement is = (IndianSettlement) settlement;
+                    if (!from.isLand() && is.getContactLevel(owner) == IndianSettlement.ContactLevel.UNCONTACTED) {
+                        return MoveType.MOVE_NO_ACCESS_CONTACT;
+                    }
+                                    
                     return (allowMoveFrom(from))
                         ? MoveType.ENTER_INDIAN_SETTLEMENT_WITH_SCOUT
                         : MoveType.MOVE_NO_ACCESS_WATER;
@@ -2682,7 +2741,7 @@ public class Unit extends GoodsLocation
      */
     public boolean isReadyToTrade() {
         return !isDisposed()
-            && !isDamaged()
+            && !isDamagedAndUnderForcedRepair()
             && !isAtSea()
             && !isOnCarrier()
             && !isInColony()
@@ -2699,7 +2758,7 @@ public class Unit extends GoodsLocation
      */
     private boolean readyAndAble() {
         return !isDisposed()
-            && !isDamaged()
+            && !isDamagedAndUnderForcedRepair()
             && !isAtSea()
             && !isOnCarrier()
             && !isInColony()
@@ -2712,6 +2771,15 @@ public class Unit extends GoodsLocation
      * needs to be currently movable by the player.
      *
      * Used as a predicate in Player.nextActiveUnitIterator.
+     *
+     * @return True if this unit could still be moved by the player.
+     */
+    public boolean isCandidateForNextActiveUnit() {
+        return couldMove() && !isInEurope();
+    }
+    
+    /**
+     * Checks if the unit is currently movable by the player.
      *
      * @return True if this unit could still be moved by the player.
      */
@@ -3609,7 +3677,7 @@ public class Unit extends GoodsLocation
         final TradeRoute tradeRoute = getTradeRoute();
         StringTemplate ret;
         if (player != null && player.owns(this)) {
-            if (isDamaged()) {
+            if (isDamagedAndUnderForcedRepair()) {
                 if (full) {
                     ret = StringTemplate.label(":")
                         .add("model.unit.occupation.underRepair")
@@ -4111,7 +4179,8 @@ public class Unit extends GoodsLocation
      * -til: While units do not contribute to tile appearance as such, if
      *     they move in/out of a colony the visible colony size changes.
      *
-     * @param newLocation The Tile where this Unit is located. Or null if its location is Europe.
+     * @param newLocation The {@code Location} where this {@code Unit}
+     *      is to be located.
      * @return True if the location change succeeds.
      */
     @Override
@@ -4382,6 +4451,13 @@ public class Unit extends GoodsLocation
         return getCargoCapacity();
     }
 
+    public boolean canAttackRanged(Tile tile) {
+        return getType().getAttackRange() >= getTile().getDistanceTo(tile)
+                && (
+                    tile.getSettlement() != null && tile.getSettlement().getOwner() != getOwner()
+                    || tile.getDefendingUnit(this) != null && tile.getDefendingUnit(this).getOwner() != getOwner()
+                );
+    }
 
     // Override FreeColGameObject
 
@@ -4606,7 +4682,6 @@ public class Unit extends GoodsLocation
     // Serialization
 
     private static final String ATTRITION_TAG = "attrition";
-    private static final String COUNT_TAG = "count";
     private static final String CURRENT_STOP_TAG = "currentStop";
     private static final String DESTINATION_TAG = "destination";
     private static final String ENTRY_LOCATION_TAG = "entryLocation";
@@ -4658,6 +4733,8 @@ public class Unit extends GoodsLocation
         xw.writeAttribute(ROLE_TAG, role);
 
         xw.writeAttribute(ROLE_COUNT_TAG, roleCount);
+        
+        xw.writeAttribute(HIT_POINTS_TAG, hitPoints);
 
         if (!xw.validFor(getOwner()) && isOwnerHidden()) {
             // Pirates do not disclose national characteristics.
@@ -4699,8 +4776,6 @@ public class Unit extends GoodsLocation
             xw.writeAttribute(INDIAN_SETTLEMENT_TAG, indianSettlement);
 
             xw.writeAttribute(WORK_LEFT_TAG, workLeft);
-
-            xw.writeAttribute(HIT_POINTS_TAG, hitPoints);
 
             xw.writeAttribute(ATTRITION_TAG, attrition);
 

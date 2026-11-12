@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -23,6 +23,7 @@ import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;
 import java.util.logging.Logger;
 
+import javax.swing.AbstractAction;
 import javax.swing.JLabel;
 import javax.swing.JTextField;
 
@@ -60,6 +61,13 @@ public final class ChatPanel extends FreeColPanel {
         this.field.addActionListener(this);
         add(this.field, BorderLayout.CENTER);
         this.field.setFocusable(true);
+        
+        setEscapeAction(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                getGUI().removeComponent(ChatPanel.this);
+            }
+        });
 
         setSize(getPreferredSize());
     }
@@ -98,7 +106,9 @@ public final class ChatPanel extends FreeColPanel {
             switch (Integer.parseInt(command)) {
             case CHAT:
                 String message = getChatText();
-                igc().chat(message);
+                if (!message.trim().equals("")) {
+                    igc().chat(message);
+                }
                 getGUI().removeComponent(this);
                 break;
             default:

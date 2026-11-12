@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -380,7 +380,7 @@ public class ModelMessage extends StringTemplate {
                         if (index > start) {
                             next.add(str.substring(start, index));
                         }
-                        next.add(b);
+                        next.add(Utility.getMessageButton(key, val, player, source));
                         start = index + val.length();
                     }
                     next.add(str.substring(start, str.length()));

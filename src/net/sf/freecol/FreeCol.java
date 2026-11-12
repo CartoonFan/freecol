@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,64 +19,73 @@
 
 package net.sf.freecol;
 
+import static net.sf.freecol.common.util.CollectionUtils.alwaysTrue;
+import static net.sf.freecol.common.util.CollectionUtils.find;
+import static net.sf.freecol.common.util.CollectionUtils.map;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+import static net.sf.freecol.common.util.StringUtils.upCase;
+
 import java.awt.Dimension;
+import java.awt.GraphicsDevice;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Writer;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.JarURLConnection;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 
+import javax.swing.SwingUtilities;
 import javax.xml.stream.XMLStreamException;
-
-import net.sf.freecol.client.ClientOptions;
-import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.common.FreeColException;
-import net.sf.freecol.common.FreeColSeed;
-import net.sf.freecol.common.debug.FreeColDebugger;
-import net.sf.freecol.common.i18n.Messages;
-import net.sf.freecol.common.io.FreeColDirectories;
-import net.sf.freecol.common.io.FreeColSavegameFile;
-import net.sf.freecol.common.io.FreeColModFile;
-import net.sf.freecol.common.io.FreeColTcFile;
-import net.sf.freecol.common.logging.DefaultHandler;
-import static net.sf.freecol.common.model.Constants.*;
-import net.sf.freecol.common.model.NationOptions.Advantages;
-import net.sf.freecol.common.model.Specification;
-import net.sf.freecol.common.model.StringTemplate;
-import net.sf.freecol.common.option.OptionGroup;
-import static net.sf.freecol.common.util.CollectionUtils.*;
-import net.sf.freecol.common.util.LogBuilder;
-import net.sf.freecol.common.util.OSUtils;
-import static net.sf.freecol.common.util.StringUtils.*;
-import net.sf.freecol.common.util.Utils;
-import net.sf.freecol.server.FreeColServer;
-import net.sf.freecol.server.control.Controller;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-import org.apache.commons.cli.DefaultParser;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import net.sf.freecol.client.ClientOptions;
+import net.sf.freecol.client.FreeColClient;
+import net.sf.freecol.client.gui.SplashScreen;
+import net.sf.freecol.common.FreeColException;
+import net.sf.freecol.common.FreeColSeed;
+import net.sf.freecol.common.FreeColUserMessageException;
+import net.sf.freecol.common.debug.FreeColDebugger;
+import net.sf.freecol.common.i18n.Messages;
+import net.sf.freecol.common.io.FreeColDirectories;
+import net.sf.freecol.common.io.FreeColModFile;
+import net.sf.freecol.common.io.FreeColRules;
+import net.sf.freecol.common.io.FreeColSavegameFile;
+import net.sf.freecol.common.logging.DefaultHandler;
+import net.sf.freecol.common.model.Constants.IntegrityType;
+import net.sf.freecol.common.model.NationOptions.Advantages;
+import net.sf.freecol.common.model.Specification;
+import net.sf.freecol.common.model.StringTemplate;
+import net.sf.freecol.common.option.OptionGroup;
+import net.sf.freecol.common.util.LogBuilder;
+import net.sf.freecol.common.util.OSUtils;
+import net.sf.freecol.common.util.Utils;
+import net.sf.freecol.server.FreeColServer;
+import net.sf.freecol.server.control.Controller;
 
 
 /**
@@ -87,11 +96,23 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
  * @see net.sf.freecol.server.FreeColServer FreeColServer
  */
 public final class FreeCol {
+	
+    static {
+        /*
+         * Deactivate automatic UI scaling since we are solving it
+         * manually instead.
+         * 
+         * This needs to be done before any Swing/AWT class gets
+         * loaded. Please keep this static block right here at the top.
+         */
+        System.setProperty("sun.java2d.uiScale", "1.0");
+        System.setProperty("sun.java2d.uiScale.enabled", "false");
+    }
 
     private static final Logger logger = Logger.getLogger(FreeCol.class.getName());
 
     /** The FreeCol release version number. */
-    private static final String FREECOL_VERSION = "0.11.6";
+    private static final String FREECOL_VERSION = "1.2.0+git";
 
     /** The FreeCol protocol version number. */
     private static final String FREECOL_PROTOCOL_VERSION = "0.1.6";
@@ -113,7 +134,6 @@ public final class FreeCol {
 
     /** The maximum available memory. */
     private static final long MEMORY_MAX = Runtime.getRuntime().maxMemory();
-    private static final long MEGA = 1000000; // Metric
 
     public static final String  CLIENT_THREAD = "FreeColClient:";
     public static final String  SERVER_THREAD = "FreeColServer:";
@@ -138,13 +158,17 @@ public final class FreeCol {
     private static final int    GUI_SCALE_STEP_PCT = 25;
     public static final float   GUI_SCALE_STEP = GUI_SCALE_STEP_PCT / 100.0f;
     private static final Level  LOGLEVEL_DEFAULT = Level.INFO;
-    private static final String JAVA_VERSION_MIN = "1.8";
-    private static final long   MEMORY_MIN = 512000000; // 512M
+    private static final String JAVA_VERSION_MIN = "11";
+    private static final long   MEMORY_MIN = 536500000; // a bit less than 512MB
+    private static final long   MEMORY_MIN_IN_MB = 512; // a bit less than 512MB
+    private static final long   SOFT_MEMORY_MIN = 2000000000; // a bit less than 2GB
+    private static final long   SOFT_MEMORY_MIN_IN_GB = 2;
     private static final String META_SERVER_ADDRESS = "meta.freecol.org";
     private static final int    META_SERVER_PORT = 3540;
     private static final int    PORT_DEFAULT = 3541;
     private static final String SPLASH_DEFAULT = "splash.jpg";
-    private static final String TC_DEFAULT = "freecol";
+    private static final String TC_DEFAULT = "default";
+    private static final String RULES_DEFAULT = "freecol";
     public static final long    TIMEOUT_DEFAULT = 60L; // 1 minute
     public static final long    TIMEOUT_MIN = 10L; // 10s
     public static final long    TIMEOUT_MAX = 3600000L; // 1000hours:-)
@@ -211,14 +235,18 @@ public final class FreeCol {
     private static String name = null;
 
     /** How to name and configure the server. */
+    private static InetAddress serverAddress = null;
     private static int serverPort = -1;
     private static String serverName = null;
 
     /** A stream to get the splash image from. */
     private static InputStream splashStream;
 
-    /** The TotalConversion / ruleset in play, defaults to "freecol". */
+    /** The TotalConversion in play, defaults to "default". */
     private static String tc = null;
+    
+    /** The ruleset in play, defaults to "freecol". */
+    private static String rules = null;
 
     /** The time out (seconds) for otherwise blocking commands. */
     private static long timeout = -1L;
@@ -228,9 +256,6 @@ public final class FreeCol {
      * to require windowed mode with best determined screen size.
      */
     private static Dimension windowSize = WINDOWSIZE_FALLBACK;
-
-    /** How much gui elements get scaled. */
-    private static float guiScale = GUI_SCALE_DEFAULT;
 
     /** The special client options that must be processed early. */
     private static Map<String,String> specialOptions = null;
@@ -246,6 +271,7 @@ public final class FreeCol {
     public static void main(String[] args) {
         freeColRevision = FREECOL_VERSION;
         JarURLConnection juc;
+        
         try {
             juc = getJarURLConnection(FreeCol.class);
         } catch (ClassCastException cce) {
@@ -301,7 +327,15 @@ public final class FreeCol {
             // Memory message is in Mbytes, hence division by MEGA.
             fatal(StringTemplate.template("main.memory")
                 .addAmount("%memory%", MEMORY_MAX)
-                .addAmount("%minMemory%", MEMORY_MIN / MEGA));
+                .addAmount("%minMemory%", MEMORY_MIN_IN_MB));
+        }
+        if (memoryCheck && MEMORY_MAX < SOFT_MEMORY_MIN) {
+            System.err.println();
+            System.err.println();
+            System.err.println(Messages.message(StringTemplate.template("main.memoryLow")
+                .addAmount("%memory%", MEMORY_MAX)
+                .add("%minMemory%", SOFT_MEMORY_MIN_IN_GB + "G")));
+            System.err.println();
         }
 
         // Having parsed the command line args, we know where the user
@@ -322,8 +356,14 @@ public final class FreeCol {
         } catch (FreeColException e) {
             System.err.println("Logging initialization failure: " + e);
         }
+        
+        // This is overridden by FreeColClient.
         Thread.setDefaultUncaughtExceptionHandler((Thread thread, Throwable e) -> {
                 baseLogger.log(Level.WARNING, "Uncaught exception from thread: " + thread, e);
+                if (e instanceof Error) {
+                    e.printStackTrace();
+                    System.exit(1);
+                }
             });
 
         // Now we can find the client options, allow the options
@@ -351,8 +391,8 @@ public final class FreeCol {
         }
 
         // Now we have the user mods directory and the locale is now
-        // stable, load the TCs, the mods and their messages.
-        FreeColTcFile.loadTCs();
+        // stable, load the rules, the mods and their messages.
+        FreeColRules.loadRules();
         FreeColModFile.loadMods();
         Messages.loadModMessageBundle(getLocale());
 
@@ -454,11 +494,10 @@ public final class FreeCol {
      * @return The {@code JarURLConnection}.
      * @exception IOException if the connection fails to open.
      */
-    private static JarURLConnection getJarURLConnection(Class c)
-        throws IOException {
+    private static JarURLConnection getJarURLConnection(Class<?> c) throws IOException {
         String resourceName = "/" + c.getName().replace('.', '/') + ".class";
         URL url = c.getResource(resourceName);
-        return (JarURLConnection)url.openConnection();
+        return (JarURLConnection) url.openConnection();
     }
         
     /**
@@ -602,7 +641,6 @@ public final class FreeCol {
         { null,  "fast", "cli.fast", null },
         { "f", "font", "cli.font", "cli.arg.font" },
         { "F", "full-screen", "cli.full-screen", null },
-        { "g", "gui-scale", getGUIScaleDescription(), "!cli.arg.gui-scale" },
         { "H", "headless", "cli.headless", null },
         { "l", "load-savegame", "cli.load-savegame", argFile },
         { null,  "log-console", "cli.log-console", null },
@@ -616,9 +654,11 @@ public final class FreeCol {
         { null,  "no-sound", "cli.no-sound", null },
         { null,  "no-splash", "cli.no-splash", null },
         { "p", "private", "cli.private", null },
+        { "r", "rules", "cli.rules", "cli.arg.name" },
         { "Z", "seed", "cli.seed", "cli.arg.seed" },
         { null,  "server", "cli.server", null },
         { null,  "server-name", "cli.server-name", "cli.arg.name" },
+        { null,  "server-ip", "cli.server-ip", "cli.arg.serverIp" },
         { null,  "server-port", "cli.server-port", "cli.arg.port" },
         { "s", "splash", "cli.splash", "!" + argFile },
         { "t", "tc", "cli.tc", "cli.arg.name" },
@@ -751,15 +791,6 @@ public final class FreeCol {
                 windowSize = null;
             }
 
-            if (line.hasOption("gui-scale")) {
-                String arg = line.getOptionValue("gui-scale");
-                if(!setGUIScale(arg)) {
-                    gripe(StringTemplate.template("cli.error.gui-scale")
-                        .addName("%scales%", getValidGUIScales())
-                        .addName("%arg%", arg));
-                }
-            }
-
             if (line.hasOption("headless")) {
                 headless = true;
             }
@@ -834,6 +865,13 @@ public final class FreeCol {
                         .addName("%string%", arg));
                 }
             }
+            if (line.hasOption("server-ip")) {
+                String arg = line.getOptionValue("server-ip");
+                if (!setServerAddress(arg)) {
+                    fatal(StringTemplate.template("cli.error.serverIp")
+                        .addName("%string%", arg));
+                }
+            }
 
             boolean seeded = (line.hasOption("seed")
                 && FreeColSeed.setFreeColSeed(line.getOptionValue("seed")));
@@ -851,7 +889,11 @@ public final class FreeCol {
             }
 
             if (line.hasOption("tc")) {
-                setTC(line.getOptionValue("tc")); // Failure is deferred.
+                setTc(line.getOptionValue("tc")); // Failure is deferred.
+            }
+            
+            if (line.hasOption("rules")) {
+                setRules(line.getOptionValue("rules")); // Failure is deferred.
             }
 
             if (line.hasOption("timeout")) {
@@ -917,7 +959,7 @@ public final class FreeCol {
      */
     private static void printUsage(Options options, int status) {
         HelpFormatter formatter = new HelpFormatter();
-        formatter.printHelp("java -Xmx1G -jar freecol.jar [OPTIONS]",
+        formatter.printHelp("java -Xmx2G -jar freecol.jar [OPTIONS]",
                             options);
         quit(status);
     }
@@ -925,19 +967,19 @@ public final class FreeCol {
     /**
      * Get the specification from a given TC file.
      *
-     * @param tcf The {@code FreeColTcFile} to load.
+     * @param rulesFile The {@code FreeColModFile} to load.
      * @param advantages An optional {@code Advantages} setting.
      * @param difficulty An optional difficulty level.
      * @return A {@code Specification}.
      */
-    public static Specification loadSpecification(FreeColTcFile tcf,
+    public static Specification loadSpecification(FreeColModFile rulesFile,
                                                   Advantages advantages,
                                                   String difficulty) {
         Specification spec = null;
         try {
-            if (tcf != null) spec = tcf.getSpecification();
+            if (rulesFile != null) spec = rulesFile.getSpecification();
         } catch (IOException|XMLStreamException ex) {
-            System.err.println("Spec read failed in " + tcf.getId()
+            System.err.println("Spec read failed in " + rulesFile.getId()
                 + ": " + ex.getMessage() + "\n");
         }
         if (spec != null) spec.prepare(advantages, difficulty);
@@ -945,16 +987,16 @@ public final class FreeCol {
     }
 
     /**
-     * Get the specification from the specified TC.
+     * Get the specification from the currently selected rules.
      *
      * @return A {@code Specification}, quits on error.
      */
-    private static Specification getTCSpecification() {
-        Specification spec = loadSpecification(getTCFile(), getAdvantages(),
+    private static Specification getRulesSpecification() {
+        Specification spec = loadSpecification(getRulesFile(), getAdvantages(),
                                                getDifficulty());
         if (spec == null) {
             fatal(StringTemplate.template("cli.error.badTC")
-                .addName("%tc%", getTC()));
+                .addName("%tc%", getRules()));
         }
         return spec;
     }
@@ -1118,37 +1160,6 @@ public final class FreeCol {
     }
 
     /**
-     * Sets the scale for GUI elements.
-     * 
-     * @param arg The optional command line argument to be parsed.
-     * @return If the argument was correctly formatted.
-     */
-    private static boolean setGUIScale(String arg) {
-        boolean valid = true;
-        if(arg == null) {
-            guiScale = GUI_SCALE_MAX;
-        } else {
-            try {
-                int n = Integer.parseInt(arg);
-                if (n < GUI_SCALE_MIN_PCT) {
-                    valid = false;
-                    n = GUI_SCALE_MIN_PCT;
-                } else if(n > GUI_SCALE_MAX_PCT) {
-                    valid = false;
-                    n = GUI_SCALE_MAX_PCT;
-                } else if(n % GUI_SCALE_STEP_PCT != 0) {
-                    valid = false;
-                }
-                guiScale = ((float)n / GUI_SCALE_STEP_PCT) * GUI_SCALE_STEP;
-            } catch (NumberFormatException nfe) {
-                valid = false;
-                guiScale = GUI_SCALE_MAX;
-            }
-        }
-        return valid;
-    }
-
-    /**
      * Gets the valid scale factors for the GUI.
      * 
      * @return A string containing these.
@@ -1159,16 +1170,6 @@ public final class FreeCol {
              i += GUI_SCALE_STEP_PCT) sb.append(i).append(',');
         sb.setLength(sb.length()-1);
         return sb.toString();
-    }
-
-    /**
-     * Get a description of the GUI scale argument.
-     *
-     * @return A suitable description.
-     */
-    private static String getGUIScaleDescription() {
-        return Messages.message(StringTemplate.template("cli.gui-scale")
-                                    .addName("%scales%", getValidGUIScales()));
     }
 
     /**
@@ -1298,20 +1299,30 @@ public final class FreeCol {
      *
      * @return The host name.
      */
-    public static String getServerHost() {
-        try {
-            return InetAddress.getLocalHost().getHostAddress();
-        } catch (Exception e) {}
+    public static String getDefaultServerHost() {
         return InetAddress.getLoopbackAddress().getHostAddress();
     }
 
     /**
      * Gets the server network port.
      *
-     * @return The port number.
+     * @return The port number the server will be listening on.
      */
     public static int getServerPort() {
         return (serverPort < 0) ? PORT_DEFAULT : serverPort;
+    }
+    
+    /**
+     * Gets the server address.
+     * 
+     * @return The {@code InetAddress} the server will be listening on.
+     */
+    public static InetAddress getServerName() {
+        try {
+            return (serverAddress == null) ? InetAddress.getByName("0.0.0.0") : serverAddress;
+        } catch (UnknownHostException e) {
+            return Inet4Address.getLoopbackAddress();
+        }
     }
 
     /**
@@ -1329,16 +1340,32 @@ public final class FreeCol {
         }
         return true;
     }
+    
+    /**
+     * Sets the server address.
+     *
+     * @param arg The server address.
+     * @return True if the address was set.
+     */
+    private static boolean setServerAddress(String arg) {
+        if (arg == null) return false;
+        try {
+            serverAddress = InetAddress.getByName(arg);
+        } catch (UnknownHostException e) {
+            return false;
+        }
+        return true;
+    }
 
     /**
      * Gets the current Total-Conversion.
      *
      * @return Usually TC_DEFAULT, but can be overridden at the command line.
      */
-    public static String getTC() {
+    public static String getTc() {
         return (tc == null) ? TC_DEFAULT : tc;
     }
-
+    
     /**
      * Sets the Total-Conversion.
      *
@@ -1346,17 +1373,37 @@ public final class FreeCol {
      *
      * @param tc The name of the new total conversion.
      */
-    public static void setTC(String tc) {
+    public static void setTc(String tc) {
         FreeCol.tc = tc;
+    }
+    
+    /**
+     * Gets the current rules
+     *
+     * @return Usually RULES_DEFAULT, but can be overridden at the command line.
+     */
+    public static String getRules() {
+        return (rules == null) ? RULES_DEFAULT : rules;
     }
 
     /**
-     * Gets the FreeColTcFile for the current TC.
+     * Sets the rules.
      *
-     * @return The {@code FreeColTcFile}.
+     * Called from NewPanel when a selection is made.
+     *
+     * @param tc The name of the new total conversion.
      */
-    public static FreeColTcFile getTCFile() {
-        return FreeColTcFile.getFreeColTcFile(getTC());
+    public static void setRules(String tc) {
+        FreeCol.rules = tc;
+    }
+
+    /**
+     * Gets the FreeColModFile for the current rules.
+     *
+     * @return The {@code FreeColModFile}.
+     */
+    public static FreeColModFile getRulesFile() {
+        return FreeColRules.getFreeColRulesFile(getRules());
     }
 
     /**
@@ -1463,6 +1510,10 @@ public final class FreeCol {
      */
     public static StringTemplate errorFromException(Exception ex,
                                                     StringTemplate fallback) {
+        if (ex instanceof FreeColUserMessageException) {
+            return ((FreeColUserMessageException) ex).getStringTemplate();
+        }
+        
         String msg;
         return (ex == null || (msg = ex.getMessage()) == null)
             ? fallback
@@ -1523,25 +1574,56 @@ public final class FreeCol {
      * Start a client.
      */
     private static void startClient() {
-        Specification spec = null;
-        File savegame = FreeColDirectories.getSavegameFile();
-        if (debugStart) {
-            spec = FreeCol.getTCSpecification();
-        } else if (fastStart) {
-            if (savegame == null) {
-                // continue last saved game if possible,
-                // otherwise start a new one
-                savegame = FreeColDirectories.getLastSaveGameFile();
-                if (savegame == null) {
-                    spec = FreeCol.getTCSpecification();
+        SwingUtilities.invokeLater(() -> {
+            /*
+             * Please do NOT move the splash screen into SwingGUI again. Make a separate
+             * interface if this needs to be pluggable.
+             * 
+             * The Swing-classes need to be constructed in the EDT -- and the splash screen
+             * is never displayed correctly if SwingGUI is loaded correctly in the EDT.
+             * 
+             * In addition, the splash screen should not be displayed at the same time
+             * as a fullscreen frame.
+             */
+            
+            final SplashScreen splashScreen = createSplashScreen();
+            SwingUtilities.invokeLater(() -> {
+                Specification spec = null;
+                File savegame = FreeColDirectories.getSavegameFile();
+                if (debugStart) {
+                    spec = FreeCol.getRulesSpecification();
+                } else if (fastStart) {
+                    if (savegame == null) {
+                        // continue last saved game if possible,
+                        // otherwise start a new one
+                        savegame = FreeColDirectories.getLastSaveGameFile();
+                        if (savegame == null) {
+                            spec = FreeCol.getRulesSpecification();
+                        }
+                    }
+                    // savegame was specified on command line
                 }
-            }
-            // savegame was specified on command line
-        }
+                
+                new FreeColClient(splashScreen, fontName, windowSize,
+                                      (String)null, sound, introVideo, savegame, spec);
+            });
+        });
+        
 
-        new FreeColClient(splashStream, fontName,
-                          guiScale, windowSize,
-                          (String)null, sound, introVideo, savegame, spec);
+    }
+
+    private static SplashScreen createSplashScreen() {
+        SplashScreen splashScreen = null;
+        if (splashStream != null) {
+            try {
+                final GraphicsDevice defaultScreenDevice = Utils.getGoodGraphicsDevice();
+                splashScreen = new SplashScreen(defaultScreenDevice, splashStream);
+                splashScreen.setVisible(true);
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "Splash screen failure", e);
+            }
+        }
+        return splashScreen;
     }
 
     /**
@@ -1552,8 +1634,7 @@ public final class FreeCol {
      */
     public static FreeColClient startTestClient(Specification spec) {
         FreeCol.setHeadless(true);
-        return new FreeColClient((InputStream)null, (String)null,
-                                 FreeCol.GUI_SCALE_DEFAULT, (Dimension)null,
+        return new FreeColClient(null, (String)null, (Dimension)null,
                                  (String)null, false, false, (File)null, spec);
     }
 
@@ -1603,7 +1684,11 @@ public final class FreeCol {
                 final FreeColSavegameFile fis
                     = new FreeColSavegameFile(saveGame);
                 freeColServer = new FreeColServer(fis, (Specification)null,
-                                                  serverPort, serverName);
+                        serverAddress, serverPort, serverName);
+                freeColServer.setPublicServer(publicServer);
+                if (!freeColServer.registerWithMetaServer()) {
+                    fatal(Messages.message("server.noRouteToServer"));
+                }
             } catch (Exception e) {
                 logger.log(Level.SEVERE, "Load fail", e);
                 fatal(Messages.message(badFile("error.couldNotLoad", saveGame))
@@ -1613,10 +1698,13 @@ public final class FreeCol {
             if (checkIntegrity) checkServerIntegrity(freeColServer);
             if (freeColServer == null) return;
         } else {
-            Specification spec = FreeCol.getTCSpecification();
+            Specification spec = FreeCol.getRulesSpecification();
             try {
                 freeColServer = new FreeColServer(publicServer, false, spec,
-                                                  serverPort, serverName);
+                        serverAddress, serverPort, serverName);
+                if (!freeColServer.registerWithMetaServer()) {
+                    fatal(Messages.message("server.noRouteToServer"));
+                }
             } catch (Exception e) {
                 fatal(Messages.message("server.initialize")
                     + ": " + e.getMessage());

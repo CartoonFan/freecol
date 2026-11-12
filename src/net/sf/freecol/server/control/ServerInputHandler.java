@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,14 +19,11 @@
 
 package net.sf.freecol.server.control;
 
-import java.util.logging.Logger;
-
 import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.common.FreeColException;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.networking.ChangeSet;
-import net.sf.freecol.common.networking.ChangeSet.See;
 import net.sf.freecol.common.networking.Connection;
 import net.sf.freecol.common.networking.Message;
 import net.sf.freecol.common.networking.MessageHandler;
@@ -37,11 +34,7 @@ import net.sf.freecol.server.model.ServerPlayer;
 /**
  * Handles the network messages on the server side.
  */
-public final class ServerInputHandler extends FreeColServerHolder
-    implements MessageHandler {
-
-    private static final Logger logger = Logger.getLogger(ServerInputHandler.class.getName());
-
+public final class ServerInputHandler extends FreeColServerHolder implements MessageHandler {
 
     /**
      * The constructor to use.

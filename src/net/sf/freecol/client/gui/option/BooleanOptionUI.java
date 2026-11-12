@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -18,6 +18,8 @@
  */
 
 package net.sf.freecol.client.gui.option;
+
+import java.awt.event.ActionListener;
 
 import javax.swing.JCheckBox;
 
@@ -57,7 +59,18 @@ public final class BooleanOptionUI extends OptionUI<BooleanOption>  {
     public void setValue(boolean b) {
         box.setSelected(b);
     }
-
+    
+    public boolean getValue() {
+        return box.isSelected();
+    }
+    
+    public void addActionListener(ActionListener actionListener) {
+        box.addActionListener(actionListener);
+    }
+    
+    public void removeActionListener(ActionListener actionListener) {
+        box.removeActionListener(actionListener);
+    }
 
     // Implement OptionUI
 

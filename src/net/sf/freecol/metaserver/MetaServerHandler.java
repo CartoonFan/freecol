@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,7 +19,6 @@
 
 package net.sf.freecol.metaserver;
 
-import java.io.IOException;
 import java.util.logging.Logger;
 
 import javax.xml.stream.XMLStreamException;
@@ -27,13 +26,13 @@ import javax.xml.stream.XMLStreamException;
 import net.sf.freecol.common.FreeColException;
 import net.sf.freecol.common.metaserver.ServerInfo;
 import net.sf.freecol.common.networking.Connection;
+import net.sf.freecol.common.networking.ConnectionVerificationMessage;
 import net.sf.freecol.common.networking.DisconnectMessage;
 import net.sf.freecol.common.networking.Message;
 import net.sf.freecol.common.networking.MessageHandler;
 import net.sf.freecol.common.networking.RegisterServerMessage;
 import net.sf.freecol.common.networking.RemoveServerMessage;
 import net.sf.freecol.common.networking.ServerListMessage;
-import net.sf.freecol.common.networking.TrivialMessage;
 import net.sf.freecol.common.networking.UpdateServerMessage;
 
 
@@ -80,18 +79,23 @@ public final class MetaServerHandler implements MessageHandler {
             disconnect(connection);
             break;
         case RegisterServerMessage.TAG:
-            RegisterServerMessage rsm = (RegisterServerMessage)message;
+            final RegisterServerMessage rsm = (RegisterServerMessage) message;
             rsm.setAddress(connection.getHostAddress()); // Trust the connection
-            register(rsm);
+            final boolean connectable = register(rsm);
+            reply = new ConnectionVerificationMessage(connectable);
             break;
         case RemoveServerMessage.TAG:
-            remove((RemoveServerMessage)message);
+            final RemoveServerMessage removeServerMessage = (RemoveServerMessage) message;
+            removeServerMessage.setAddress(connection.getHostAddress()); // Trust the connection
+            remove(removeServerMessage);
+            
+            // TODO: Send connection.getHostAddress() and message about connectivity
             break;
         case ServerListMessage.TAG:
             reply = serverList();
             break;
         case UpdateServerMessage.TAG:
-            UpdateServerMessage usm = (UpdateServerMessage)message;
+            final UpdateServerMessage usm = (UpdateServerMessage) message;
             usm.setAddress(connection.getHostAddress()); // Trust the connection
             update(usm);
             break;
@@ -126,11 +130,12 @@ public final class MetaServerHandler implements MessageHandler {
      * Handle a "register"-request.
      * 
      * @param message The {@code RegisterServerMessage} to process.
+     * @return true if the server was registered.
      */
-    private void register(RegisterServerMessage message) {
+    private boolean register(RegisterServerMessage message) {
         final ServerInfo si = message.getServerInfo(); 
 
-        metaRegister.addServer(si);
+        return metaRegister.addServer(si);
     }
 
     /**

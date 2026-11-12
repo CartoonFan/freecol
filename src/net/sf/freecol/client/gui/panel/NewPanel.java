@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -22,12 +22,13 @@ package net.sf.freecol.client.gui.panel;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
+import java.net.InetAddress;
 import java.util.List;
 import java.util.logging.Logger;
 
+import javax.swing.AbstractAction;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -38,7 +39,6 @@ import javax.swing.JSeparator;
 import javax.swing.JTextField;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.FreeCol;
 import net.sf.freecol.client.ClientOptions;
 import net.sf.freecol.client.FreeColClient;
@@ -46,11 +46,13 @@ import net.sf.freecol.client.control.ConnectController;
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.plaf.FreeColComboBoxRenderer;
 import net.sf.freecol.common.i18n.Messages;
-import net.sf.freecol.common.io.FreeColTcFile;
+import net.sf.freecol.common.io.FreeColModFile;
+import net.sf.freecol.common.io.FreeColRules;
 import net.sf.freecol.common.metaserver.MetaServerUtils;
 import net.sf.freecol.common.metaserver.ServerInfo;
 import net.sf.freecol.common.model.NationOptions.Advantages;
 import net.sf.freecol.common.model.Specification;
+import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.option.OptionGroup;
 
 
@@ -112,12 +114,14 @@ public final class NewPanel extends FreeColPanel implements ItemListener {
 
     /** Start server port number label and field to input through. */
     private final JTextField serverPortField;
+    
+    private final JComboBox<InetAddress> serverAddressBox;
 
     /** The label for the rules selection. */
     private final JLabel rulesLabel;
 
     /** A box to choose the rules from. */
-    private final JComboBox<FreeColTcFile> rulesBox;
+    private final JComboBox<FreeColModFile> rulesBox;
 
     /** The check box to select a public server with. */
     private final JCheckBox publicServer;
@@ -188,15 +192,15 @@ public final class NewPanel extends FreeColPanel implements ItemListener {
         this.buttonGroup.add(single);
         single.setActionCommand(String.valueOf(NewPanelAction.SINGLE));
         single.addActionListener(ae -> enableComponents());
-        this.buttonGroup.add(join);
-        join.setActionCommand(String.valueOf(NewPanelAction.JOIN));
-        join.addActionListener(ae -> enableComponents());
         this.buttonGroup.add(start);
         start.setActionCommand(String.valueOf(NewPanelAction.START));
         start.addActionListener(ae -> enableComponents());
         this.buttonGroup.add(meta);
         meta.setActionCommand(String.valueOf(NewPanelAction.META_SERVER));
         meta.addActionListener(ae -> enableComponents());
+        this.buttonGroup.add(join);
+        join.setActionCommand(String.valueOf(NewPanelAction.JOIN));
+        join.addActionListener(ae -> enableComponents());
         single.setSelected(true);
 
         String name = getClientOptions().getText(ClientOptions.NAME);
@@ -219,22 +223,24 @@ public final class NewPanel extends FreeColPanel implements ItemListener {
         this.serverPortField.addActionListener((ActionEvent ae) -> {
                 getSelectedPort(NewPanel.this.serverPortField);
             });
+        
+        this.serverAddressBox = Utility.createServerInetAddressBox();
 
         this.rulesLabel = Utility.localizedLabel("rules");
         this.rulesBox = new JComboBox<>();
-        String selectTC;
+        String selectRules;
         if (this.fixedSpecification == null) { // Allow TC selection
-            selectTC = FreeCol.getTC();
-            for (FreeColTcFile tc : FreeColTcFile.getRulesList()) {
+            selectRules = FreeCol.getRules();
+            for (FreeColModFile tc : FreeColRules.getRulesList()) {
                 this.rulesBox.addItem(tc);
-                if (selectTC.equals(tc.getId())) {
+                if (selectRules.equals(tc.getId())) {
                     this.rulesBox.setSelectedItem(tc);
                 }
             }
         } else { // Force the use of the TC that contains the given spec
-            selectTC = this.fixedSpecification.getId();
-            for (FreeColTcFile tc : FreeColTcFile.getRulesList()) {
-                if (selectTC.equals(tc.getId())) {
+            selectRules = this.fixedSpecification.getId();
+            for (FreeColModFile tc : FreeColRules.getRulesList()) {
+                if (selectRules.equals(tc.getId())) {
                     this.rulesBox.addItem(tc);
                     this.rulesBox.setSelectedItem(tc);
                 }
@@ -242,15 +248,22 @@ public final class NewPanel extends FreeColPanel implements ItemListener {
         }
         if (this.rulesBox.getSelectedItem() == null) {
             this.rulesBox.setSelectedItem(this.rulesBox.getItemCount()-1);
-            logger.warning("No TC found for: " + selectTC
+            logger.warning("No TC found for: " + selectRules
                 + ", failling back to " + this.rulesBox.getSelectedItem());
         }
         this.rulesBox
-            .setRenderer(new FreeColComboBoxRenderer<FreeColTcFile>("mod."));
+            .setRenderer(new FreeColComboBoxRenderer<FreeColModFile>("mod."));
         this.rulesBox.addItemListener(this);
 
         this.publicServer
             = new JCheckBox(Messages.message("newPanel.publicServer"));
+        
+        serverAddressBox.addActionListener(event -> {
+            final InetAddress address = (InetAddress) serverAddressBox.getSelectedItem();
+            publicServer.setEnabled(!address.isLoopbackAddress());
+        });
+        final InetAddress address = (InetAddress) serverAddressBox.getSelectedItem();
+        publicServer.setEnabled(!address.isLoopbackAddress());
 
         this.difficultyLabel = Utility.localizedLabel("difficulty");
         this.difficultyBox = new JComboBox<>();
@@ -259,17 +272,15 @@ public final class NewPanel extends FreeColPanel implements ItemListener {
         this.difficultyBox.addItemListener(this);
         this.difficultyButton = Utility.localizedButton("newPanel.showDifficulty");
         this.difficultyButton.addActionListener(ae -> {
-                OptionGroup newDifficulty = getGUI()
-                    .showDifficultyDialog(this.specification, this.difficulty,
-                                          this.difficulty.isEditable());
-                if (newDifficulty != null) {
-                    this.difficulty = newDifficulty;
-                    update(true); // Brings in new difficulty if edited
+            getGUI().showDifficultyDialog(this.specification, this.difficulty, this.difficulty.isEditable(), (group) -> {
+                if (group != null) {
+                    update(true);
                 }
             });
+        });
 
         this.joinNameLabel = Utility.localizedLabel("host");
-        this.joinNameField = new JTextField(FreeCol.getServerHost());
+        this.joinNameField = new JTextField(FreeCol.getDefaultServerHost());
         this.joinPortLabel = Utility.localizedLabel("port");
         this.joinPortField
             = new JTextField(Integer.toString(FreeCol.getServerPort()));
@@ -290,7 +301,12 @@ public final class NewPanel extends FreeColPanel implements ItemListener {
                     gui.showMainPanel(null);
                 }
             });
-        setCancelComponent(cancel);
+        setEscapeAction(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                cancel.doClick();
+            }
+        });
 
         // Add all the components
         add(Utility.localizedHeader("newPanel.newGamePanel",
@@ -303,6 +319,7 @@ public final class NewPanel extends FreeColPanel implements ItemListener {
         add(start, "newline, span 3");
         add(this.advantagesLabel);
         add(this.advantagesBox, "growx");
+        add(this.serverAddressBox, "newline, skip");
         add(this.serverPortLabel, "newline, skip");
         add(this.serverPortField, "width 60:");
         add(this.rulesLabel);
@@ -324,7 +341,7 @@ public final class NewPanel extends FreeColPanel implements ItemListener {
             this.joinPortLabel, this.joinPortField
         };
         serverComponents = new Component[] {
-            this.serverPortLabel, this.serverPortField, this.publicServer
+            this.serverAddressBox, this.serverPortLabel, this.serverPortField, this.publicServer
         };
         gameComponents = new Component[] {
             this.advantagesLabel, this.advantagesBox,
@@ -353,7 +370,7 @@ public final class NewPanel extends FreeColPanel implements ItemListener {
         setSize(getPreferredSize());
     }
 
-    
+        
     /**
      * Update specification and difficulty as needed.
      *
@@ -380,7 +397,7 @@ public final class NewPanel extends FreeColPanel implements ItemListener {
      */
     private boolean checkTC() {
         if (this.specification.getId()
-            .equals(getSelectedTC().getId())) return false;
+            .equals(getSelectedRules().getId())) return false;
         this.specification = getSpecification();
         return true;
     }
@@ -443,8 +460,8 @@ public final class NewPanel extends FreeColPanel implements ItemListener {
      *
      * @return The selected TC.
      */
-    private FreeColTcFile getSelectedTC() {
-        return (FreeColTcFile)this.rulesBox.getSelectedItem();
+    private FreeColModFile getSelectedRules() {
+        return (FreeColModFile)this.rulesBox.getSelectedItem();
     }
 
     /**
@@ -534,7 +551,7 @@ public final class NewPanel extends FreeColPanel implements ItemListener {
     @Override
     public Specification getSpecification() {
         if (this.fixedSpecification != null) return this.fixedSpecification;
-        return FreeCol.loadSpecification(getSelectedTC(), null, null);
+        return FreeCol.loadSpecification(getSelectedRules(), null, null);
     }
 
 
@@ -549,45 +566,52 @@ public final class NewPanel extends FreeColPanel implements ItemListener {
         final GUI gui = getGUI();
         final String command = ae.getActionCommand();
 
-        switch (Enum.valueOf(NewPanelAction.class, command)) {
-        case OK:
-            FreeCol.setName(getSelectedName());
-            FreeCol.setAdvantages(getSelectedAdvantages());
-            FreeCol.setTC(getSelectedTC().getId());
-
-            NewPanelAction action = Enum.valueOf(NewPanelAction.class,
-                buttonGroup.getSelection().getActionCommand());
-            switch (action) {
-            case SINGLE:
-                this.specification.prepare(getSelectedAdvantages(),
-                                           this.difficulty);
-                if (cc.startSinglePlayerGame(this.specification)) return;
-                break;
-            case JOIN:
-                int joinPort = getSelectedPort(this.joinPortField);
-                if (joinPort < 0) break;
-                if (cc.joinMultiplayerGame(this.joinNameField.getText(),
-                                           joinPort)) return;
-                break;
-            case START:
-                int serverPort = getSelectedPort(this.serverPortField);
-                if (serverPort < 0) break;
-                this.specification.prepare(getSelectedAdvantages(),
-                                           this.difficulty);
-                if (cc.startMultiplayerGame(this.specification,
-                        this.publicServer.isSelected(), serverPort)) return;
-                break;
-            case META_SERVER:
-                List<ServerInfo> servers = MetaServerUtils.getServerList();
-                if (servers != null) gui.showServerListPanel(servers);
+        try {
+            switch (Enum.valueOf(NewPanelAction.class, command)) {
+            case OK:
+                FreeCol.setName(getSelectedName());
+                FreeCol.setAdvantages(getSelectedAdvantages());
+                FreeCol.setRules(getSelectedRules().getId());
+    
+                NewPanelAction action = Enum.valueOf(NewPanelAction.class,
+                    buttonGroup.getSelection().getActionCommand());
+                switch (action) {
+                case SINGLE:
+                    this.specification.prepare(getSelectedAdvantages(),
+                                               this.difficulty);
+                    if (cc.startSinglePlayerGame(this.specification)) return;
+                    break;
+                case JOIN:
+                    int joinPort = getSelectedPort(this.joinPortField);
+                    if (joinPort < 0) break;
+                    if (cc.joinMultiplayerGame(this.joinNameField.getText(),
+                                               joinPort)) return;
+                    break;
+                case START:
+                    int serverPort = getSelectedPort(this.serverPortField);
+                    if (serverPort < 0) break;
+                    this.specification.prepare(getSelectedAdvantages(),
+                                               this.difficulty);
+                    final InetAddress serverAddress = (InetAddress) this.serverAddressBox.getSelectedItem();
+                    final boolean publicServerValue = this.publicServer.isSelected()
+                            && !serverAddress.isLoopbackAddress();
+                    if (cc.startMultiplayerGame(this.specification,
+                            publicServerValue, serverAddress, serverPort)) return;
+                    break;
+                case META_SERVER:
+                    List<ServerInfo> servers = MetaServerUtils.getServerList();
+                    if (servers != null) gui.showServerListPanel(servers);
+                    break;
+                default:
+                    break;
+                }
                 break;
             default:
+                super.actionPerformed(ae);
                 break;
             }
-            break;
-        default:
-            super.actionPerformed(ae);
-            break;
+        } catch (RuntimeException e) {
+            gui.showErrorPanel(e, StringTemplate.key("error.unspecified"));
         }
     }
 

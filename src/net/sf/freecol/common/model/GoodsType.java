@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -455,6 +455,26 @@ public final class GoodsType extends FreeColSpecObjectType {
         GoodsType refinedType = makes;
         while (refinedType != null) {
             if (refinedType.isBuildingMaterial()) return true;
+            refinedType = refinedType.makes;
+        }
+        return false;
+    }
+    
+    /**
+     * Is this type of goods required somewhere in the chain for
+     * producing a BuildableType, and is not itself buildable.
+     *
+     * @return True if a raw building type.
+     * @see BuildableType
+     */
+    public boolean isRawMaterialForUnstorableBuildingMaterial() {
+        if (this.madeFrom != null) return false;
+
+        GoodsType refinedType = makes;
+        while (refinedType != null) {
+            if (refinedType.isBuildingMaterial() && !refinedType.isStorable()) {
+                return true;
+            }
             refinedType = refinedType.makes;
         }
         return false;

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -50,6 +50,7 @@ import net.sf.freecol.common.util.Utils;
 import net.sf.freecol.server.ai.mission.BuildColonyMission;
 import net.sf.freecol.server.ai.mission.CashInTreasureTrainMission;
 import net.sf.freecol.server.ai.mission.DefendSettlementMission;
+import net.sf.freecol.server.ai.mission.EscortUnitMission;
 import net.sf.freecol.server.ai.mission.IdleAtSettlementMission;
 import net.sf.freecol.server.ai.mission.IndianBringGiftMission;
 import net.sf.freecol.server.ai.mission.IndianDemandMission;
@@ -879,6 +880,9 @@ public final class AIUnit extends TransportableAIObject {
 
         } else if (DefendSettlementMission.TAG.equals(tag)) {
             mission = new DefendSettlementMission(aiMain, this, xr);
+            
+        } else if (EscortUnitMission.TAG.equals(tag)) {
+            mission = new EscortUnitMission(aiMain, this, xr);
 
         } else if (IdleAtSettlementMission.TAG.equals(tag)) {
             mission = new IdleAtSettlementMission(aiMain, this, xr);

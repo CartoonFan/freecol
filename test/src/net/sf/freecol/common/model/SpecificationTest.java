@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,6 +19,9 @@
 
 package net.sf.freecol.common.model;
 
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.forEachMapEntry;
+
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -26,63 +29,32 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.common.io.FreeColModFile;
-import net.sf.freecol.common.io.FreeColTcFile;
-import net.sf.freecol.common.model.Modifier;
+import net.sf.freecol.common.io.FreeColRules;
 import net.sf.freecol.common.model.Modifier.ModifierType;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.util.test.FreeColTestCase;
 
 
 public final class SpecificationTest extends FreeColTestCase {
 
-    private static final BuildingType depotType
-        = spec().getBuildingType("model.building.depot");
+    private static final BuildingType depotType = spec().getBuildingType("model.building.depot");
 
-    private static final GoodsType fishType
-        = spec().getGoodsType("model.goods.fish");
-    private static final GoodsType foodType
-        = spec().getPrimaryFoodType();
-    private static final GoodsType horsesType
-        = spec().getGoodsType("model.goods.horses");
-    private static final GoodsType musketsType
-        = spec().getGoodsType("model.goods.muskets");
-    private static final GoodsType toolsType
-        = spec().getGoodsType("model.goods.tools");
+    private static final GoodsType fishType = spec().getGoodsType("model.goods.fish");
+    private static final GoodsType foodType = spec().getPrimaryFoodType();
+    private static final GoodsType horsesType = spec().getGoodsType("model.goods.horses");
+    private static final GoodsType musketsType = spec().getGoodsType("model.goods.muskets");
+    private static final GoodsType toolsType = spec().getGoodsType("model.goods.tools");
 
-    private static final Role armedBraveRole
-        = spec().getRole("model.role.armedBrave");
-    private static final Role cavalryRole
-        = spec().getRole("model.role.cavalry");
-    private static final Role dragoonRole
-        = spec().getRole("model.role.dragoon");
-    private static final Role infantryRole
-        = spec().getRole("model.role.infantry");
-    private static final Role missionaryRole
-        = spec().getRole("model.role.missionary");
-    private static final Role nativeDragoonRole
-        = spec().getRole("model.role.nativeDragoon");
-    private static final Role soldierRole
-        = spec().getRole("model.role.soldier");
-
-    private static final UnitType blackSmithType
-        = spec().getUnitType("model.unit.masterBlacksmith");
-    private static final UnitType braveType
-        = spec().getUnitType("model.unit.brave");
-    private static final UnitType caravelType
-        = spec().getUnitType("model.unit.caravel");
-    private static final UnitType freeColonistType
-        = spec().getUnitType("model.unit.freeColonist");
-    private static final UnitType kingsRegularType
-        = spec().getUnitType("model.unit.kingsRegular");
-    private static final UnitType privateerType
-        = spec().getUnitType("model.unit.privateer");
-    private static final UnitType wagonType
-        = spec().getUnitType("model.unit.wagonTrain");
+    private static final UnitType blackSmithType = spec().getUnitType("model.unit.masterBlacksmith");
+    private static final UnitType braveType = spec().getUnitType("model.unit.brave");
+    private static final UnitType caravelType = spec().getUnitType("model.unit.caravel");
+    private static final UnitType freeColonistType = spec().getUnitType("model.unit.freeColonist");
+    private static final UnitType kingsRegularType = spec().getUnitType("model.unit.kingsRegular");
+    private static final UnitType privateerType = spec().getUnitType("model.unit.privateer");
+    private static final UnitType wagonType = spec().getUnitType("model.unit.wagonTrain");
 
 
     /**
@@ -92,7 +64,7 @@ public final class SpecificationTest extends FreeColTestCase {
     public void testLoad() {
         Specification spec = null;
         try {
-            spec = FreeColTcFile.getFreeColTcFile("classic").getSpecification();
+            spec = FreeColRules.getFreeColRulesFile("classic").getSpecification();
         } catch (Exception e) {
             e.printStackTrace();
             fail();
@@ -209,7 +181,7 @@ public final class SpecificationTest extends FreeColTestCase {
 
     public void testRequiredAbilitiesForRoles() {
         final Specification spec = spec();
-        Map<String, Boolean> abilitiesReq, expectAbilities;
+        Map<String, Boolean> expectAbilities;
         Map<String, Map<String, Boolean>> roleAbilities = new HashMap<>();
 
         expectAbilities = new HashMap<>();
@@ -382,7 +354,7 @@ public final class SpecificationTest extends FreeColTestCase {
 
         // restore original values
         try {
-            spec = FreeColTcFile.getFreeColTcFile("freecol").getSpecification();
+            spec = FreeColRules.getFreeColRulesFile("freecol").getSpecification();
         } catch (Exception e) {
             System.out.println(e);
         }
@@ -437,13 +409,12 @@ public final class SpecificationTest extends FreeColTestCase {
         
     public void testLoadMods() {
         try {
-            Specification spec = FreeColTcFile.getFreeColTcFile("freecol")
+            Specification spec = FreeColRules.getFreeColRulesFile("freecol")
                 .getSpecification();
             int numberOfUnitTypes = spec.getUnitTypeList().size();
             List<FreeColModFile> mods = new ArrayList<>();
             mods.add(new FreeColModFile(new File("data/mods/example")));
             spec.loadMods(mods);
-            UnitType milkmaid = spec.getUnitType("model.unit.milkmaid");
             assertEquals(numberOfUnitTypes + 1, spec.getUnitTypeList().size());
         } catch (IOException|XMLStreamException ex) {
             fail(ex.toString());

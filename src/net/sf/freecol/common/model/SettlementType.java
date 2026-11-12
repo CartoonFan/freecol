@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -460,16 +460,20 @@ public class SettlementType extends FreeColSpecObjectType {
     }
 
     /**
+    * {@inheritDoc}
+    */
+    @Override
+    protected void clearContainers(FreeColXMLReader xr) throws XMLStreamException {
+        super.clearContainers(xr);
+        this.plunderTypes = null;
+        this.gifts = null;
+    }
+    
+    /**
      * {@inheritDoc}
      */
     @Override
     protected void readChildren(FreeColXMLReader xr) throws XMLStreamException {
-        // Clear containers.
-        if (xr.shouldClearContainers()) {
-            this.plunderTypes = null;
-            this.gifts = null;
-        }
-
         super.readChildren(xr);
     }
 

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -20,25 +20,19 @@
 package net.sf.freecol.client.gui.panel;
 
 import java.awt.Font;
-import java.awt.Image;
 import java.awt.event.ActionEvent;
-import java.util.logging.Logger;
 
+import javax.swing.AbstractAction;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JTextArea;
-import javax.swing.border.BevelBorder;
-import javax.swing.border.CompoundBorder;
-import javax.swing.border.EmptyBorder;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.FreeCol;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.FontLibrary;
 import net.sf.freecol.client.gui.ImageLibrary;
-import net.sf.freecol.client.gui.Size;
 import net.sf.freecol.common.util.OSUtils;
 
 
@@ -72,8 +66,6 @@ import net.sf.freecol.common.util.OSUtils;
  */
 public final class AboutPanel extends FreeColPanel {
 
-    private static final Logger logger = Logger.getLogger(AboutPanel.class.getName());
-
     /** The main FreeCol website */
     private static final String SITE_URL
         = "http://www.freecol.org";
@@ -99,14 +91,11 @@ public final class AboutPanel extends FreeColPanel {
         // Header with image
         JLabel apLogoLabel = new JLabel(new ImageIcon(ImageLibrary
                 .getUnscaledImage("image.flavor.Title")));
-        apLogoLabel.setBorder(
-            new CompoundBorder(new EmptyBorder(2,2,2,2),
-                               new BevelBorder(BevelBorder.LOWERED)));
         add(apLogoLabel, "center");
 
         // Create available Font choices
-        Font fontBold = FontLibrary.getUnscaledFont("normal-bold-tiny");
-        Font fontNormal = FontLibrary.getUnscaledFont("normal-plain-tiny");
+        Font fontBold = FontLibrary.getScaledFont("normal-bold-tiny");
+        Font fontNormal = FontLibrary.getScaledFont("normal-plain-tiny");
 
         // Version
         JLabel apVersion = Utility.localizedLabel("aboutPanel.version");
@@ -163,6 +152,13 @@ public final class AboutPanel extends FreeColPanel {
         add(apCopyright, "newline 10");
 
         add(okButton, "newline 20, tag ok");
+        
+        setEscapeAction(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                okButton.doClick();
+            }
+        });
     }
 
     // Interface ActionListener

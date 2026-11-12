@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -39,13 +39,11 @@ import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.ClientOptions;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.FontLibrary;
 import net.sf.freecol.client.gui.ImageLibrary;
-import net.sf.freecol.client.gui.panel.*;
-import net.sf.freecol.client.gui.Size;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Building;
 import net.sf.freecol.common.model.Colony;
@@ -147,7 +145,7 @@ public final class ReportTurnPanel extends ReportPanel {
             FreeColObject messageDisplay = game.getMessageDisplay(message);
             final ImageLibrary lib = getImageLibrary();
             if (messageDisplay != null) {
-                Image image = lib.getObjectImage(messageDisplay, 1f);
+                Image image = lib.getObjectImage(messageDisplay);
                 ImageIcon icon = (image == null) ? null : new ImageIcon(image);
                 if (messageDisplay instanceof Colony
                     || messageDisplay instanceof Europe) {
@@ -288,7 +286,7 @@ public final class ReportTurnPanel extends ReportPanel {
             text = source.toString();
         }
 
-        Font font = FontLibrary.getUnscaledFont(Utility.FONTSPEC_SUBTITLE, text);
+        Font font = FontLibrary.getScaledFont(Utility.FONTSPEC_SUBTITLE, text);
         JComponent headline;
         if (commandId != null) {
             JButton button = new JButton(text);

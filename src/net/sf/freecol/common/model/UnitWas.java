@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -20,7 +20,6 @@
 package net.sf.freecol.common.model;
 
 import java.util.List;
-import java.util.logging.Logger;
 
 import net.sf.freecol.common.model.Colony.ColonyChangeEvent;
 import net.sf.freecol.common.util.Utils;
@@ -30,9 +29,7 @@ import net.sf.freecol.common.util.Utils;
  * Helper container to remember a unit state prior to some change,
  * and fire off any consequent property changes.
  */
-public class UnitWas implements Comparable<UnitWas> {
-
-    private static final Logger logger = Logger.getLogger(UnitWas.class.getName());
+public class UnitWas extends ObjectWas implements Comparable<UnitWas> {
 
     private final Unit unit;
     private final UnitType type;
@@ -81,9 +78,7 @@ public class UnitWas implements Comparable<UnitWas> {
     }
 
     /**
-     * Fire any property changes resulting from actions of a unit.
-     *
-     * @return True if something changed.
+     * {@inheritDoc}
      */
     public boolean fireChanges() {
         UnitType newType = null;

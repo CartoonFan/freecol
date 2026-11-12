@@ -288,7 +288,7 @@ In order to compile FreeCol you will need Java and
 \href{http://ant.apache.org/}{the Ant build system}. When these are
 installed, go to the root directory of FreeCol and type \verb$ant$ to
 build a JAR file containing the game. The game is started using the
-command \verb$java -Xmx1G -jar FreeCol.jar$.
+command \verb$java -Xmx2G -jar FreeCol.jar$.
 
 If something goes wrong, please open a bug report at the
 \href{http://sourceforge.net/projects/freecol}{SourceForge page of
@@ -316,7 +316,7 @@ paragraphs.
 \hypertarget{Command line options}{\subsection{Command line options}}
 
 If you are in the directory in which FreeCol is installed, you can
-start the game with the command \verb$java -Xmx1G -jar FreeCol.jar$.
+start the game with the command \verb$java -Xmx2G -jar FreeCol.jar$.
 This will tell the Virtual Machine to load the game and to set the
 maximum heap size to 512 MB. Refer to the manual of your Java Virtual
 Machine for details.
@@ -472,12 +472,10 @@ such as the amount of gold you start the game with. If you select
 select ``Easy'', you will start with only 300 gold, and in higher
 levels you will start entirely penniless.
 
-You can also create your own custom difficulty level. Just select the
-difficulty level that is closest to what you want (i.e. select ``Very
-Hard'' if you want a difficulty level that is even harder) and press
-the ``edit'' button to change the settings. Please note that the range
-of all settings is limited.
-
+You can also create your own custom difficulty level by selecting the
+``Custom'' difficulty level and clicking on the ``Edit Difficulty'' button.
+The initial settings will be as for ``Very Hard'' but should now all
+be editable within sensible ranges.
 
 \hypertarget{select nations}{\subsubsection{Select nations}}
 

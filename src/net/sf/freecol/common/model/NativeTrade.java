@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -28,9 +28,6 @@ import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
-import net.sf.freecol.common.model.IndianSettlement;
-import net.sf.freecol.common.model.NativeTradeItem;
-import net.sf.freecol.common.model.Unit;
 import static net.sf.freecol.common.util.CollectionUtils.*;
 
 
@@ -43,10 +40,6 @@ public class NativeTrade extends FreeColGameObject {
     private static final Logger logger = Logger.getLogger(NativeTrade.class.getName());
 
     public static final String TAG = "nativeTrade";
-
-    /** A template to use as a magic cookie for aborted trades. */
-    private static final StringTemplate abortTrade
-        = StringTemplate.template("");
 
     /** The type of native trade command. */
     public static enum NativeTradeAction {

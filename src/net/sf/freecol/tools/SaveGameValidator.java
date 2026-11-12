@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,6 +21,7 @@ package net.sf.freecol.tools;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,12 +30,11 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 import javax.xml.validation.Validator;
 
-import net.sf.freecol.common.io.FreeColDirectories;
-import net.sf.freecol.common.io.FreeColSavegameFile;
-import static net.sf.freecol.common.util.CollectionUtils.*;
-
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
+
+import net.sf.freecol.common.io.FreeColDirectories;
+import net.sf.freecol.common.io.FreeColSavegameFile;
 
 
 /**
@@ -45,6 +45,7 @@ public class SaveGameValidator {
     public static void main(String[] args) throws Exception {
 
         SchemaFactory factory = SchemaFactory.newInstance("http://www.w3.org/2001/XMLSchema");
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         File schemaLocation = new File("schema/data/data-savedGame.xsd");
         Schema schema = factory.newSchema(schemaLocation);
         Validator saveGameValidator = schema.newValidator();
@@ -66,7 +67,9 @@ public class SaveGameValidator {
             //System.out.println("Processing file " + file.getPath());
             try {
                 FreeColSavegameFile mapFile = new FreeColSavegameFile(file);
-                saveGameValidator.validate(new StreamSource(mapFile.getSavegameInputStream()));
+                try (InputStream in = mapFile.getSavegameInputStream()) {
+                    saveGameValidator.validate(new StreamSource(in));
+                }
                 System.out.println("Successfully validated " + file.getName());
             } catch (SAXParseException e) {
                 System.out.println(e.getMessage() 

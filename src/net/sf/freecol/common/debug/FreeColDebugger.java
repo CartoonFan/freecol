@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,7 +19,6 @@
 
 package net.sf.freecol.common.debug;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
@@ -39,6 +38,7 @@ import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.common.util.LogBuilder;
 import static net.sf.freecol.common.util.StringUtils.*;
 import net.sf.freecol.server.FreeColServer;
+import net.sf.freecol.server.ai.military.DefensiveMap;
 
 
 /**
@@ -81,6 +81,11 @@ public class FreeColDebugger {
      */
     private static boolean normalGameFogOfWar = false;
 
+    /**
+     * Displays elements for debugging the rendering.
+     */
+    private static boolean debugRendering = false;
+    
     /** Display map coordinates? */
     private static boolean displayCoordinates = false;
 
@@ -96,6 +101,9 @@ public class FreeColDebugger {
     /** Stream for debugLog. */
     private static final AtomicReference<PrintStream> debugStream
         = new AtomicReference<PrintStream>(null);
+    
+    /** Displays the defence map for this player */
+    private static Player defenceMapPlayer = null;
 
 
     /**
@@ -105,6 +113,16 @@ public class FreeColDebugger {
      */
     public static boolean isInDebugMode() {
         return FreeColDebugger.debugMode != 0;
+    }
+    
+    /**
+     * Checks if automatic changing of the scaleFactor on window resize
+     * has been enabled.
+     * 
+     * @return {@code true} if any debug mode is enabled.
+     */
+    public static boolean isAutomaticRescalingOnWindowResize() {
+        return FreeColDebugger.debugMode != 0;    
     }
 
     /**
@@ -291,6 +309,22 @@ public class FreeColDebugger {
     public static void signalEndDebugRun() {
         if (debugRunTurns > 0) setDebugRunTurns(0);
     }
+    
+    /**
+     * Should elements for debugging the rendering be displayed?
+     */
+    public static boolean debugRendering() {
+        return debugRendering;
+    }
+    
+    /**
+     * Displays elements for debugging the rendering.
+     *
+     * @param _debugRendering If true, displays elements for debugging the rendering.
+     */
+    public static void setDebugRendering(boolean _debugRendering) {
+        debugRendering = _debugRendering;
+    }
 
     /**
      * Should the map viewer display tile coordinates?
@@ -364,6 +398,17 @@ public class FreeColDebugger {
     public static void setDebugShowMissionInfo(boolean display) {
         showMissionInfo = display;
     }
+    
+    /**
+     * Displays the {@link DefensiveMap} for a given player.
+     */
+    public static void setDebugShowDefenceMapForPlayer(Player defenceMapPlayer) {
+        FreeColDebugger.defenceMapPlayer = defenceMapPlayer;        
+    }
+    
+    public static Player debugShowDefenceMapForPlayer() {
+        return defenceMapPlayer;
+    }
 
     /**
      * Handler for log records that include a crash.
@@ -371,7 +416,6 @@ public class FreeColDebugger {
     public static void handleCrash() {
         if (debugRunSave != null) signalEndDebugRun();
     }
-
 
     /**
      * Emergency run time log to use when the normal logging is failing.

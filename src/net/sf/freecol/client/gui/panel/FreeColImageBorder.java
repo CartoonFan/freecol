@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,57 +19,181 @@
 
 package net.sf.freecol.client.gui.panel;
 
+import static net.sf.freecol.common.util.ImageUtils.fillTexture;
+
 import java.awt.Component;
+import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.Insets;
+import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.border.AbstractBorder;
 
-import net.sf.freecol.client.gui.ImageLibrary;
-import static net.sf.freecol.common.util.ImageUtils.*;
+import net.sf.freecol.common.resources.ImageResource;
+import net.sf.freecol.common.resources.ResourceManager;
 
 
 /**
  * A border created from a set of images. 
  */
-public class FreeColImageBorder extends AbstractBorder {
+public class FreeColImageBorder extends AbstractBorder implements FreeColBorder {
 
-    public static final FreeColImageBorder imageBorder = new FreeColImageBorder();
+    private static final List<FreeColImageBorder> borders = new ArrayList<>();
+    
+    public static final FreeColImageBorder panelWithoutShadowBorder = new FreeColImageBorder("image.border.panel.noshadow");
+    public static final FreeColImageBorder panelBorder = new FreeColImageBorder("image.border.panel");    
+    public static final FreeColImageBorder buttonBorder = new FreeColImageBorder("image.border.button");
+    public static final FreeColImageBorder simpleButtonBorder = new FreeColImageBorder("image.border.button.simple");
+    public static final FreeColImageBorder menuBarBorder = new FreeColImageBorder("image.border.menu");
+    public static final FreeColImageBorder woodenPanelBorder = new FreeColImageBorder("image.border.wooden");
+    
+    public static final FreeColImageBorder colonyWarehouseBorder = new FreeColImageBorder("image.border.colonyWarehouse");
+    public static final FreeColImageBorder colonyPanelBorder = new FreeColImageBorder("image.border.colony.panel");
+    public static final FreeColImageBorder innerColonyPanelBorder = new FreeColImageBorder("image.border.colony.panel.inner");
+    public static final FreeColImageBorder outerColonyPanelBorder = new FreeColImageBorder("image.border.colony.panel.outer");
 
-
-    // The buffered image objects
-    private final BufferedImage topLeftCornerImage;
-    private final BufferedImage topImage;
-    private final BufferedImage topRightCornerImage;
-    private final BufferedImage rightImage;
-    private final BufferedImage bottomRightCornerImage;
-    private final BufferedImage bottomImage;
-    private final BufferedImage bottomLeftCornerImage;
-    private final BufferedImage leftImage;
-
+    private static float scaleFactor = 1;
+    
+    /**
+     * The key used for getting the image resources.
+     */
+    private final String baseKey;
+    
+    /**
+     * If true, no scaling to the border is applied.
+     */
+    private final boolean noScaling;
+    
+    private boolean initialized = false;
 
     /**
-     * Creates the default border.
+     * NW-corner
      */
-    public FreeColImageBorder() {
-        this(ImageLibrary.getUnscaledImage("image.menuborder.nw"),
-             ImageLibrary.getUnscaledImage("image.menuborder.n"),
-             ImageLibrary.getUnscaledImage("image.menuborder.ne"),
-             ImageLibrary.getUnscaledImage("image.menuborder.e"),
-             ImageLibrary.getUnscaledImage("image.menuborder.se"),
-             ImageLibrary.getUnscaledImage("image.menuborder.s"),
-             ImageLibrary.getUnscaledImage("image.menuborder.sw"),
-             ImageLibrary.getUnscaledImage("image.menuborder.w"));
+    private BufferedImage topLeftCornerImage;
+    
+    /**
+     * NNW
+     */
+    private BufferedImage topStartImage;
+    
+    /**
+     * N-border
+     */
+    private BufferedImage topImage;
+    
+    /**
+     * NNE
+     */
+    private BufferedImage topEndImage;
+    
+    /**
+     * NE-corner
+     */
+    private BufferedImage topRightCornerImage;
+    
+    /**
+     * ENE
+     */
+    private BufferedImage rightStartImage;
+    
+    /**
+     * E-border
+     */
+    private BufferedImage rightImage;
+    
+    /**
+     * ESE
+     */
+    private BufferedImage rightEndImage;
+    
+    /**
+     * SE-corner
+     */
+    private BufferedImage bottomRightCornerImage;
+    
+    /**
+     * SSE
+     */
+    private BufferedImage bottomEndImage;
+    
+    /**
+     * S-border
+     */
+    private BufferedImage bottomImage;
+    
+    /**
+     * SSW
+     */
+    private BufferedImage bottomStartImage;
+    
+    /**
+     * SW-corner
+     */
+    private BufferedImage bottomLeftCornerImage;
+    
+    /**
+     * WSW
+     */
+    private BufferedImage leftEndImage;
+    
+    /**
+     * W-border
+     */
+    private BufferedImage leftImage;
+    
+    /**
+     * WNW
+     */
+    private BufferedImage leftStartImage;
+
+
+    private FreeColImageBorder(String baseKey) {
+        this(baseKey, false);
+    }
+    
+
+    private FreeColImageBorder(String baseKey, boolean noScaling) {
+        this.baseKey = baseKey;
+        this.noScaling = noScaling;
+        
+        loadImages();
+        borders.add(this);
     }
 
+    
+    private void ensureInitialized() {
+        if (!initialized) {
+            loadImages();
+        }
+    }
+
+    private void loadImages() {
+        loadImages(getImage(baseKey + ".nw"),
+                getImage(baseKey + ".nnw"),
+                getImage(baseKey + ".n"),
+                getImage(baseKey + ".nne"),
+                getImage(baseKey + ".ne"),
+                getImage(baseKey + ".ene"),
+                getImage(baseKey + ".e"),
+                getImage(baseKey + ".ese"),
+                getImage(baseKey + ".se"),
+                getImage(baseKey + ".sse"),
+                getImage(baseKey + ".s"),
+                getImage(baseKey + ".ssw"),
+                getImage(baseKey + ".sw"),
+                getImage(baseKey + ".wsw"),
+                getImage(baseKey + ".w"),
+                getImage(baseKey + ".wnw"));
+        initialized = true;
+    }
 
     /**
-     * Creates a border with the given set of images.
-     * Needs {@code BufferedImage} objects, because the images will
-     * be used as Textures for the border.
+     * Loads the images for the border.
      *
      * @param topLeftCornerImage NW-corner
      * @param topImage N-border
@@ -80,22 +204,64 @@ public class FreeColImageBorder extends AbstractBorder {
      * @param bottomLeftCornerImage SW-corner
      * @param leftImage W-border
      */
-    private FreeColImageBorder(BufferedImage topLeftCornerImage,
-                               BufferedImage topImage,
-                               BufferedImage topRightCornerImage,
-                               BufferedImage rightImage,
-                               BufferedImage bottomRightCornerImage,
-                               BufferedImage bottomImage,
-                               BufferedImage bottomLeftCornerImage,
-                               BufferedImage leftImage) {
+    private void loadImages(BufferedImage topLeftCornerImage,
+            BufferedImage topStartImage,
+            BufferedImage topImage,
+            BufferedImage topEndImage,
+            BufferedImage topRightCornerImage,
+            BufferedImage rightStartImage,
+            BufferedImage rightImage,
+            BufferedImage rightEndImage,
+            BufferedImage bottomRightCornerImage,
+            BufferedImage bottomEndImage,
+            BufferedImage bottomImage,
+            BufferedImage bottomStartImage,
+            BufferedImage bottomLeftCornerImage,
+            BufferedImage leftEndImage,
+            BufferedImage leftImage,
+            BufferedImage leftStartImage) {
         this.topLeftCornerImage = topLeftCornerImage;
+        this.topStartImage = topStartImage;
         this.topImage = topImage;
+        this.topEndImage = topEndImage;
         this.topRightCornerImage = topRightCornerImage;
+        this.rightStartImage = rightStartImage;
         this.rightImage = rightImage;
+        this.rightEndImage = rightEndImage;
         this.bottomRightCornerImage = bottomRightCornerImage;
+        this.bottomEndImage = bottomEndImage;
         this.bottomImage = bottomImage;
+        this.bottomStartImage = bottomStartImage;
         this.bottomLeftCornerImage = bottomLeftCornerImage;
+        this.leftEndImage = leftEndImage;
         this.leftImage = leftImage;
+        this.leftStartImage = leftStartImage;
+    }
+    
+    public static void setScaleFactor(float scaleFactor) {
+        FreeColImageBorder.scaleFactor = scaleFactor;
+        reloadAllImages();
+    }
+    
+    private static void reloadAllImages() {
+        borders.stream().forEach(FreeColImageBorder::loadImages);
+    }
+
+
+    private BufferedImage getImage(String key) {
+        final ImageResource ir = ResourceManager.getImageResource(key, false);
+        if (ir == null) {
+            return null;
+        }
+        final BufferedImage image = ir.getImage();
+        if (noScaling) {
+            return image;
+        }
+        final Dimension scaledDimensions = new Dimension(
+            (int) Math.round(image.getWidth() * scaleFactor),
+            (int) Math.round(image.getHeight() * scaleFactor)
+        );
+        return ir.getImage(scaledDimensions, false);
     }
 
     /**
@@ -106,7 +272,56 @@ public class FreeColImageBorder extends AbstractBorder {
      */    
     @Override
     public Insets getBorderInsets(Component c) {
+        ensureInitialized();
         return getBorderInsets(c, null);
+    }
+    
+    /**
+     * Returns spaces that are open on this border.
+     * 
+     * @param c The component having the border.
+     * @return A list of areas that can be considered out-of-bounds for this border.
+     */
+    @Override
+    public List<Rectangle> getOpenSpace(Component c) {
+        ensureInitialized();
+        
+        final List<Rectangle> openSpace = new ArrayList<>();
+        
+        /*
+         * For now, only the top part of the border is handled. Feel free to extend this method.
+         */
+        
+        if (topStartImage != null && topStartImage.getHeight() < max(getHeight(topImage), getHeight(topEndImage))) {
+            final int openSpaceHeight = max(getHeight(topImage), getHeight(topEndImage)) - topStartImage.getHeight();
+            openSpace.add(new Rectangle(0, 0, topStartImage.getWidth(), openSpaceHeight));
+        }
+        if (topImage != null && topImage.getHeight() < max(getHeight(topStartImage), getHeight(topEndImage))) {
+            final int openSpaceHeight = max(getHeight(topStartImage), getHeight(topEndImage)) - topImage.getHeight();
+            final int x = getWidth(topStartImage);
+            final int width = c.getWidth() - getWidth(topStartImage) - getWidth(topEndImage);
+            openSpace.add(new Rectangle(x, 0, width, openSpaceHeight));
+        }
+        if (topEndImage != null && topEndImage.getHeight() < max(getHeight(topStartImage), getHeight(topImage))) {
+            final int openSpaceHeight = max(getHeight(topStartImage), getHeight(topImage)) - topEndImage.getHeight();
+            openSpace.add(new Rectangle(c.getWidth() - topEndImage.getWidth(), 0, topEndImage.getWidth(), openSpaceHeight));
+        }
+        
+        return openSpace;
+    }
+    
+    /**
+     * Determines the inset of the top left corner.
+     */
+    public int getTopLeftCornerInsetY() {
+        final int top = max(
+                getHeight(topImage),
+                getHeight(topStartImage),
+                getHeight(topEndImage),
+                getHeight(topLeftCornerImage),
+                getHeight(topRightCornerImage)
+            );
+        return top - getHeight(topLeftCornerImage);
     }
 
     /**
@@ -118,19 +333,36 @@ public class FreeColImageBorder extends AbstractBorder {
      *      {@code null}, or a new instance otherwise.
      */
     @Override
-    public Insets getBorderInsets(Component c, Insets insets) {        
-        int top = Math.max(Math.max(getHeight(topImage),
-                getHeight(topLeftCornerImage)),
-            getHeight(topRightCornerImage));
-        int left = Math.max(Math.max(getWidth(leftImage),
-                getWidth(topLeftCornerImage)),
-            getWidth(bottomLeftCornerImage));
-        int bottom = Math.max(Math.max(getHeight(bottomImage),
-                getHeight(bottomLeftCornerImage)),
-            getHeight(bottomRightCornerImage));
-        int right = Math.max(Math.max(getWidth(rightImage),
-                getWidth(topRightCornerImage)),
-            getWidth(bottomRightCornerImage));
+    public Insets getBorderInsets(Component c, Insets insets) {
+        ensureInitialized();
+        int top = max(
+            getHeight(topImage),
+            getHeight(topStartImage),
+            getHeight(topEndImage),
+            getHeight(topLeftCornerImage),
+            getHeight(topRightCornerImage)
+        );
+        int left = max(
+            getWidth(leftImage),
+            getWidth(leftStartImage),
+            getWidth(leftEndImage),
+            getWidth(topLeftCornerImage),
+            getWidth(bottomLeftCornerImage)
+        );
+        int bottom = max(
+            getHeight(bottomImage),
+            getHeight(bottomStartImage),
+            getHeight(bottomEndImage),
+            getHeight(bottomLeftCornerImage),
+            getHeight(bottomRightCornerImage)
+        );
+        int right = max(
+            getWidth(rightImage),
+            getWidth(rightStartImage),
+            getWidth(rightEndImage),
+            getWidth(topRightCornerImage),
+            getWidth(bottomRightCornerImage)
+        );
 
         if (topImage == null) {
             top = 0;
@@ -155,6 +387,16 @@ public class FreeColImageBorder extends AbstractBorder {
             return insets;
         }
     }
+    
+    private int max(int... numbers) {
+        int highest = Integer.MIN_VALUE;
+        for (int i : numbers) {
+            if (i > highest) {
+                highest = i;
+            }
+        }
+        return highest;
+    }
 
     /**
      * Paints the border on the given component.
@@ -168,51 +410,135 @@ public class FreeColImageBorder extends AbstractBorder {
      */
     @Override
     public void paintBorder(Component c, Graphics g, int x, int y, int width, int height) {
-        Insets insets = getBorderInsets(c);
-        Graphics2D g2 = (Graphics2D) g;
+        ensureInitialized();
+        
+        final Insets insets = getBorderInsets(c);
+        final Graphics2D g2 = (Graphics2D) g;
 
         // Get width and height of the images
-        int topHeight = getHeight(topImage);
-        int leftWidth = getWidth(leftImage);
-        int bottomHeight = getHeight(bottomImage);
-        int rightWidth = getWidth(rightImage);  
-        int topLeftCornerWidth = getWidth(topLeftCornerImage);
-        int topLeftCornerHeight = getHeight(topLeftCornerImage);
-        int topRightCornerWidth = getWidth(topRightCornerImage);
-        int topRightCornerHeight = getHeight(topRightCornerImage);
-        int bottomLeftCornerWidth = getWidth(bottomLeftCornerImage);
-        int bottomLeftCornerHeight = getHeight(bottomLeftCornerImage);
-        int bottomRightCornerWidth = getWidth(bottomRightCornerImage);
-        int bottomRightCornerHeight = getHeight(bottomRightCornerImage);
+        final int topHeight = getHeight(topImage);
+        final int leftWidth = getWidth(leftImage);
+        final int bottomHeight = getHeight(bottomImage);
+        final int rightWidth = getWidth(rightImage);
+        
+        final int topStartWidth = getWidth(topStartImage);
+        final int topStartHeight = getHeight(topStartImage);
+        final int topEndWidth = getWidth(topEndImage);
+        final int topEndHeight = getHeight(topEndImage);
+        final int leftStartWidth = getWidth(leftStartImage);
+        final int leftStartHeight = getHeight(leftStartImage);
+        final int leftEndWidth = getWidth(leftEndImage);
+        final int leftEndHeight = getHeight(leftEndImage);
+        final int bottomStartWidth = getWidth(bottomStartImage);
+        final int bottomStartHeight = getHeight(bottomStartImage);
+        final int bottomEndWidth = getWidth(bottomEndImage);
+        final int bottomEndHeight = getHeight(bottomEndImage);
+        final int rightStartWidth = getWidth(rightStartImage);
+        final int rightStartHeight = getHeight(rightStartImage);
+        final int rightEndWidth = getWidth(rightEndImage);
+        final int rightEndHeight = getHeight(rightEndImage);
+        
+        final int topLeftCornerWidth = getWidth(topLeftCornerImage);
+        final int topLeftCornerHeight = getHeight(topLeftCornerImage);
+        final int topRightCornerWidth = getWidth(topRightCornerImage);
+        final int topRightCornerHeight = getHeight(topRightCornerImage);
+        final int bottomLeftCornerWidth = getWidth(bottomLeftCornerImage);
+        final int bottomLeftCornerHeight = getHeight(bottomLeftCornerImage);
+        final int bottomRightCornerWidth = getWidth(bottomRightCornerImage);
+        final int bottomRightCornerHeight = getHeight(bottomRightCornerImage);
 
         // Add the image border
+        if (topStartImage != null) {
+            final int w = Math.min(topStartWidth, width - topLeftCornerWidth - topRightCornerWidth);
+            fillTexture(g2, topStartImage,
+                        x + topLeftCornerWidth,
+                        y + insets.top - topStartHeight,
+                        w,
+                        topStartHeight);
+        }
         if (topImage != null) {
             fillTexture(g2, topImage,
-                        x + topLeftCornerWidth,
+                        x + topLeftCornerWidth + topStartWidth,
                         y + insets.top - topHeight,
-                        width - topLeftCornerWidth - topRightCornerWidth,
+                        width - topLeftCornerWidth - topRightCornerWidth - topStartWidth - topEndWidth,
                         topHeight);
         }
-        if(leftImage != null) {
+        if (topEndImage != null) {
+            final int w = Math.min(topEndWidth, width - topLeftCornerWidth - topRightCornerWidth - topStartWidth);
+            fillTexture(g2, topEndImage,
+                        x + width - Math.max(insets.right, topRightCornerWidth) - w,
+                        y + insets.top - topEndHeight,
+                        w,
+                        topEndHeight);
+        }
+        if (leftStartImage != null) {
+            final int h = Math.min(leftStartHeight, height - Math.max(insets.top, topLeftCornerHeight) - bottomLeftCornerHeight);
+            fillTexture(g2, leftStartImage,
+                        x + insets.left - leftStartWidth,
+                        y + Math.max(insets.top, topLeftCornerHeight),
+                        leftStartWidth,
+                        h);
+        }
+        if (leftImage != null) {
             fillTexture(g2, leftImage,
                         x + insets.left - leftWidth,
-                        y + topLeftCornerHeight,
+                        y + Math.max(insets.top, topLeftCornerHeight) + leftStartHeight,
                         leftWidth,
-                        height - topLeftCornerHeight - bottomLeftCornerHeight);
+                        height - Math.max(insets.top, topLeftCornerHeight) - Math.max(insets.bottom, bottomLeftCornerHeight) - leftStartHeight - leftEndHeight);
+        }
+        if (leftEndImage != null) {
+            final int h = Math.min(leftEndHeight, height - topLeftCornerHeight - bottomLeftCornerHeight - leftStartHeight);
+            fillTexture(g2, leftEndImage,
+                        x + insets.left - leftEndWidth,
+                        y + height - Math.max(insets.bottom, bottomLeftCornerHeight) - h,
+                        leftEndWidth,
+                        h);
+        }
+        if (bottomStartImage != null) {
+            final int w = Math.min(bottomStartWidth, width - bottomLeftCornerWidth - bottomRightCornerWidth);
+            fillTexture(g2, bottomStartImage,
+                        x + bottomLeftCornerWidth,
+                        y + height - insets.bottom,
+                        w,
+                        bottomStartHeight);
         }
         if (bottomImage != null) {
             fillTexture(g2, bottomImage,
-                        x + bottomLeftCornerWidth,
+                        x + bottomLeftCornerWidth + bottomStartWidth,
                         y + height - insets.bottom,
-                        width - bottomLeftCornerWidth - bottomRightCornerWidth,
+                        width - bottomLeftCornerWidth - bottomRightCornerWidth - bottomStartWidth - bottomEndWidth,
                         bottomHeight);
+        }
+        if (bottomEndImage != null) {
+            final int w = Math.min(bottomEndWidth, width - bottomLeftCornerWidth - bottomRightCornerWidth - bottomStartWidth);
+            fillTexture(g2, bottomEndImage,
+                        x + width - Math.max(insets.right, bottomRightCornerWidth) - w,
+                        y + height - insets.bottom,
+                        w,
+                        bottomEndHeight);
+        }
+        if (rightStartImage != null) {
+            final int h = Math.min(rightStartHeight, height - Math.max(insets.top, topRightCornerHeight) - bottomRightCornerHeight);
+            fillTexture(g2, rightStartImage,
+                        x + width - insets.right,
+                        y + Math.max(insets.top, topRightCornerHeight),
+                        rightStartWidth,
+                        h);
         }
         if (rightImage != null) {
             fillTexture(g2, rightImage,
                         x + width - insets.right,
-                        y + topRightCornerHeight,
+                        y + Math.max(insets.top, topRightCornerHeight) + rightStartHeight,
                         rightWidth,
-                        height - topRightCornerHeight - bottomRightCornerHeight);
+                        height - Math.max(insets.top, topRightCornerHeight) - bottomRightCornerHeight - rightStartHeight - rightEndHeight);
+        }
+        if (rightEndImage != null) {
+            final int h = Math.min(rightEndHeight, height - topRightCornerHeight - bottomRightCornerHeight - rightStartHeight);
+            fillTexture(g2, rightEndImage,
+                        x + width - insets.right,
+                        y + height - Math.max(insets.bottom, bottomRightCornerHeight) - h,
+                        rightEndWidth,
+                        h);
         }
         if (topLeftCornerImage != null) {
             fillTexture(g2, topLeftCornerImage,

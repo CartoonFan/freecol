@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -26,6 +26,7 @@ import static net.sf.freecol.common.util.CollectionUtils.transform;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -157,8 +158,7 @@ public final class ConnectController extends FreeColClientHolder {
                 mainTitle();
             });
             break;
-        case LOGIN: // FIXME: This should not happen, drop when convinced
-            FreeCol.trace(logger, "logout(LOGIN) detected");
+        case LOGIN: // Occurs when you Open a new game during a current one
             fcc.logout(false);
             break;
         case MAIN_TITLE: // All the way back to the MainPanel
@@ -186,7 +186,8 @@ public final class ConnectController extends FreeColClientHolder {
                 final String name = player.getName();
                 try {
                     if (askServer().reconnect() != null
-                        && askServer().login(name, FreeCol.getVersion(),
+                        && askServer().login(name, player.getNationId(),
+                                             FreeCol.getVersion(),
                                              fcc.getSinglePlayer(),
                                              fcc.currentPlayerIsMyPlayer())) {
                         logger.info("Reconnected for client " + name);
@@ -211,12 +212,13 @@ public final class ConnectController extends FreeColClientHolder {
      * Public for the test suite.
      *
      * @param user The name of the player to use.
+     * @param nationId The nationId when the client is selecting a player.
      * @param host The name of the machine running the {@code FreeColServer}.
      * @param port The port to use when connecting to the host.
      * @return True if the player was already logged in, or if the login
      *     message was sent.
      */
-    public boolean requestLogin(String user, String host, int port) {
+    public boolean requestLogin(String user, String nationId, String host, int port) {
         final FreeColClient fcc = getFreeColClient();
         if (fcc.isLoggedIn()) return true;
         fcc.setMapEditor(false);
@@ -231,7 +233,7 @@ public final class ConnectController extends FreeColClientHolder {
             // name.  Control effectively transfers through the server
             // back to PGIH.login() and then to login() below.
             logger.info("Login request for client " + FreeCol.getName());
-            if (askServer().login(user, FreeCol.getVersion(),
+            if (askServer().login(user, nationId, FreeCol.getVersion(),
                                   fcc.getSinglePlayer(),
                                   fcc.currentPlayerIsMyPlayer())) {
                 return true;
@@ -344,9 +346,9 @@ public final class ConnectController extends FreeColClientHolder {
         spec.loadMods(mods);
         Messages.loadActiveModMessageBundle(mods, FreeCol.getLocale());
 
-        FreeColServer fcs = fcc.startServer(false, true, spec, -1);
+        FreeColServer fcs = fcc.startServer(false, true, spec, null, -1);
         return (fcs == null) ? false
-            : requestLogin(FreeCol.getName(),
+            : requestLogin(FreeCol.getName(), null,
                            fcs.getHost(), fcs.getPort());
     }
 
@@ -384,8 +386,8 @@ public final class ConnectController extends FreeColClientHolder {
             return false;
         }
         options.merge(fis);
-
-        options.fixClientOptions();
+        options.fixClientOptions();       
+        
         List<String> values = null;
         try {
             values = fis.peekAttributes(savedKeys);
@@ -410,6 +412,7 @@ public final class ConnectController extends FreeColClientHolder {
         final boolean publicServer = defaultPublicServer;
         final boolean singlePlayer;
         final String serverName;
+        final InetAddress address;
         final int port;
         final int sgo = options.getInteger(ClientOptions.SHOW_SAVEGAME_SETTINGS);
         boolean show = sgo == ClientOptions.SHOW_SAVEGAME_SETTINGS_ALWAYS
@@ -422,31 +425,26 @@ public final class ConnectController extends FreeColClientHolder {
             if (lsi == null) return false;
             singlePlayer = lsi.isSinglePlayer();
             serverName = lsi.getServerName();
+            address = lsi.getAddress();
             port = lsi.getPort();
         } else {
             singlePlayer = defaultSinglePlayer;
             serverName = null;
+            address = null;
             port = -1;
         }
         Messages.loadActiveModMessageBundle(options.getActiveMods(),
             FreeCol.getLocale());
 
-        if (!fcc.unblockServer(port)) return false;
-
-        if (fcc.isLoggedIn()) { // Should not happen, warn and suppress
-            logger.warning("startSavedGame while logged in!");
-            requestLogout(LogoutReason.LOGIN);
-        }
-
         FreeColServer fcs = fcc.startServer(publicServer, singlePlayer, file,
-                                            port, serverName);
+                address, port, serverName);
         if (fcs == null) return false;
-
-        fcs.getGame().getSpecification().loadMods(options.getActiveMods());
+        
+        getGUI().refreshGuiUsingClientOptions();
 
         fcc.setFreeColServer(fcs);
         fcc.setSinglePlayer(true);
-        return requestLogin(FreeCol.getName(), fcs.getHost(), fcs.getPort());
+        return requestLogin(FreeCol.getName(), null, fcs.getHost(), fcs.getPort());
     }
 
     /**
@@ -454,11 +452,14 @@ public final class ConnectController extends FreeColClientHolder {
      *
      * @param specification The {@code Specification} for the game.
      * @param publicServer Whether to make the server public.
+     * @param address The address in which the server should listen for new clients.
      * @param port The port in which the server should listen for new clients.
      * @return True if the game is started successfully.
      */
     public boolean startMultiplayerGame(Specification specification,
-                                        boolean publicServer, int port) {
+                                        boolean publicServer,
+                                        InetAddress address,
+                                        int port) {
         final FreeColClient fcc = getFreeColClient();
         fcc.setMapEditor(false);
 
@@ -470,11 +471,11 @@ public final class ConnectController extends FreeColClientHolder {
         }
 
         FreeColServer fcs = fcc.startServer(publicServer, false,
-                                            specification, port);
+                                            specification, address, port);
         if (fcs == null) return false;
         fcc.setFreeColServer(fcs);
         fcc.setSinglePlayer(false);
-        return requestLogin(FreeCol.getName(), fcs.getHost(), fcs.getPort());
+        return requestLogin(FreeCol.getName(), null, fcs.getHost(), fcs.getPort());
     }
 
     /**
@@ -503,6 +504,7 @@ public final class ConnectController extends FreeColClientHolder {
         while (fcc.getServerState() == null) Utils.delay(1000, null);
         askServer().disconnect();
         
+        String nationId = null;
         switch (fcc.getServerState()) {
         case PRE_GAME: case LOAD_GAME:
             // Name is good
@@ -522,20 +524,19 @@ public final class ConnectController extends FreeColClientHolder {
             if (names.isEmpty()) return false;
             if (names.contains(name)) break; // Already there, use it
             StringTemplate tmpl = StringTemplate.template("client.choicePlayer");
-            String choice = getGUI().getChoice(tmpl, "cancel",
+            nationId = getGUI().modalChoiceDialog(tmpl, "cancel",
                     transform(names, alwaysTrue(), n ->
                         new ChoiceItem<>(Messages.message(StringTemplate
                                 .template("countryName")
                                 .add("%nation%", Messages.nameKey(n))), n)));
-            if (choice == null) return false; // User cancelled
-            name = Messages.getRulerName(choice);
+            if (nationId == null) return false; // User cancelled
             break;
 
         case END_GAME: default:
             getGUI().showErrorPanel(StringTemplate.template("client.ending"));
             return false;
         }
-        return requestLogin(name, host, port);
+        return requestLogin(name, nationId, host, port);
     }
 
     /**
@@ -557,6 +558,8 @@ public final class ConnectController extends FreeColClientHolder {
 
         if (fcc.isLoggedIn()) {
             requestLogout(LogoutReason.MAIN_TITLE);
+        } else {
+            fcc.logout(false);
         }
         
         fcc.stopServer();

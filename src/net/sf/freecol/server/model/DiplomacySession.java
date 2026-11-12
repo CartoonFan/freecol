@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -33,8 +33,6 @@ import net.sf.freecol.common.networking.ChangeSet;
 import net.sf.freecol.common.networking.ChangeSet.See;
 import net.sf.freecol.common.networking.CloseMessage;
 import net.sf.freecol.common.networking.DiplomacyMessage;
-import net.sf.freecol.common.networking.Message;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 
 
 /**

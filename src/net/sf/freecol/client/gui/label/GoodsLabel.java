@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2002-2021   The FreeCol Team
+ * Copyright (C) 2002-2024   The FreeCol Team
  *
  * This file is part of FreeCol.
  *
@@ -19,14 +19,8 @@
 
 package net.sf.freecol.client.gui.label;
 
-import java.awt.Color;
 import java.awt.Component;
-import java.awt.Image;
-
-import javax.swing.ImageIcon;
-
 import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.client.gui.panel.CargoPanel;
 import net.sf.freecol.client.gui.panel.Utility;
@@ -50,6 +44,7 @@ import net.sf.freecol.common.option.GameOptions;
 public final class GoodsLabel extends AbstractGoodsLabel
     implements CargoLabel, Draggable {
 
+    private final boolean whiteForeground;
 
     /**
      * Initializes this FreeColLabel with the given goods data.
@@ -58,8 +53,22 @@ public final class GoodsLabel extends AbstractGoodsLabel
      * @param goods The {@code Goods} that this label will represent.
      */
     public GoodsLabel(FreeColClient freeColClient, Goods goods) {
+        this(freeColClient, goods, false);
+    }
+    
+    /**
+     * Initializes this FreeColLabel with the given goods data.
+     *
+     * @param freeColClient The enclosing {@code FreeColClient}.
+     * @param goods The {@code Goods} that this label will represent.
+     * @param whiteForeground If the color should be white (or bright) so that
+     *     it works on a black background.
+     */
+    public GoodsLabel(FreeColClient freeColClient, Goods goods, boolean whiteForeground) {
         super(freeColClient, goods);
 
+        this.whiteForeground = whiteForeground;
+        
         initialize();
     }
 
@@ -76,10 +85,12 @@ public final class GoodsLabel extends AbstractGoodsLabel
         final GoodsType type = goods.getType();
         final Specification spec = goods.getGame().getSpecification();
 
-        if (getAmount() < GoodsContainer.CARGO_SIZE) setPartialChosen(true);
+        if (getAmount() < GoodsContainer.CARGO_SIZE) {
+            setAmountType(AmountType.PARTIAL);
+        }
 
         setForeground(ImageLibrary.getGoodsColor(type, goods.getAmount(),
-                                                 location));
+                                                 location, whiteForeground));
         setText(String.valueOf(goods.getAmount()));
 
         if (player == null

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,8 +19,9 @@
 
 package net.sf.freecol.common.option;
 
+import static net.sf.freecol.common.util.CollectionUtils.any;
+
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -36,7 +37,6 @@ import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
 import net.sf.freecol.common.model.Specification;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.common.util.LogBuilder;
 
 
@@ -51,14 +51,14 @@ public class OptionGroup extends AbstractOption<OptionGroup>
     public static final String TAG = "optionGroup";
 
     /** The options in this group. */
-    private final List<Option> options = new ArrayList<>();
+    private final List<Option<?>> options = new ArrayList<>();
 
     /**
      * A map of all option ids to its option.  Unlike the options
      * array, this contains all child options of options that are
      * themselves groups.
      */
-    private final Map<String, Option> optionMap = new HashMap<>();
+    private final Map<String, Option<?>> optionMap = new HashMap<>();
 
     /** Is this option group user editable? */
     private boolean editable = true;
@@ -161,7 +161,7 @@ public class OptionGroup extends AbstractOption<OptionGroup>
      *
      * @return The list of {@code Option}s.
      */
-    public List<Option> getOptions() {
+    public List<Option<?>> getOptions() {
         return options;
     }
 
@@ -171,7 +171,7 @@ public class OptionGroup extends AbstractOption<OptionGroup>
      * @param id The object identifier.
      * @return The option, or null if not found.
      */
-    public Option getOption(String id) {
+    public Option<?> getOption(String id) {
         return optionMap.get(id);
     }
 
@@ -190,7 +190,7 @@ public class OptionGroup extends AbstractOption<OptionGroup>
      *
      * @param option The {@code Option} to add.
      */
-    public void add(Option option) {
+    public void add(Option<?> option) {
         String id = option.getId();
         if (optionMap.containsKey(id)) {
             for (int index = 0; index < options.size(); index++) {
@@ -226,7 +226,8 @@ public class OptionGroup extends AbstractOption<OptionGroup>
      * @param lb A {@code LogBuilder} to log to.
      * @return True if the merge was accepted.
      */
-    public boolean merge(Option option, LogBuilder lb) {
+    public boolean merge(Option<?> option, LogBuilder lb) {
+        if (option == null) return false;
         final String id = option.getId();
         OptionGroup etc = null;
 
@@ -235,7 +236,7 @@ public class OptionGroup extends AbstractOption<OptionGroup>
         if (option instanceof OptionGroup) {
             OptionGroup optionGroup = (OptionGroup)option;
             boolean result = true;
-            for (Option o : optionGroup.getOptions()) {
+            for (Option<?> o : optionGroup.getOptions()) {
                 // @compat 0.11.6
                 // Placement options move to their own group
                 if (o.getId().startsWith("net.sf.freecol.client.gui.panel.")) {
@@ -264,7 +265,7 @@ public class OptionGroup extends AbstractOption<OptionGroup>
         }
 
         for (int index = 0; index < options.size(); index++) {
-            Option o = options.get(index);
+            Option<?> o = options.get(index);
             if (id.equals(o.getId())) { // Found it, replace and return true
                 options.remove(index);
                 options.add(index, option);
@@ -292,7 +293,7 @@ public class OptionGroup extends AbstractOption<OptionGroup>
      * @param group The initial {@code OptionGroup} to add.
      */
     private void addOptionGroup(OptionGroup group) {
-        for (Option option : group.getOptions()) {
+        for (Option<?> option : group.getOptions()) {
             optionMap.put(option.getId(), option);
             if (option instanceof OptionGroup) {
                 addOptionGroup((OptionGroup) option);
@@ -306,9 +307,15 @@ public class OptionGroup extends AbstractOption<OptionGroup>
      * @param id The identifier of the option to remove.
      * @return The {@code Option} removed if any.
      */
-    public Option remove(String id) {
-        Option op = optionMap.remove(id);
-        if (op != null) options.remove(op);
+    public Option<?> remove(String id) {
+        final Option<?> op = optionMap.remove(id);
+        options.remove(op);
+        if (op != null) {
+            options.stream()
+                    .filter(o -> o instanceof OptionGroup)
+                    .map(o -> (OptionGroup) o)
+                    .forEach(og -> og.remove(id));
+        }
         return op;
     }
 
@@ -372,7 +379,7 @@ public class OptionGroup extends AbstractOption<OptionGroup>
         OptionGroup ret = new OptionGroup(spec);
         if (ret.load(file)) {
             if (!optionId.equals(ret.getId())) {
-                Option op = ret.getOption(optionId);
+                final Option<?> op = ret.getOption(optionId);
                 ret = (op instanceof OptionGroup) ? (OptionGroup)op : null;
             }
         } else {
@@ -387,10 +394,10 @@ public class OptionGroup extends AbstractOption<OptionGroup>
     /**
      * {@inheritDoc}
      */    
-    public <T extends Option> boolean hasOption(String id,
+    public <T extends Option<?>> boolean hasOption(String id,
                                                 Class<T> returnClass) {
         if (id == null) return false;
-        Option val = this.optionMap.get(id);
+        Option<?> val = this.optionMap.get(id);
         return (val == null) ? false
             : returnClass.isAssignableFrom(val.getClass());
     }
@@ -398,7 +405,7 @@ public class OptionGroup extends AbstractOption<OptionGroup>
     /**
      * {@inheritDoc}
      */
-    public <T extends Option> T getOption(String id,
+    public <T extends Option<?>> T getOption(String id,
                                           Class<T> returnClass) {
         if (id == null) {
             throw new RuntimeException("Null id: " + this);
@@ -445,7 +452,8 @@ public class OptionGroup extends AbstractOption<OptionGroup>
     @Override
     public void setValue(OptionGroup value) {
         if (value != null) {
-            for (Option other : value.getOptions()) {
+            for (Option<?> other : value.getOptions()) {
+                @SuppressWarnings("rawtypes")
                 Option mine = getOption(other.getId());
                 // could be null if using custom options generated
                 // from an older version of the specification
@@ -472,11 +480,11 @@ public class OptionGroup extends AbstractOption<OptionGroup>
      */
     @Override
     public void generateChoices() {
-        for (Option o : options) {
+        for (Option<?> o : options) {
             if (o instanceof OptionGroup) {
                 ((OptionGroup)o).generateChoices();
-            } else if (o instanceof AbstractOption) {
-                ((AbstractOption)o).generateChoices();
+            } else if (o instanceof AbstractOption<?>) {
+                ((AbstractOption<?>)o).generateChoices();
             }
         }
     }
@@ -536,7 +544,9 @@ public class OptionGroup extends AbstractOption<OptionGroup>
     protected void writeChildren(FreeColXMLWriter xw) throws XMLStreamException {
         super.writeChildren(xw);
 
-        for (Option o : options) o.toXML(xw);
+        for (Option<?> o : options) {
+            o.toXML(xw);
+        }
     }
 
     /**
@@ -560,6 +570,13 @@ public class OptionGroup extends AbstractOption<OptionGroup>
         // ATM OptionGroups are purely additive/overwriting.
 
         super.readChildren(xr);
+        
+        for (Option<?> option : getOptions()) {
+            optionMap.put(option.getId(), option);
+            if (option instanceof OptionGroup) {
+                addOptionGroup((OptionGroup) option);
+            }
+        }
     }
 
     /**
@@ -568,9 +585,9 @@ public class OptionGroup extends AbstractOption<OptionGroup>
     @Override
     public void readChild(FreeColXMLReader xr) throws XMLStreamException {
         String optionId = xr.readId();
-        Option option = getOption(optionId);
+        Option<?> option = getOption(optionId);
         if (option == null) {
-            AbstractOption abstractOption = readOption(xr);
+            AbstractOption<?> abstractOption = readOption(xr);
             if (abstractOption != null) {
                 add(abstractOption);
                 abstractOption.setGroup(this.getId());
@@ -596,7 +613,7 @@ public class OptionGroup extends AbstractOption<OptionGroup>
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append('[').append(getId()).append(" <");
-        for (Option o : getOptions()) {
+        for (Option<?> o : getOptions()) {
             sb.append(' ').append(o.toString());
         }
         sb.append(" >]");

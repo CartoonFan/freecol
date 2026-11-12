@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -18,9 +18,6 @@
  */
 
 package net.sf.freecol.common.model;
-
-import net.sf.freecol.common.model.FreeColObject;
-import net.sf.freecol.common.model.Specification;
 
 
 /**

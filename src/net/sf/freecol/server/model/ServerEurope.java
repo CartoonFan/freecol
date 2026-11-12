@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -30,7 +30,6 @@ import net.sf.freecol.common.model.AbstractGoods;
 import net.sf.freecol.common.model.AbstractUnit;
 import net.sf.freecol.common.model.Europe;
 import net.sf.freecol.common.model.Game;
-import net.sf.freecol.common.model.Market;
 import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.Role;
 import net.sf.freecol.common.model.Specification;
@@ -40,7 +39,6 @@ import net.sf.freecol.common.networking.ChangeSet;
 import net.sf.freecol.common.networking.ChangeSet.See;
 import net.sf.freecol.common.option.GameOptions;
 import net.sf.freecol.common.option.IntegerOption;
-import net.sf.freecol.common.option.UnitListOption;
 import net.sf.freecol.common.util.LogBuilder;
 import net.sf.freecol.common.util.RandomChoice;
 import static net.sf.freecol.common.util.CollectionUtils.*;
@@ -198,7 +196,8 @@ public class ServerEurope extends Europe implements TurnTaker {
         final Player owner = getOwner();
         return transform(getSpecification().getUnitTypeList(),
                          ut -> ut.isRecruitable()
-                             && owner.hasAbility(Ability.CAN_RECRUIT_UNIT, ut),
+                             && owner.hasAbility(Ability.CAN_RECRUIT_UNIT, ut)
+                             && ut.isAvailableTo(owner),
                          ut -> new RandomChoice<>(ut, ut.getRecruitProbability()));
     }
 

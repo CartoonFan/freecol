@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,14 +21,8 @@ package net.sf.freecol.common.io;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import net.sf.freecol.common.io.FreeColDirectories;
 import net.sf.freecol.common.resources.ResourceMapping;
 
 
@@ -37,11 +31,8 @@ import net.sf.freecol.common.resources.ResourceMapping;
  */
 public class FreeColTcFile extends FreeColModFile {
 
+    @SuppressWarnings("unused")
     private static final Logger logger = Logger.getLogger(FreeColTcFile.class.getName());
-
-    /** A cache of all the TCs. */
-    private static final Map<String, FreeColTcFile> allTCs = new HashMap<>();
-
 
     /**
      * Opens the given file for reading.
@@ -75,43 +66,16 @@ public class FreeColTcFile extends FreeColModFile {
     }
 
     /**
-     * Get all the standard rule sets.
-     *
-     * @return A list of {@code FreeColTcFile}s holding the rule sets.
-     */
-    public static List<FreeColTcFile> getRulesList() {
-        List<FreeColTcFile> ret = new ArrayList<>();
-        for (File f : FreeColDirectories.getTcFileList()) {
-            try {
-                ret.add(new FreeColTcFile(f));
-            } catch (IOException ioe) {
-                logger.log(Level.WARNING, "Failed to load TC from: " + f, ioe);
-            }
-        }
-        return ret;
-    }
-
-
-    // Cache manipulation
-
-    /**
-     * Require all TCs to be loaded.
-     */
-    public static void loadTCs() {
-        if (allTCs.isEmpty()) {
-            for (FreeColTcFile fctf : FreeColTcFile.getRulesList()) {
-                allTCs.put(fctf.getId(), fctf);
-            }
-        }
-    }
-
-    /**
      * Get a TC by id.
      *
      * @param id The TC file identifier to look for.
      * @return The {@code FreeColTcFile} found, or null if none present.
      */
     public static FreeColTcFile getFreeColTcFile(String id) {
-        return allTCs.get(id);
+        try {
+            return new FreeColTcFile(new File(FreeColDirectories.getDataDirectory(), id));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

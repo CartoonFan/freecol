@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -20,13 +20,11 @@
 package net.sf.freecol.client.control;
 
 import net.sf.freecol.client.ClientOptions;
-import net.sf.freecol.client.control.ConnectController;
-import net.sf.freecol.client.control.InGameController;
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.common.model.Game;
-import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.Map;
+import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.Specification;
 import net.sf.freecol.common.networking.ServerAPI;
 import net.sf.freecol.server.FreeColServer;

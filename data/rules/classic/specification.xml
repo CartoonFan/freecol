@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-    *  Copyright (C) 2002-2021  The FreeCol Team
+    *  Copyright (C) 2002-2022  The FreeCol Team
     *
     *  This file is part of FreeCol.
     *
@@ -303,7 +303,7 @@
            temperature-minimum="0" temperature-maximum="15"
            altitude-minimum="1" altitude-maximum="2"/>
       <production unattended="true">
-        <output goods-type="model.goods.grain" value="5"/>
+        <output goods-type="model.goods.grain" value="3"/>
         <output goods-type="model.goods.cotton" value="2"/>
       </production>
       <production>
@@ -359,7 +359,7 @@
            temperature-minimum="30" temperature-maximum="40"
            altitude-minimum="1" altitude-maximum="1"/>
       <production unattended="true">
-        <output goods-type="model.goods.grain" value="4"/>
+        <output goods-type="model.goods.grain" value="3"/>
         <output goods-type="model.goods.sugar" value="3"/>
       </production>
       <production>
@@ -429,16 +429,16 @@
            temperature-minimum="10" temperature-maximum="40"
            altitude-minimum="1" altitude-maximum="2"/>
       <production unattended="true" production-level="veryHigh">
-        <output goods-type="model.goods.grain" value="3"/>
-        <output goods-type="model.goods.cotton" value="1"/>
+        <output goods-type="model.goods.grain" value="2"/>
+        <output goods-type="model.goods.ore" value="2"/>
       </production>
       <production unattended="true" production-level="veryLow">
         <output goods-type="model.goods.grain" value="1"/>
-        <output goods-type="model.goods.cotton" value="1"/>
+        <output goods-type="model.goods.ore" value="2"/>
       </production>
       <production unattended="true">
-        <output goods-type="model.goods.grain" value="2"/>
-        <output goods-type="model.goods.cotton" value="1"/>
+        <output goods-type="model.goods.grain" value="1"/>
+        <output goods-type="model.goods.ore" value="2"/>
       </production>
       <production>
         <output goods-type="model.goods.grain" value="2"/>
@@ -484,7 +484,7 @@
       <modifier id="model.modifier.defence" index="50"
                 type="percentage" value="50"/>
       <production unattended="true">
-        <output goods-type="model.goods.grain" value="3"/>
+        <output goods-type="model.goods.grain" value="2"/>
         <output goods-type="model.goods.furs" value="3"/>
       </production>
       <production>
@@ -566,7 +566,7 @@
       <modifier id="model.modifier.defence" index="50"
                 type="percentage" value="50"/>
       <production unattended="true">
-        <output goods-type="model.goods.grain" value="3"/>
+        <output goods-type="model.goods.grain" value="2"/>
         <output goods-type="model.goods.furs" value="2"/>
       </production>
       <production>
@@ -628,7 +628,7 @@
                 type="percentage" value="75"/>
       <production unattended="true">
         <output goods-type="model.goods.grain" value="2"/>
-        <output goods-type="model.goods.furs" value="1"/>
+        <output goods-type="model.goods.sugar" value="1"/>
       </production>
       <production>
         <output goods-type="model.goods.grain" value="2"/>
@@ -661,7 +661,7 @@
       <modifier id="model.modifier.defence" index="50"
                 type="percentage" value="50"/>
       <production unattended="true" production-level="veryHigh">
-        <output goods-type="model.goods.grain" value="3"/>
+        <output goods-type="model.goods.grain" value="2"/>
         <output goods-type="model.goods.furs" value="2"/>
       </production>
       <production unattended="true" production-level="veryLow">
@@ -669,7 +669,7 @@
         <output goods-type="model.goods.furs" value="2"/>
       </production>
       <production unattended="true">
-        <output goods-type="model.goods.grain" value="2"/>
+        <output goods-type="model.goods.grain" value="1"/>
         <output goods-type="model.goods.furs" value="2"/>
       </production>
       <production>
@@ -724,7 +724,7 @@
                basic-move-cost="6" basic-work-turns="4" is-elevation="true">
       <gen humidity-minimum="0" humidity-maximum="100"
            temperature-minimum="-20" temperature-maximum="40"
-           altitude-minimum="2" altitude-maximum="3"/>
+           altitude-minimum="10" altitude-maximum="19"/>
       <modifier id="model.modifier.defence" index="50"
                 type="percentage" value="100"/>
       <production unattended="true">
@@ -748,7 +748,7 @@
                is-elevation="true" can-settle="false">
       <gen humidity-minimum="0" humidity-maximum="100"
            temperature-minimum="-20" temperature-maximum="40"
-           altitude-minimum="3" altitude-maximum="3"/>
+           altitude-minimum="20" altitude-maximum="30"/>
       <modifier id="model.modifier.defence" index="50"
                 type="percentage" value="150"/>
       <production>
@@ -1795,7 +1795,7 @@
          defaults to the unit type itself! -->
     <unit-type id="colonist" abstract="true"
                offence="0" defence="1" movement="3" line-of-sight="1"
-               priority="1000">
+               priority="1000" hit-points="5">
       <ability id="model.ability.person"
                value="true"/>
       <ability id="model.ability.foundColony"
@@ -1825,7 +1825,7 @@
                price="1100" skill="1" expert-production="model.goods.grain"
                recruit-probability="1" score-value="4">
       <modifier id="model.goods.grain" index="30"
-                type="additive" value="3"/>
+                type="additive" value="2"/> <!-- Documentation for the classic game says 3, but it's actually 2.  -->
     </unit-type>
     <unit-type id="model.unit.expertFisherman" extends="colonist"
                price="1000" skill="1" expert-production="model.goods.fish"
@@ -1968,6 +1968,8 @@
       <default-role id="model.role.missionary"/>
       <ability id="model.ability.expertMissionary"
                value="true"/>
+      <ability id="model.ability.dressMissionary"
+               value="true"/>
       <modifier id="model.modifier.missionaryTradeBonus"
                 type="percentage" value="10"/>
     </unit-type>
@@ -1997,7 +1999,7 @@
     </unit-type>
     <unit-type id="model.unit.indianConvert"
                skill="0" offence="0" defence="1" movement="3" line-of-sight="1"
-               maximum-attrition="8" score-value="3">
+               maximum-attrition="8" score-value="3" hit-points="5">
       <consumes id="model.goods.food" value="2"/>
       <consumes id="model.goods.bells" value="1"/>
       <ability id="model.ability.person"
@@ -2022,7 +2024,8 @@
     </unit-type>
     <unit-type id="model.unit.brave"
                offence="1" defence="1"
-               default-unit="true" movement="3" line-of-sight="1" space="1">
+               default-unit="true" movement="3" line-of-sight="1" space="1"
+               hit-points="5">
       <required-ability id="model.ability.native"/>
       <consumes id="model.goods.food" value="2"/>
       <consumes id="model.goods.rum" value="1"/>
@@ -2052,7 +2055,8 @@
                value="true"/>
     </unit-type>
     <unit-type id="model.unit.colonialRegular" extends="colonist"
-               skill-taught="model.unit.veteranSoldier" skill="3">
+               skill-taught="model.unit.veteranSoldier" skill="3"
+               hit-points="5">
       <required-ability id="model.ability.independenceDeclared"/>
       <ability id="model.ability.demoteOnAllEquipLost"
                value="true"/>
@@ -2066,7 +2070,7 @@
                 type="additive" value="3"/>
     </unit-type>
     <unit-type id="model.unit.kingsRegular" extends="colonist"
-               default-unit="true" skill="4">
+               default-unit="true" skill="4" hit-points="5">
       <required-ability id="model.ability.royalExpeditionaryForce"/>
       <ability id="model.ability.refUnit"
                value="true"/>
@@ -2164,13 +2168,13 @@
       <ability id="model.ability.piracy"
                value="true"/>
     </unit-type>
-    <unit-type id="wagon" abstract="true" line-of-sight="1">
+    <unit-type id="wagon" abstract="true" line-of-sight="1" hit-points="1">
       <ability id="model.ability.foundColony"
                value="false"/>
     </unit-type>
     <unit-type id="model.unit.artillery" extends="wagon" price="500"
                offence="7" defence="5" movement="3"
-               score-value="2">
+               score-value="2" hit-points="6">
       <required-goods id="model.goods.hammers"
                       value="192"/>
       <required-goods id="model.goods.tools"
@@ -2190,7 +2194,7 @@
     </unit-type>
     <unit-type id="model.unit.damagedArtillery" extends="wagon"
                offence="5" defence="3" movement="3"
-               score-value="1">
+               score-value="1" hit-points="6">
       <ability id="model.ability.captureUnits"
                value="true"/>
       <ability id="model.ability.bombard"
@@ -2971,6 +2975,10 @@
         <modifier id="model.modifier.defence" index="50"
                   type="percentage" value="50"/>
       </settlement>
+      <!-- default to units being recruitable for Europeans, note that
+           Brewster disables this for specific unit types, but we do
+           not do this for other unit types (man-o-war, natives) and
+           perhaps should -->
       <ability id="model.ability.canRecruitUnit"
                value="true"/>
       <ability id="model.ability.electFoundingFather"
@@ -3032,6 +3040,47 @@
       <modifier id="model.modifier.offenceAgainst" index="50"
                 type="percentage" value="50">
         <scope method-name="isIndian" method-value="true"/>
+      </modifier>
+    </european-nation-type>
+    <european-nation-type id="model.nationType.naval"
+                          extends="model.nationType.default">
+      <modifier id="model.modifier.movementBonus"
+                type="additive" value="3">
+        <scope ability-id="model.ability.navalUnit"/>
+      </modifier>
+      <unit id="ship" type="model.unit.merchantman"/>
+    </european-nation-type>
+    <european-nation-type id="model.nationType.building"
+                          extends="model.nationType.default">
+      <unit id="pioneer" type="model.unit.masterCarpenter"
+            role="model.role.pioneer"/>
+      <unit id="soldier" type="model.unit.expertLumberJack"
+            role="model.role.soldier"/>
+      <modifier id="model.goods.lumber" index="80"
+                type="additive" value="2"/>
+      <modifier id="model.goods.hammers" index="80"
+                type="additive" value="2">
+        <scope ability-id="model.ability.person" />
+      </modifier>
+    </european-nation-type>
+    <european-nation-type id="model.nationType.agriculture"
+                          extends="model.nationType.default">
+      <unit id="pioneer" type="model.unit.expertFarmer"
+            role="model.role.pioneer"/>
+      <modifier id="model.goods.grain" index="80"
+                type="additive" value="2"/>
+    </european-nation-type>
+    <european-nation-type id="model.nationType.furTrapping"
+                          extends="model.nationType.default">
+      <unit id="pioneer" type="model.unit.expertFurTrapper"
+            role="model.role.pioneer"/>
+      <unit id="soldier" type="model.unit.masterFurTrader"
+            role="model.role.soldier"/>
+      <modifier id="model.goods.furs" index="80"
+                type="additive" value="2"/>
+      <modifier id="model.goods.coats" index="80"
+                type="additive" value="2">
+        <scope ability-id="model.ability.person" />
       </modifier>
     </european-nation-type>
   </european-nation-types>
@@ -3135,7 +3184,7 @@
       <skill id="model.unit.expertFarmer" probability="10"/>
       <skill id="model.unit.masterSugarPlanter" probability="3"/>
       <skill id="model.unit.masterTobaccoPlanter" probability="3"/>
-      <region id="model.region.west" />
+      <region id="model.region.center" />
     </indian-nation-type>
     <indian-nation-type id="model.nationType.sioux" extends="camp"
                         number-of-settlements="average" aggression="average">
@@ -3146,16 +3195,17 @@
       <region id="model.region.northWest" />
     </indian-nation-type>
     <indian-nation-type id="model.nationType.tupi" extends="camp"
-                        number-of-settlements="low" aggression="high">
+                        number-of-settlements="high" aggression="low">
       <skill id="model.unit.masterSugarPlanter" probability="20"/>
       <skill id="model.unit.seasonedScout" probability="10"/>
       <skill id="model.unit.masterCottonPlanter" probability="10"/>
       <skill id="model.unit.expertFurTrapper" probability="3"/>
       <skill id="model.unit.masterTobaccoPlanter" probability="3"/>
       <region id="model.region.southEast" />
+      <region id="model.region.south" />
     </indian-nation-type>
     <indian-nation-type id="model.nationType.arawak" extends="village"
-                        number-of-settlements="low" aggression="low">
+                        number-of-settlements="low" aggression="high">
       <skill id="model.unit.masterSugarPlanter" probability="20"/>
       <skill id="model.unit.expertFisherman" probability="10"/>
       <skill id="model.unit.masterFurTrader" probability="3"/>
@@ -3170,7 +3220,7 @@
       <skill id="model.unit.masterTobaccoPlanter" probability="3"/>
       <skill id="model.unit.expertFarmer" probability="3"/>
       <skill id="model.unit.masterFurTrader" probability="3"/>
-      <region id="model.region.northEast" />
+      <region id="model.region.north" />
     </indian-nation-type>
     <indian-nation-type id="model.nationType.iroquois" extends="village"
                         number-of-settlements="average" aggression="average">
@@ -3182,10 +3232,10 @@
       <skill id="model.unit.expertFisherman" probability="3"/>
       <skill id="model.unit.expertOreMiner" probability="3"/>
       <skill id="model.unit.masterFurTrader" probability="3"/>
-      <region id="model.region.north" />
+      <region id="model.region.northEast" />
     </indian-nation-type>
     <indian-nation-type id="city" abstract="true" extends="default"
-                        number-of-settlements="high">
+                        number-of-settlements="low">
       <skill id="model.unit.expertSilverMiner" probability="20"/>
       <skill id="model.unit.expertFarmer" probability="10"/>
       <skill id="model.unit.expertFisherman" probability="10"/>
@@ -3195,7 +3245,6 @@
                         aggression="low">
       <skill id="model.unit.expertOreMiner" probability="10"/>
       <region id="model.region.southWest" />
-      <region id="model.region.south" />
       <settlement id="model.settlement.inca" capital="false"
                   claimable-radius="2" extra-claimable-radius="2"
                   minimum-size="8" maximum-size="12"
@@ -3239,8 +3288,7 @@
                         aggression="high">
       <skill id="model.unit.masterSugarPlanter" probability="3"/>
       <skill id="model.unit.expertOreMiner" probability="3"/>
-      <region id="model.region.center" />
-      <region id="model.region.east" />
+      <region id="model.region.west" />
       <settlement id="model.settlement.aztec" capital="false"
                   claimable-radius="2" extra-claimable-radius="2"
                   minimum-size="8" maximum-size="12"
@@ -3314,13 +3362,35 @@
             nation-type="model.nationType.apache"/>
     <nation id="model.nation.tupi" color="0x045c04"
             nation-type="model.nationType.tupi"/>
-    <nation id="model.nation.dutchREF" color="0xcc5500"
+    <nation id="model.nation.dutchREF" color="0xffffff"
             nation-type="model.nationType.ref"/>
-    <nation id="model.nation.frenchREF" color="0x6050dc"
+    <nation id="model.nation.frenchREF" color="0xffffff"
             nation-type="model.nationType.ref"/>
-    <nation id="model.nation.englishREF" color="0xde3163"
+    <nation id="model.nation.englishREF" color="0xffffff"
             nation-type="model.nationType.ref"/>
-    <nation id="model.nation.spanishREF" color="0xffdf00"
+    <nation id="model.nation.spanishREF" color="0xffffff"
+            nation-type="model.nationType.ref"/>
+            
+    <nation id="model.nation.portuguese" color="0x00ff00"
+            nation-type="model.nationType.naval" selectable="true"
+            preferred-latitude="-16" ref="model.nation.portugueseREF"/>
+    <nation id="model.nation.swedish" color="0x00bfff"
+            nation-type="model.nationType.building" selectable="true"
+            preferred-latitude="-39" ref="model.nation.swedishREF"/>
+    <nation id="model.nation.danish" color="0xff00bf"
+            nation-type="model.nationType.agriculture" selectable="true"
+            preferred-latitude="-64" ref="model.nation.danishREF"/>
+    <nation id="model.nation.russian" color="0xaaaaaa"
+            nation-type="model.nationType.furTrapping" selectable="true"
+            preferred-latitude="-55" starts-on-east-coast="false"
+            ref="model.nation.russianREF"/>
+    <nation id="model.nation.portugueseREF" color="0xffffff"
+            nation-type="model.nationType.ref"/>
+    <nation id="model.nation.swedishREF" color="0xffffff"
+            nation-type="model.nationType.ref"/>
+    <nation id="model.nation.danishREF" color="0xffffff"
+            nation-type="model.nationType.ref"/>
+    <nation id="model.nation.russianREF" color="0xffffff"
             nation-type="model.nationType.ref"/>
   </nations>
 
@@ -3353,7 +3423,7 @@
             </unitOption>
             <unitOption id="model.option.immigrants.3">
               <unitType value="model.unit.seasonedScout"/>
-              <role value="model.role.default" />
+              <role value="model.role.scout" />
               <number value="1"/>
             </unitOption>
             <unitOption id="model.option.immigrants.4">
@@ -3510,19 +3580,23 @@
         </optionGroup>
         <optionGroup id="model.difficulty.cheat" editable="false">
           <integerOption id="model.option.liftBoycottCheat"
-                         value="1"/>
+                         value="0"/>
           <integerOption id="model.option.equipScoutCheat"
-                         value="1"/>
+                         value="0"/>
           <integerOption id="model.option.equipPioneerCheat"
-                         value="1"/>
+                         value="0"/>
           <integerOption id="model.option.landUnitCheat"
-                         value="1"/>
+                         value="0"/>
           <integerOption id="model.option.offensiveLandUnitCheat"
                          value="0"/>
           <integerOption id="model.option.offensiveNavalUnitCheat"
-                         value="1"/>
+                         value="0"/>
           <integerOption id="model.option.transportNavalUnitCheat"
+                         value="0"/>
+          <integerOption id="model.option.tradeProfitMultiplierCheat"
                          value="1"/>
+          <integerOption id="model.option.tradeProfitMultiplierCheatTurns"
+                         value="0"/>
         </optionGroup>
       </optionGroup>
 
@@ -3712,7 +3786,11 @@
           <integerOption id="model.option.offensiveNavalUnitCheat"
                          value="5"/>
           <integerOption id="model.option.transportNavalUnitCheat"
-                         value="5"/>
+                         value="0"/>
+          <integerOption id="model.option.tradeProfitMultiplierCheat"
+                         value="2"/>
+          <integerOption id="model.option.tradeProfitMultiplierCheatTurns"
+                         value="200"/>
         </optionGroup>
       </optionGroup>
 
@@ -3897,7 +3975,11 @@
           <integerOption id="model.option.offensiveNavalUnitCheat"
                          value="10"/>
           <integerOption id="model.option.transportNavalUnitCheat"
-                         value="10"/>
+                         value="4"/>
+          <integerOption id="model.option.tradeProfitMultiplierCheat"
+                         value="4"/>
+          <integerOption id="model.option.tradeProfitMultiplierCheatTurns"
+                         value="200"/>
         </optionGroup>
       </optionGroup>
 
@@ -4077,6 +4159,10 @@
                          value="15"/>
           <integerOption id="model.option.transportNavalUnitCheat"
                          value="15"/>
+          <integerOption id="model.option.tradeProfitMultiplierCheat"
+                         value="10"/>
+          <integerOption id="model.option.tradeProfitMultiplierCheatTurns"
+                         value="200"/>
         </optionGroup>
       </optionGroup>
 
@@ -4256,6 +4342,10 @@
                          value="20"/>
           <integerOption id="model.option.transportNavalUnitCheat"
                          value="20"/>
+          <integerOption id="model.option.tradeProfitMultiplierCheat"
+                         value="30"/>
+          <integerOption id="model.option.tradeProfitMultiplierCheatTurns"
+                         value="400"/>
         </optionGroup>
       </optionGroup>
 
@@ -4529,6 +4619,10 @@
                          value="20"/>
           <integerOption id="model.option.transportNavalUnitCheat"
                          value="20"/>
+          <integerOption id="model.option.tradeProfitMultiplierCheat"
+                         value="15"/>
+          <integerOption id="model.option.tradeProfitMultiplierCheatTurns"
+                         value="400"/>
         </optionGroup>
       </optionGroup>
     </optionGroup>
@@ -4593,6 +4687,10 @@
              sail in? -->
         <booleanOption id="model.option.teleportREF"
                        defaultValue="true"/>
+                       
+        <!-- Use map defined starting positions (if available). -->
+        <booleanOption id="model.option.mapDefinedStartingPositions" defaultValue="true" />
+        
         <!-- Types of starting positions -->
         <selectOption id="model.option.startingPositions"
                       defaultValue="0" localizedLabels="true">
@@ -4643,7 +4741,7 @@
         <!-- Whether experts have connections, producing without raw
              materials in factories -->
         <booleanOption id="model.option.expertsHaveConnections"
-                       defaultValue="true"/>
+                       defaultValue="false"/>
         <!-- Can colonies be founded during the war of independence? -->
         <booleanOption id="model.option.foundColonyDuringRebellion"
                        defaultValue="false"/>
@@ -4770,15 +4868,19 @@
         <!-- Maximum latitude -->
         <integerOption id="model.option.maximumLatitude"
                        defaultValue="90" minimumValue="-90" maximumValue="90"/>
+                       
+        <!-- Enables generation of rivers that cannot be traversed by land units. -->
+        <booleanOption id="mapGeneratorOptions.enableGreatRivers" defaultValue="false"/>
+                       
         <!-- Option for setting the number of rivers on the map
              The value indicates the number of land tile per river tile -->
         <rangeOption id="model.option.riverNumber"
-                     defaultValue="10" localizedLabels="true">
-          <rangeValue label="verySmall" value="20"/>
+                     defaultValue="15" localizedLabels="true">
+          <rangeValue label="verySmall" value="5"/>
           <rangeValue label="small" value="10"/>
-          <rangeValue label="medium" value="9"/>
-          <rangeValue label="large" value="8"/>
-          <rangeValue label="veryLarge" value="7"/>
+          <rangeValue label="medium" value="15"/>
+          <rangeValue label="large" value="20"/>
+          <rangeValue label="veryLarge" value="40"/>
         </rangeOption>
         <!-- Option for setting the number of mountains on the map
              The value indicates the number of land tile per mountain tile -->

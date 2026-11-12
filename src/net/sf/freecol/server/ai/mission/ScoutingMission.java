@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,6 +19,11 @@
 
 package net.sf.freecol.server.ai.mission;
 
+import static net.sf.freecol.common.util.CollectionUtils.toList;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+import static net.sf.freecol.common.util.RandomUtils.getRandomMember;
+
+import java.util.List;
 import java.util.logging.Logger;
 
 import javax.xml.stream.XMLStreamException;
@@ -27,9 +32,9 @@ import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
 import net.sf.freecol.common.model.Ability;
 import net.sf.freecol.common.model.Colony;
+import net.sf.freecol.common.model.Direction;
 import net.sf.freecol.common.model.IndianSettlement;
 import net.sf.freecol.common.model.Location;
-import net.sf.freecol.common.model.Direction;
 import net.sf.freecol.common.model.PathNode;
 import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.Settlement;
@@ -66,6 +71,8 @@ public final class ScoutingMission extends Mission {
      * - An unexplored tile
      */
     private Location target;
+    /** A Tile to go to before going to the real target. */
+    private Location precedingTile;
 
 
     /**
@@ -366,7 +373,7 @@ public final class ScoutingMission extends Mission {
      */
     @Override
     public Location getTarget() {
-        return this.target;
+        return (this.precedingTile != null) ? this.precedingTile : this.target;
     }
 
     /**
@@ -374,8 +381,26 @@ public final class ScoutingMission extends Mission {
      */
     @Override
     public void setTarget(Location target) {
-        if (target == null
-            || target instanceof Settlement || target instanceof Tile) {
+        if (target == null || target instanceof Tile
+            || target instanceof Colony) {
+            this.target = target;
+            this.precedingTile = null;
+        } else if (target instanceof IndianSettlement) {
+            AIUnit aiUnit = getAIUnit();
+            Unit unit = aiUnit.getUnit();
+            Tile t = target.getTile();
+            if (!unit.hasTile()
+                || unit.getTile().getContiguity() != t.getContiguity()) {
+                // Not going to be able to walk there, so we will need to take
+                // a carrier, but that means going first to a tile adjacent
+                // to the settlement, which we were not doing in BR#3228.
+                List<Tile> tiles = toList(t.getContiguityAdjacent(t.getContiguity()));
+                List<Tile> coast = transform(tiles, Tile::isCoastland);
+                this.precedingTile = getRandomMember(logger, "scout-tile",
+                    (coast.isEmpty()) ? tiles : coast, aiUnit.getAIRandom());
+            } else {
+                this.precedingTile = null;
+            }
             this.target = target;
         }
     }
@@ -416,7 +441,13 @@ public final class ScoutingMission extends Mission {
         Unit.MoveType mt = travelToTarget(getTarget(),
             CostDeciders.avoidSettlementsAndBlockingUnits(), lb);
         switch (mt) {
-        case MOVE: // Arrived at a colony
+        case MOVE: // Arrived
+            if (this.precedingTile != null) {
+                // At a tile next to the settlement, stop pretending that
+                // is where we are going.
+                this.precedingTile = null;
+                return doMission(lb);
+            }
             break;
 
         case MOVE_HIGH_SEAS: case MOVE_NO_MOVES: case MOVE_ILLEGAL:
@@ -426,6 +457,7 @@ public final class ScoutingMission extends Mission {
             return lbFail(lb, false, AIUNITDIED);
 
         case MOVE_NO_ACCESS_EMBARK:
+            setTarget(target);
             return this;
 
         case MOVE_NO_TILE:
@@ -508,7 +540,9 @@ public final class ScoutingMission extends Mission {
     protected void readAttributes(FreeColXMLReader xr) throws XMLStreamException {
         super.readAttributes(xr);
 
-        target = xr.getLocationAttribute(getGame(), TARGET_TAG, false);
+        // Do not use setTarget, yet, it does complex stuff that may not
+        // be initialized
+        this.target = xr.getLocationAttribute(getGame(), TARGET_TAG, false);
     }
 
     /**

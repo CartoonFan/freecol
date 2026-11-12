@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,11 +19,20 @@
 
 package net.sf.freecol.common.model;
 
+import static net.sf.freecol.common.model.Constants.INFINITY;
+import static net.sf.freecol.common.util.CollectionUtils.alwaysTrue;
+import static net.sf.freecol.common.util.CollectionUtils.any;
+import static net.sf.freecol.common.util.CollectionUtils.find;
+import static net.sf.freecol.common.util.CollectionUtils.iterable;
+import static net.sf.freecol.common.util.CollectionUtils.matchKey;
+import static net.sf.freecol.common.util.CollectionUtils.matchKeyEquals;
+import static net.sf.freecol.common.util.CollectionUtils.none;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+
 import java.awt.Color;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Constructor;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -32,9 +41,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.function.Predicate;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -42,18 +50,18 @@ import java.util.stream.Stream;
 
 import javax.xml.stream.XMLStreamException;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import net.sf.freecol.common.FreeColUserMessageException;
+import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.io.FreeColDirectories;
 import net.sf.freecol.common.io.FreeColModFile;
-import net.sf.freecol.common.io.FreeColTcFile;
+import net.sf.freecol.common.io.FreeColRules;
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
-import static net.sf.freecol.common.model.Constants.*;
 import net.sf.freecol.common.model.NationOptions.Advantages;
-import net.sf.freecol.common.model.UnitChangeType;
 import net.sf.freecol.common.option.AbstractOption;
 import net.sf.freecol.common.option.AbstractUnitOption;
 import net.sf.freecol.common.option.BooleanOption;
-import net.sf.freecol.common.option.FileOption;
 import net.sf.freecol.common.option.GameOptions;
 import net.sf.freecol.common.option.IntegerOption;
 import net.sf.freecol.common.option.MapGeneratorOptions;
@@ -61,15 +69,10 @@ import net.sf.freecol.common.option.Option;
 import net.sf.freecol.common.option.OptionContainer;
 import net.sf.freecol.common.option.OptionGroup;
 import net.sf.freecol.common.option.PercentageOption;
-import net.sf.freecol.common.option.RangeOption;
-import net.sf.freecol.common.option.StringOption;
 import net.sf.freecol.common.option.TextOption;
 import net.sf.freecol.common.option.UnitListOption;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.common.util.Introspector;
 import net.sf.freecol.common.util.LogBuilder;
-
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 
 /**
@@ -83,7 +86,7 @@ public final class Specification implements OptionContainer {
     private static final Logger logger = Logger.getLogger(Specification.class.getName());
 
     /** Fixed class array argument used in newType(). */
-    private static final Class[] newTypeClasses
+    private static final Class<?>[] newTypeClasses
         = new Class[] { String.class, Specification.class };
     
     // Special reader classes for spec objects
@@ -107,6 +110,22 @@ public final class Specification implements OptionContainer {
                 Modifier modifier = new Modifier(xr, Specification.this);
                 Specification.this.addModifier(modifier);
                 Specification.this.specialModifiers.add(modifier);
+            }
+        }
+    }
+    
+    private class AbilityReader implements ChildReader {
+
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void readChildren(FreeColXMLReader xr)
+            throws XMLStreamException {
+            while (xr.moreTags()) {
+                Ability ability = new Ability(xr, Specification.this);
+                Specification.this.addAbility(ability);
+                Specification.this.gameAbilities.add(ability);
             }
         }
     }
@@ -200,9 +219,13 @@ public final class Specification implements OptionContainer {
                     } else {
                         logger.warning("Delete " + id + " failed");
                     }
+                    // Consume the </delete> end tag, otherwise the reader
+                    // desyncs and every element after the first <delete>
+                    // in the section is silently dropped.
+                    xr.closeTag(FreeColSpecObjectType.DELETE_TAG);
 
                 } else {
-                    T object = getType(id, type);
+                    T object = getAlreadyInitializedType(id, type);
                     if (object == null) {
                         object = newType(id, type);
                         addType(id, object);
@@ -215,8 +238,7 @@ public final class Specification implements OptionContainer {
                     // extensions to not have to re-specify all the
                     // attributes when just changing the children.
                     if (object.getId() != null
-                        && xr.getAttribute(FreeColSpecObjectType.PRESERVE_TAG,
-                                           false)) {
+                        && xr.getAttribute(FreeColSpecObjectType.PRESERVE_TAG, false)) {
                         object.readChildren(xr);
                     } else {
                         object.readFromXML(xr);
@@ -412,7 +434,7 @@ public final class Specification implements OptionContainer {
     private final List<Modifier> specialModifiers = new ArrayList<>();
 
     // readerMap("options")
-    private final Map<String, AbstractOption> allOptions = new HashMap<>();
+    private final Map<String, AbstractOption<?>> allOptions = new HashMap<>();
     private final Map<String, OptionGroup> allOptionGroups = new HashMap<>();
 
     /* Containers derived from readerMap containers */
@@ -426,6 +448,8 @@ public final class Specification implements OptionContainer {
     private final List<GoodsType> libertyGoodsTypeList = new ArrayList<>();
     private final List<GoodsType> immigrationGoodsTypeList = new ArrayList<>();
     private final List<GoodsType> rawBuildingGoodsTypeList = new ArrayList<>();
+    private final List<GoodsType> rawMaterialsForUnstorableBuildingMaterials = new ArrayList<>();
+    private final List<GoodsType> rawMaterialsForStorableBuildingMaterials = new ArrayList<>();
 
     // Derived from readerMap container: nations
     private final List<Nation> europeanNations = new ArrayList<>();
@@ -446,11 +470,21 @@ public final class Specification implements OptionContainer {
     private final List<UnitType> defaultUnitTypes = new ArrayList<>();
 
     // Other containers
-    /** All the FreeColSpecObjectType objects, indexed by identifier. */
+    
+    /**
+     * All the FreeColSpecObjectType objects, indexed by identifier.
+     * 
+     * This list include abstract types that are read from the specification files,
+     * but no longer contains the abstract types after reserialization. The reason
+     * for this is that the abstract types are needed when still applying mods
+     * that might reference the abstract type. 
+     */
     private final Map<String, FreeColSpecObjectType> allTypes = new HashMap<>(256);
 
     /** All the abilities by identifier. */
     private final Map<String, List<Ability>> allAbilities = new HashMap<>(128);
+    
+    private final List<Ability> gameAbilities = new ArrayList<>();
 
     /** A cache of the military roles in decreasing order.  Do not serialize. */
     private List<Role> militaryRoles = null;
@@ -510,6 +544,7 @@ public final class Specification implements OptionContainer {
         readerMap.put(UNIT_TYPES_TAG,
                       new TypeReader<>(UnitType.class, unitTypeList));
 
+        readerMap.put(ABILITIES_TAG, new AbilityReader());
         readerMap.put(MODIFIERS_TAG, new ModifierReader());
         readerMap.put(OPTIONS_TAG, new OptionReader());
     }
@@ -580,12 +615,20 @@ public final class Specification implements OptionContainer {
                 }
                 loadedMod = true;
                 logger.info("Loaded mod " + mod.getId());
+            } catch (FreeColUserMessageException e) {
+                throw e;
             } catch (IOException|XMLStreamException ex) {
-                logger.log(Level.WARNING, "Read error in mod " + mod.getId(),
-                    ex);
+                logger.log(Level.WARNING, "Read error in mod " + mod.getId(), ex);
+                throw new FreeColUserMessageException(
+                    StringTemplate.template("error.mod").add("%id%", mod.getId()).add("%name%", Messages.getName("mod." + mod.getId())),
+                    ex
+                );
             } catch (RuntimeException rte) {
-                logger.log(Level.WARNING, "Parse error in mod " + mod.getId(),
-                    rte);
+                logger.log(Level.WARNING, "Parse error in mod " + mod.getId(), rte);
+                throw new FreeColUserMessageException(
+                    StringTemplate.template("error.mod").add("%id%", mod.getId()).add("%name%", Messages.getName("mod." + mod.getId())),
+                    rte
+                );
             }
         }
         if (loadedMod) clean("mod loading");
@@ -602,6 +645,11 @@ public final class Specification implements OptionContainer {
     public void prepare(Advantages advantages, String difficulty) {
         prepare(advantages, (difficulty == null) ? null
             : getDifficultyOptionGroup(difficulty));
+    }
+    
+    public boolean hasAbility(String key) {
+        List<Ability> ability = allAbilities.get(key);
+        return ability != null && ability.stream().anyMatch(a -> a.getValue());
     }
 
     /**
@@ -634,9 +682,6 @@ public final class Specification implements OptionContainer {
     public void clean(String why) {
         logger.finest("Cleaning up specification following " + why + ".");
 
-        // Drop all abstract types
-        removeInPlace(allTypes, e -> e.getValue().isAbstractType());
-
         // Fix up the GoodsType derived attributes.  Several GoodsType
         // predicates are likely to fail until this is done.
         GoodsType.setDerivedAttributes(this);
@@ -649,6 +694,8 @@ public final class Specification implements OptionContainer {
         libertyGoodsTypeList.clear();
         immigrationGoodsTypeList.clear();
         rawBuildingGoodsTypeList.clear();
+        rawMaterialsForUnstorableBuildingMaterials.clear();
+        rawMaterialsForStorableBuildingMaterials.clear();
         for (GoodsType goodsType : goodsTypeList) {
             if (goodsType.isStorable()) {
                 storableGoodsTypeList.add(goodsType);
@@ -673,6 +720,12 @@ public final class Specification implements OptionContainer {
             }
             if (goodsType.isRawBuildingMaterial() && !goodsType.isFoodType()) {
                 rawBuildingGoodsTypeList.add(goodsType);
+                if (!goodsType.isRawMaterialForUnstorableBuildingMaterial()) {
+                    rawMaterialsForStorableBuildingMaterials.add(goodsType);
+                }
+            }
+            if (goodsType.isRawMaterialForUnstorableBuildingMaterial() && !goodsType.isFoodType()) {
+                rawMaterialsForUnstorableBuildingMaterials.add(goodsType);
             }
         }
 
@@ -849,7 +902,7 @@ public final class Specification implements OptionContainer {
      * @param returnClass The expected {@code Class}.
      * @return The {@code FreeColSpecObjectType} found if any.
      */
-    private <T extends FreeColSpecObjectType> T getType(String id,
+    public <T extends FreeColSpecObjectType> T getAlreadyInitializedType(String id,
                                                         Class<T> returnClass) {
         FreeColSpecObjectType ret = getType(id);
         return (ret == null) ? null : returnClass.cast(ret);
@@ -989,10 +1042,10 @@ public final class Specification implements OptionContainer {
     /**
      * {@inheritDoc}
      */
-    public <T extends Option> boolean hasOption(String id,
+    public <T extends Option<?>> boolean hasOption(String id,
                                                 Class<T> returnClass) {
         if (id == null) return false;
-        AbstractOption val = this.allOptions.get(id);
+        AbstractOption<?> val = this.allOptions.get(id);
         return (val == null) ? false
             : returnClass.isAssignableFrom(val.getClass());
     }
@@ -1000,7 +1053,7 @@ public final class Specification implements OptionContainer {
     /**
      * {@inheritDoc}
      */
-    public <T extends Option> T getOption(String id,
+    public <T extends Option<?>> T getOption(String id,
                                           Class<T> returnClass) {
         if (id == null) {
             throw new RuntimeException("Null identifier for "
@@ -1008,7 +1061,7 @@ public final class Specification implements OptionContainer {
         } else if (!this.allOptions.containsKey(id)) {
             throw new RuntimeException("Missing option: " + id);
         } else {
-            AbstractOption op = this.allOptions.get(id);
+            AbstractOption<?> op = this.allOptions.get(id);
             try {
                 return returnClass.cast(op);
             } catch (ClassCastException cce) {
@@ -1039,14 +1092,14 @@ public final class Specification implements OptionContainer {
      */
     private void addOptionGroup(OptionGroup optionGroup, boolean recursive) {
         // Add the options of the group
-        for (Option option : optionGroup.getOptions()) {
+        for (Option<?> option : optionGroup.getOptions()) {
             if (option instanceof OptionGroup) {
                 allOptionGroups.put(option.getId(), (OptionGroup)option);
                 if (recursive) {
                     addOptionGroup((OptionGroup)option, true);
                 }
             } else {
-                addAbstractOption((AbstractOption)option);
+                addAbstractOption((AbstractOption<?>) option);
             }
         }
     }
@@ -1056,30 +1109,9 @@ public final class Specification implements OptionContainer {
      *
      * @param abstractOption The {@code AbstractOption} to add.
      */
-    private void addAbstractOption(AbstractOption abstractOption) {
+    private void addAbstractOption(AbstractOption<?> abstractOption) {
         // Add the option
         allOptions.put(abstractOption.getId(), abstractOption);
-    }
-
-    /**
-     * Merge an option group into the spec.
-     *
-     * @param group The {@code OptionGroup} to merge.
-     * @return The merged {@code OptionGroup} from this
-     *     {@code Specification}.
-     */
-    private OptionGroup mergeGroup(OptionGroup group) {
-        OptionGroup realGroup = allOptionGroups.get(group.getId());
-        if (realGroup == null || !realGroup.isEditable()) return realGroup;
-
-        for (Option o : group.getOptions()) {
-            if (o instanceof OptionGroup) {
-                mergeGroup((OptionGroup)o);
-            } else {
-                realGroup.add(o);
-            }
-        }
-        return realGroup;
     }
 
     /**
@@ -1089,9 +1121,9 @@ public final class Specification implements OptionContainer {
      */
     public List<OptionGroup> getDifficultyLevels() {
         OptionGroup group = allOptionGroups.get(DIFFICULTY_LEVELS);
-        Stream<Option> stream = (group == null) ? Stream.<Option>empty()
+        Stream<Option<?>> stream = (group == null) ? Stream.<Option<?>>empty()
             : group.getOptions().stream();
-        return transform(stream, (Option o) -> o instanceof OptionGroup,
+        return transform(stream, (Option<?> o) -> o instanceof OptionGroup,
                          o -> (OptionGroup)o);
     }
 
@@ -1189,6 +1221,7 @@ public final class Specification implements OptionContainer {
      */
     public boolean updateGameAndMapOptions() {
         boolean ret = false;
+        /*
         String gtag = GameOptions.TAG;
         File gof = FreeColDirectories
             .getOptionsFile(FreeColDirectories.GAME_OPTIONS_FILE_NAME);
@@ -1214,6 +1247,7 @@ public final class Specification implements OptionContainer {
             mog = getOptionGroup(mtag);
         }
         mog.save(mof, null, true);
+        */
         return ret;
     }
 
@@ -1326,7 +1360,7 @@ public final class Specification implements OptionContainer {
     // -- Buildables --
 
     public BuildableType getBuildableType(String id) {
-        return getType(id, BuildableType.class);
+        return getAlreadyInitializedType(id, BuildableType.class);
     }
 
     // -- Buildings --
@@ -1342,7 +1376,7 @@ public final class Specification implements OptionContainer {
      * @return The {@code BuildingType} found.
      */
     public BuildingType getBuildingType(String id) {
-        return getType(id, BuildingType.class);
+        return getAlreadyInitializedType(id, BuildingType.class);
     }
 
     // -- Disasters --
@@ -1358,7 +1392,7 @@ public final class Specification implements OptionContainer {
      * @return The {@code Disaster} found.
      */
     public Disaster getDisaster(String id) {
-        return getType(id, Disaster.class);
+        return getAlreadyInitializedType(id, Disaster.class);
     }
 
     // -- Events --
@@ -1374,7 +1408,7 @@ public final class Specification implements OptionContainer {
      * @return The {@code Event} found.
      */
     public Event getEvent(String id) {
-        return getType(id, Event.class);
+        return getAlreadyInitializedType(id, Event.class);
     }
 
     // -- Founding Fathers --
@@ -1390,7 +1424,7 @@ public final class Specification implements OptionContainer {
      * @return The {@code FoundingFather} found.
      */
     public FoundingFather getFoundingFather(String id) {
-        return getType(id, FoundingFather.class);
+        return getAlreadyInitializedType(id, FoundingFather.class);
     }
 
     // -- Goods --
@@ -1427,8 +1461,16 @@ public final class Specification implements OptionContainer {
         return new ArrayList<>(foodGoodsTypeList);
     }
 
-    public final List<GoodsType> getRawBuildingGoodsTypeList() {
+    public List<GoodsType> getRawBuildingGoodsTypeList() {
         return new ArrayList<>(rawBuildingGoodsTypeList);
+    }
+    
+    public List<GoodsType> getRawMaterialsForUnstorableBuildingMaterials() {
+        return new ArrayList<>(rawMaterialsForUnstorableBuildingMaterials);
+    }
+    
+    public List<GoodsType> getRawMaterialsForStorableBuildingMaterials() {
+        return new ArrayList<>(rawMaterialsForStorableBuildingMaterials);
     }
 
     /**
@@ -1469,7 +1511,7 @@ public final class Specification implements OptionContainer {
      * @return The {@code GoodsType} found.
      */
     public GoodsType getGoodsType(String id) {
-        return getType(id, GoodsType.class);
+        return getAlreadyInitializedType(id, GoodsType.class);
     }
 
     // -- Improvements --
@@ -1485,7 +1527,7 @@ public final class Specification implements OptionContainer {
      * @return The {@code TileImprovementType} found.
      */
     public TileImprovementType getTileImprovementType(String id) {
-        return getType(id, TileImprovementType.class);
+        return getAlreadyInitializedType(id, TileImprovementType.class);
     }
 
     // -- NationTypes --
@@ -1496,6 +1538,12 @@ public final class Specification implements OptionContainer {
 
     public List<EuropeanNationType> getEuropeanNationTypes() {
         return europeanNationTypes;
+    }
+    
+    public List<EuropeanNationType> getVisibleEuropeanNationTypes() {
+        return europeanNationTypes.stream()
+                .filter(type -> !"model.nationType.optionOnly".equals(type.getId()))
+                .collect(Collectors.toList());
     }
 
     public List<EuropeanNationType> getREFNationTypes() {
@@ -1513,7 +1561,7 @@ public final class Specification implements OptionContainer {
      * @return The {@code NationType} found.
      */
     public NationType getNationType(String id) {
-        return getType(id, NationType.class);
+        return getAlreadyInitializedType(id, NationType.class);
     }
 
     public NationType getDefaultNationType() {
@@ -1546,7 +1594,7 @@ public final class Specification implements OptionContainer {
      * @return The {@code Nation} found.
      */
     public Nation getNation(String id) {
-        return getType(id, Nation.class);
+        return getAlreadyInitializedType(id, Nation.class);
     }
 
     /**
@@ -1580,7 +1628,7 @@ public final class Specification implements OptionContainer {
      * @return The {@code ResourceType} found.
      */
     public ResourceType getResourceType(String id) {
-        return getType(id, ResourceType.class);
+        return getAlreadyInitializedType(id, ResourceType.class);
     }
 
     // -- Roles --
@@ -1610,7 +1658,7 @@ public final class Specification implements OptionContainer {
      * @return The {@code Role} found.
      */
     public Role getRole(String id) {
-        return getType(id, Role.class);
+        return getAlreadyInitializedType(id, Role.class);
     }
 
     /**
@@ -1714,6 +1762,14 @@ public final class Specification implements OptionContainer {
     public List<TileType> getTileTypeList() {
         return tileTypeList;
     }
+    
+    public List<TileType> getHillsTileTypeList() {
+        return getTileTypeList().stream().filter(t -> t.isHills()).collect(Collectors.toList());
+    }
+    
+    public List<TileType> getMountainsTileTypeList() {
+        return getTileTypeList().stream().filter(t -> t.isMountains()).collect(Collectors.toList());
+    }
 
     /**
      * Get a tile type by identifier.
@@ -1722,7 +1778,7 @@ public final class Specification implements OptionContainer {
      * @return The {@code TileType} found.
      */
     public TileType getTileType(String id) {
-        return getType(id, TileType.class);
+        return getAlreadyInitializedType(id, TileType.class);
     }
 
     // -- UnitChangeTypes --
@@ -1913,19 +1969,25 @@ public final class Specification implements OptionContainer {
     /**
      * Gets the unit types that can be trained in Europe.
      *
+     * @param player The player that want to purchase the unit.
      * @return A list of Europe-trainable {@code UnitType}s.
      */
-    public List<UnitType> getUnitTypesTrainedInEurope() {
-        return unitTypesTrainedInEurope;
+    public List<UnitType> getUnitTypesTrainedInEurope(Player player) {
+        return unitTypesTrainedInEurope.stream()
+                .filter(type -> type.isAvailableTo(player))
+                .collect(Collectors.toList());
     }
-
+    
     /**
-     * Get the unit types that can be purchased in Europe.
+     * Get the unit types that can be purchased in Europe for a given player.
      *
+     * @param player The player that want to purchase the unit.
      * @return A list of Europe-purchasable {@code UnitType}s.
      */
-    public List<UnitType> getUnitTypesPurchasedInEurope() {
-        return unitTypesPurchasedInEurope;
+    public List<UnitType> getUnitTypesPurchasedInEurope(Player player) {
+        return unitTypesPurchasedInEurope.stream()
+                .filter(type -> type.isAvailableTo(player))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -1964,7 +2026,7 @@ public final class Specification implements OptionContainer {
      * @return The {@code UnitType} found.
      */
     public UnitType getUnitType(String id) {
-        return getType(id, UnitType.class);
+        return getAlreadyInitializedType(id, UnitType.class);
     }
 
     // General type retrieval
@@ -1979,7 +2041,7 @@ public final class Specification implements OptionContainer {
      */
     public <T extends FreeColSpecObjectType> T findType(String id,
                                                         Class<T> returnClass) {
-        T o = getType(id, returnClass);
+        T o = getAlreadyInitializedType(id, returnClass);
         if (o != null) return o;
 
         if (initialized) {
@@ -2043,6 +2105,7 @@ public final class Specification implements OptionContainer {
                                           String... abilities) {
         return transform(allTypes.values(),
                          type -> resultType.isInstance(type)
+                             && !type.isAbstractType()
                              && any(abilities, a -> type.hasAbility(a)),
                          type -> resultType.cast(type));
     }
@@ -2061,6 +2124,7 @@ public final class Specification implements OptionContainer {
                                              String... abilities) {
         return transform(allTypes.values(),
                          type -> resultType.isInstance(type)
+                             && !type.isAbstractType()
                              && none(abilities, a -> type.hasAbility(a)),
                          type -> resultType.cast(type));
     }
@@ -2098,19 +2162,19 @@ public final class Specification implements OptionContainer {
      * @return True if a fix was made.
      */
     private boolean fixOrphanOptions() {
-        Collection<AbstractOption> allO = new HashSet<>(allOptions.values());
-        Collection<AbstractOption> allG = new HashSet<>(allOptionGroups.values());
+        Collection<AbstractOption<?>> allO = new HashSet<>(allOptions.values());
+        Collection<AbstractOption<?>> allG = new HashSet<>(allOptionGroups.values());
         for (String id : coreOptionGroups) {
             dropOptions(allOptionGroups.get(id), allO);
             dropOptions(allOptionGroups.get(id), allG);
         }
-        for (AbstractOption ao : allO) {
+        for (AbstractOption<?> ao : allO) {
             // Drop from actual allOptions map
             dropOptions(ao, allOptions.values());
             if (ao instanceof OptionGroup) allOptionGroups.remove(ao.getId());
             logger.warning("Dropping orphan option: " + ao);
         }
-        for (AbstractOption ao : allG) {
+        for (AbstractOption<?> ao : allG) {
             allOptionGroups.remove(ao.getId());
             logger.warning("Dropping orphan option group: " + ao);
         }
@@ -2123,13 +2187,13 @@ public final class Specification implements OptionContainer {
      * @param o The {@code AbstractOption} to drop.
      * @param all The collection of options to drop from.
      */
-    private void dropOptions(AbstractOption o, Collection<AbstractOption> all) {
+    private void dropOptions(AbstractOption<?> o, Collection<AbstractOption<?>> all) {
         all.remove(o);
         if (o instanceof OptionGroup) {
             OptionGroup og = (OptionGroup)o;
-            for (Option op : og.getOptions()) {
-                if (op instanceof AbstractOption) {
-                    dropOptions((AbstractOption)op, all);
+            for (Option<?> op : og.getOptions()) {
+                if (op instanceof AbstractOption<?>) {
+                    dropOptions((AbstractOption<?>) op, all);
                 }
             }
         }
@@ -2239,8 +2303,8 @@ public final class Specification implements OptionContainer {
         // Older specs (<= 0.10.5 ?) had refSize directly under difficulty
         // level, later moved it under the monarch group.
         for (OptionGroup level : getDifficultyLevels()) {
-            Option monarch = level.getOption(GameOptions.DIFFICULTY_MONARCH);
-            Option refSize = ((OptionGroup)((monarch instanceof OptionGroup)
+            Option<?> monarch = level.getOption(GameOptions.DIFFICULTY_MONARCH);
+            Option<?> refSize = ((OptionGroup)((monarch instanceof OptionGroup)
                     ? monarch : level)).getOption(GameOptions.REF_FORCE);
             if (!(refSize instanceof UnitListOption)) continue;
             boolean changed;
@@ -2263,11 +2327,11 @@ public final class Specification implements OptionContainer {
         }
 
         // Fix all other UnitListOptions
-        List<Option> todo = new ArrayList<>(getDifficultyLevels());
+        List<Option<?>> todo = new ArrayList<>(getDifficultyLevels());
         while (!todo.isEmpty()) {
-            Option o = todo.remove(0);
+            Option<?> o = todo.remove(0);
             if (o instanceof OptionGroup) {
-                List<Option> next = ((OptionGroup)o).getOptions();
+                List<Option<?>> next = ((OptionGroup) o).getOptions();
                 todo.addAll(new ArrayList<>(next));
             } else if (o instanceof UnitListOption) {
                 boolean changed;
@@ -2453,7 +2517,6 @@ public final class Specification implements OptionContainer {
     private boolean fixDifficultyOptions() {
         boolean ret = false;
         String id;
-        AbstractOption op;
         OptionGroup og;
         UnitListOption ulo;
 
@@ -2672,13 +2735,18 @@ public final class Specification implements OptionContainer {
                                             GameOptions.DIFFICULTY_MONARCH, lb,
                                             1500);
         // end @compat 0.11.3
+        
+        // @compat 1.0.0
+        ret |= checkDifficultyIntegerOption(GameOptions.TRADE_PROFIT_MULTIPLIER_CHEAT, GameOptions.DIFFICULTY_CHEAT, lb, 10);
+        ret |= checkDifficultyIntegerOption(GameOptions.TRADE_PROFIT_MULTIPLIER_CHEAT_TURNS, GameOptions.DIFFICULTY_CHEAT, lb, 200);
+        // end @compat 1.0.0
 
         // Ensure 2 levels of groups, and one level of leaves
         for (OptionGroup level : getDifficultyLevels()) {
-            for (Option o : level.getOptions()) {
+            for (Option<?> o : level.getOptions()) {
                 if (o instanceof OptionGroup) {
                     og = (OptionGroup)o;
-                    for (Option o2 : og.getOptions()) {
+                    for (Option<?> o2 : og.getOptions()) {
                         if (o2 instanceof OptionGroup) {
                             lb.add("?-group ", level.getId() + "/" + og.getId()
                                 + "/" + o2.getId());
@@ -2703,7 +2771,7 @@ public final class Specification implements OptionContainer {
         boolean ret = false;
         for (OptionGroup level : getDifficultyLevels()) {
             OptionGroup og = null;
-            for (Option o : level.getOptions()) {
+            for (Option<?> o : level.getOptions()) {
                 if (o.getId().equals(gr) && o instanceof OptionGroup) {
                     og = (OptionGroup)o;
                     break;
@@ -2718,8 +2786,8 @@ public final class Specification implements OptionContainer {
                 ret = true;
             }
             for (String id : ids) {
-                Option op = null;
-                for (Option o : level.getOptions()) {
+                Option<?> op = null;
+                for (Option<?> o : level.getOptions()) {
                     if (o.getId().equals(id) && !(o instanceof OptionGroup)) {
                         op = o;
                         break;
@@ -2727,8 +2795,8 @@ public final class Specification implements OptionContainer {
                 }
                 if (op != null) {
                     level.remove(op.getId());
-                    if (op instanceof AbstractOption) {
-                        ((AbstractOption)op).setGroup(og.getId());
+                    if (op instanceof AbstractOption<?>) {
+                        ((AbstractOption<?>) op).setGroup(og.getId());
                     }
                     og.add(op);
                     lb.add("\n  ~", level.getId(), "/", id, " -> ",
@@ -2746,15 +2814,15 @@ public final class Specification implements OptionContainer {
         boolean ret = false;
         for (OptionGroup level : getDifficultyLevels()) {
             OptionGroup og = null;
-            for (Option o : level.getOptions()) {
+            for (Option<?> o : level.getOptions()) {
                 if (o.getId().equals(gr) && o instanceof OptionGroup) {
                     og = (OptionGroup)o;
                     break;
                 }
             }
             if (og == null) continue;
-            Option op = null;
-            for (Option o : level.getOptions()) {
+            Option<?> op = null;
+            for (Option<?> o : level.getOptions()) {
                 if (o.getId().equals(id) && !(o instanceof OptionGroup)) {
                     op = o;
                     break;
@@ -2773,7 +2841,7 @@ public final class Specification implements OptionContainer {
                     level.getId(), "/" + og.getId());
             } else {
                 op = null;
-                for (Option o : og.getOptions()) {
+                for (Option<?> o : og.getOptions()) {
                     if (o.getId().equals(id)) {
                         op = o;
                         break;
@@ -2799,15 +2867,15 @@ public final class Specification implements OptionContainer {
         boolean ret = false;
         for (OptionGroup level : getDifficultyLevels()) {
             OptionGroup og = null;
-            for (Option o : level.getOptions()) {
+            for (Option<?> o : level.getOptions()) {
                 if (o.getId().equals(gr) && o instanceof OptionGroup) {
                     og = (OptionGroup)o;
                     break;
                 }
             }
             if (og == null) continue;
-            Option op = null;
-            for (Option o : level.getOptions()) {
+            Option<?> op = null;
+            for (Option<?> o : level.getOptions()) {
                 if (o.getId().equals(id) && !(o instanceof OptionGroup)) {
                     op = o;
                     break;
@@ -2826,7 +2894,7 @@ public final class Specification implements OptionContainer {
                     level.getId(), "/" + og.getId());
             } else {
                 op = null;
-                for (Option o : og.getOptions()) {
+                for (Option<?> o : og.getOptions()) {
                     if (o.getId().equals(id)) {
                         op = o;
                         break;
@@ -2851,15 +2919,15 @@ public final class Specification implements OptionContainer {
         UnitListOption ulo = null;
         for (OptionGroup level : getDifficultyLevels()) {
             OptionGroup og = null;
-            for (Option o : level.getOptions()) {
+            for (Option<?> o : level.getOptions()) {
                 if (o.getId().equals(gr) && o instanceof OptionGroup) {
                     og = (OptionGroup)o;
                     break;
                 }
             }
             if (og == null) continue;
-            Option op = null;
-            for (Option o : level.getOptions()) {
+            Option<?> op = null;
+            for (Option<?> o : level.getOptions()) {
                 if (o.getId().equals(id) && !(o instanceof OptionGroup)) {
                     op = o;
                     break;
@@ -2867,15 +2935,15 @@ public final class Specification implements OptionContainer {
             }
             if (op != null) {
                 level.remove(op.getId());
-                if (op instanceof AbstractOption) {
-                    ((AbstractOption)op).setGroup(og.getId());
+                if (op instanceof AbstractOption<?>) {
+                    ((AbstractOption<?>) op).setGroup(og.getId());
                 }
                 og.add(op);
                 lb.add("\n  ~", level.getId(), "/", id, " -> ",
                     level.getId(), "/" + og.getId());
             } else {
                 op = null;
-                for (Option o : og.getOptions()) {
+                for (Option<?> o : og.getOptions()) {
                     if (o.getId().equals(id)) {
                         op = o;
                         break;
@@ -3008,6 +3076,12 @@ public final class Specification implements OptionContainer {
                        Boolean.FALSE, BooleanOption.class);
         // end @compat 0.11.6
 
+        // @compat 1.1.0
+        ret |= checkOp(GameOptions.MAP_DEFINED_STARTING_POSITIONS,
+                GameOptions.GAMEOPTIONS_MAP,
+                Boolean.TRUE, BooleanOption.class);        
+        // end @compat 1.1.0
+        
         // SAVEGAME_VERSION == 14
         return ret;
     }
@@ -3060,13 +3134,14 @@ public final class Specification implements OptionContainer {
         op.setGroup(gr);
         op.setValue(defaultValue);
         getOptionGroup(gr).add(op);
-        addAbstractOption((AbstractOption)op);
+        addAbstractOption((AbstractOption<?>) op);
         return true;
     }
         
 
-    // Serialization
+    // SerializationgameAbilities
 
+    private static final String ABILITIES_TAG = "abilities";
     private static final String BUILDING_TYPES_TAG = "building-types";
     private static final String DIFFICULTY_LEVEL_TAG = "difficulty-level";
     private static final String DISASTERS_TAG = "disasters";
@@ -3113,6 +3188,7 @@ public final class Specification implements OptionContainer {
         }
 
         // copy the order of section in specification.xml
+        writeSection(xw, ABILITIES_TAG, gameAbilities);
         writeSection(xw, MODIFIERS_TAG, specialModifiers);
         writeSection(xw, EVENTS_TAG, events);
         writeSection(xw, DISASTERS_TAG, disasters);
@@ -3129,7 +3205,7 @@ public final class Specification implements OptionContainer {
         writeSection(xw, EUROPEAN_NATION_TYPES_TAG, REFNationTypes);
         writeSection(xw, INDIAN_NATION_TYPES_TAG, indianNationTypes);
         writeSection(xw, NATIONS_TAG, nations);
-
+        
         xw.writeStartElement(OPTIONS_TAG);
         for (String id : coreOptionGroups) {
             OptionGroup og = allOptionGroups.get(id);
@@ -3188,8 +3264,15 @@ public final class Specification implements OptionContainer {
                                           (String)null);
         if (parentId != null) {
             try {
-                FreeColTcFile parent = FreeColTcFile.getFreeColTcFile(parentId);
-                load(parent.getSpecificationInputStream());
+                FreeColModFile parent = FreeColRules.getFreeColRulesFile(parentId);
+                try {
+                    load(parent.getSpecificationInputStream());
+                } catch (RuntimeException|XMLStreamException e) {
+                    throw new FreeColUserMessageException(
+                        StringTemplate.template("error.mod").add("%id%", parent.getId()).add("%name%", Messages.getName("mod." + parent.getId())),
+                        e
+                    );
+                }
                 initialized = false;
             } catch (IOException e) {
                 throw new XMLStreamException("Failed to open parent specification: ", e);

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,7 +21,6 @@ package net.sf.freecol.client.gui.label;
 
 
 import javax.swing.ImageIcon;
-import javax.swing.JLabel;
 
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.ImageLibrary;
@@ -35,20 +34,23 @@ import net.sf.freecol.common.util.Utils;
  * This label represents AbstractGoods.
  */
 public class AbstractGoodsLabel extends FreeColLabel {
+    
+    public enum AmountType {
+        DEFAULT,
+        PARTIAL,
+        FULL,
+        
+        /**
+         * Special flag for SHIFT+ALT drag functionality on
+         * {@code DefaultTransferHandler}.
+         */
+        SUPER_FULL
+    }
 
     private final ImageLibrary lib;
-
     private final AbstractGoods abstractGoods;
 
-    private boolean partialChosen;
-
-    private boolean fullChosen;
-
-    /**
-     * Special flag for SHIFT+ALT drag functionality on
-     * {@code DefaultTransferHandler}.
-     */
-    private boolean superFullChosen;
+    private AmountType amountType = AmountType.DEFAULT;
 
 
     /**
@@ -77,6 +79,14 @@ public class AbstractGoodsLabel extends FreeColLabel {
     protected ImageLibrary getImageLibrary() {
         return this.lib;
     }
+    
+    /**
+     * Sets the type of transfer being used on drag.
+     * @param amountType
+     */
+    public void setAmountType(AmountType amountType) {
+        this.amountType = (amountType == null) ? AmountType.DEFAULT : amountType;
+    }
 
     /**
      * Has the SHIFT-ALT been pressed on drag?
@@ -84,17 +94,7 @@ public class AbstractGoodsLabel extends FreeColLabel {
      * @return True if this label was dragged with SHIFT-ALT
      */
     public boolean isSuperFullChosen() {
-        return superFullChosen;
-    }
-
-    /**
-     * Set DRAG-ALL functionality when SHIFT+ALT used on drag from
-     * {@code DragListener}
-     * 
-     * @param superFullChosen The new state of drag-all 
-     */
-    public void setSuperFullChosen(boolean superFullChosen) {
-        this.superFullChosen = superFullChosen;
+        return amountType == AmountType.SUPER_FULL;
     }
 
     /**
@@ -103,16 +103,7 @@ public class AbstractGoodsLabel extends FreeColLabel {
      * @return True if a partial amount has been selected.
      */
     public boolean isPartialChosen() {
-        return partialChosen;
-    }
-
-    /**
-     * Set the partial amount state.
-     *
-     * @param partialChosen The new partial amount state.
-     */
-    public void setPartialChosen(boolean partialChosen) {
-        this.partialChosen = partialChosen;
+        return amountType == AmountType.PARTIAL;
     }
 
     /**
@@ -121,16 +112,7 @@ public class AbstractGoodsLabel extends FreeColLabel {
      * @return True if a full amount has been selected.
      */
     public boolean isFullChosen() {
-        return fullChosen;
-    }
-
-    /**
-     * Set the full amount state.
-     *
-     * @param fullChosen The new full amount state.
-     */
-    public void setFullChosen(boolean fullChosen) {
-        this.fullChosen = fullChosen;
+        return amountType == AmountType.FULL;
     }
 
     /**
@@ -189,9 +171,7 @@ public class AbstractGoodsLabel extends FreeColLabel {
         if (o instanceof AbstractGoodsLabel) {
             AbstractGoodsLabel other = (AbstractGoodsLabel)o;
             return Utils.equals(this.abstractGoods, other.abstractGoods)
-                && this.partialChosen == other.partialChosen
-                && this.fullChosen == other.fullChosen
-                && this.superFullChosen == other.superFullChosen;
+                && this.amountType == other.amountType;
         }
         return false;
     }
@@ -203,9 +183,7 @@ public class AbstractGoodsLabel extends FreeColLabel {
     public int hashCode() {
         int hash = super.hashCode();
         hash = 31 * hash + Utils.hashCode(this.abstractGoods);
-        hash = 31 * hash + ((this.partialChosen) ? 1 : 0)
-            + ((this.fullChosen) ? 2 : 0)
-            + ((this.superFullChosen) ? 4 : 0);
+        hash = 31 * hash + this.amountType.ordinal();
         return hash;
     }
 }

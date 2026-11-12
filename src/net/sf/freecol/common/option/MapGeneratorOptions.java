@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -107,7 +107,10 @@ public class MapGeneratorOptions {
     public static final String MAXIMUM_LATITUDE 
         = "model.option.maximumLatitude";
 
-    /** Option for setting the number of rivers on the map. */
+    /** Option for enabling generation of great rivers. */
+    public static final String ENABLE_GREAT_RIVERS  = "mapGeneratorOptions.enableGreatRivers";
+    
+    /** Option for setting the number of river tiles on the map as a percentage of all possible tiles for a river. */
     public static final String RIVER_NUMBER
         = "model.option.riverNumber";
 

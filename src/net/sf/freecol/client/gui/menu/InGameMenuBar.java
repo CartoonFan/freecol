@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,6 +19,7 @@
 
 package net.sf.freecol.client.gui.menu;
 
+import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -32,7 +33,9 @@ import javax.swing.ButtonGroup;
 import javax.swing.JMenu;
 
 import net.sf.freecol.client.FreeColClient;
+import net.sf.freecol.client.gui.FontLibrary;
 import net.sf.freecol.client.gui.action.AssignTradeRouteAction;
+import net.sf.freecol.client.gui.action.AttackRangedAction;
 import net.sf.freecol.client.gui.action.BuildColonyAction;
 import net.sf.freecol.client.gui.action.CenterAction;
 import net.sf.freecol.client.gui.action.ChangeAction;
@@ -42,6 +45,7 @@ import net.sf.freecol.client.gui.action.ClearOrdersAction;
 import net.sf.freecol.client.gui.action.DeclareIndependenceAction;
 import net.sf.freecol.client.gui.action.DisbandUnitAction;
 import net.sf.freecol.client.gui.action.DisplayBordersAction;
+import net.sf.freecol.client.gui.action.DisplayFogOfWarAction;
 import net.sf.freecol.client.gui.action.DisplayGridAction;
 import net.sf.freecol.client.gui.action.DisplayTileTextAction;
 import net.sf.freecol.client.gui.action.DisplayTileTextAction.DisplayText;
@@ -96,6 +100,7 @@ import net.sf.freecol.client.gui.action.ZoomOutAction;
 import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.debug.FreeColDebugger;
 import net.sf.freecol.common.i18n.Messages;
+import net.sf.freecol.common.model.Ability;
 import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.Specification;
 import net.sf.freecol.common.model.StringTemplate;
@@ -114,7 +119,6 @@ public class InGameMenuBar extends FreeColMenuBar {
 
     @SuppressWarnings("unused")
     private static final Logger logger = Logger.getLogger(InGameMenuBar.class.getName());
-    
 
     /**
      * Creates a new {@code FreeColMenuBar}. This menu bar will include
@@ -125,10 +129,7 @@ public class InGameMenuBar extends FreeColMenuBar {
      */
     public InGameMenuBar(FreeColClient freeColClient,
                          MouseMotionListener listener) {
-        super(freeColClient);
-
-        // Add a mouse listener so that autoscrolling can happen here
-        this.addMouseMotionListener(listener);
+        super(freeColClient, listener);
         
         reset();
     }
@@ -182,7 +183,7 @@ public class InGameMenuBar extends FreeColMenuBar {
         menu.add(getMenuItem(RetireAction.id));
         menu.add(getMenuItem(SaveAndQuitAction.id));
         menu.add(getMenuItem(QuitAction.id));
-
+        
         add(menu);
     }
 
@@ -195,6 +196,7 @@ public class InGameMenuBar extends FreeColMenuBar {
         menu.add(getCheckBoxMenuItem(MapControlsAction.id));
         menu.add(getCheckBoxMenuItem(DisplayGridAction.id));
         menu.add(getCheckBoxMenuItem(DisplayBordersAction.id));
+        menu.add(getCheckBoxMenuItem(DisplayFogOfWarAction.id));
         menu.add(getMenuItem(ToggleViewModeAction.id));
         menu.add(getCheckBoxMenuItem(ChangeWindowedModeAction.id));
 
@@ -228,6 +230,10 @@ public class InGameMenuBar extends FreeColMenuBar {
         menu.setOpaque(false);
         menu.setMnemonic(KeyEvent.VK_O);
 
+        if (spec.hasAbility(Ability.HITPOINTS_COMBAT_MODEL)) {
+            menu.add(getMenuItem(AttackRangedAction.id));
+        }
+        
         menu.add(getMenuItem(SentryAction.id));
         menu.add(getMenuItem(FortifyAction.id));
 
@@ -317,19 +323,27 @@ public class InGameMenuBar extends FreeColMenuBar {
             .addAmount("%tax%", player.getTax())
             .addAmount("%score%", player.getScore())
             .addStringTemplate("%year%", this.freeColClient.getGame()
-                .getTurn().getLabel()));
+            .getTurn().getLabel())).replace("|", "\u2727"); // ✧
+        
         Graphics2D g2d = (Graphics2D)g;
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                              RenderingHints.VALUE_ANTIALIAS_ON);
         g2d.setRenderingHint(RenderingHints.KEY_RENDERING,
                              RenderingHints.VALUE_RENDER_QUALITY);
+
+        final Font font = FontLibrary.getMainFont();
+        g2d.setFont(font);
         
         final FontMetrics fm = g2d.getFontMetrics();
         final Rectangle2D d  = fm.getStringBounds(text, g2d);
         final int textWidth = (int) d.getWidth();
         final int textHeight = (int) d.getHeight();
-
+        
         final int rightSidePaddingInPx = 10;
-        g2d.drawString(text, getWidth() - rightSidePaddingInPx - textWidth, (getHeight() - textHeight) / 2 + fm.getAscent());
+        final int centerHeight = getHeight() - getInsets().bottom;
+        final int x = getWidth() - rightSidePaddingInPx - textWidth - getInsets().right;
+        final int y = (centerHeight - textHeight) / 2 + fm.getAscent();
+        
+        Utility.drawGoldenText(text, g2d, font, x, y);
     }
 }

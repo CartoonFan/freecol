@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,10 +21,13 @@ package net.sf.freecol.common.resources;
 
 import java.awt.Dimension;
 import java.awt.image.BufferedImage;
-
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.SoftReference;
 import java.util.HashMap;
-import java.util.logging.Logger;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import net.sf.freecol.FreeCol;
 
@@ -36,10 +39,18 @@ public class ImageCache {
 
     private static final Logger logger = Logger.getLogger(ImageCache.class.getName());
 
+    private static final boolean DEBUG_PRINT_CACHE_SIZES_TO_STDOUT = false;
+    
     public static final String REPLACEMENT_IMAGE = "image.miscicon.delete";
 
     /** A cache of scaled (and possibly greyed) images. */
     private final Map<Long, BufferedImage> cache;
+    private final Map<Long, CacheSoftReference<Long, BufferedImage>> lowPriorityCache;
+    private final ReferenceQueue<BufferedImage> lowPriorityCacheReferenceQueue = new ReferenceQueue<>();
+    private final CacheCleanupThread cleanupThread = new CacheCleanupThread();
+    
+    private long cacheSize = 0;
+    private long lowPriorityCacheSize = 0;
 
 
     /**
@@ -47,6 +58,9 @@ public class ImageCache {
      */
     public ImageCache() {
         this.cache = new HashMap<>();
+        this.lowPriorityCache = new HashMap<>();
+        
+        cleanupThread.start();
     }
 
 
@@ -59,7 +73,7 @@ public class ImageCache {
      * @param key The key to look up.
      * @return The {@code ImageResource} found.
      */
-    private ImageResource getImageResource(final String key) {
+    public static ImageResource getImageResource(final String key) {
         ImageResource r = ResourceManager.getImageResource(key, false);
         if (r == null) {
             r = ResourceManager.getImageResource(REPLACEMENT_IMAGE, false);
@@ -75,20 +89,32 @@ public class ImageCache {
      * Hash function for images.
      *
      * We accept the standard 32-bit int hashCode of the key, and
-     * or it with 15 bits of the width and height, and one more bit for the
-     * grayscale boolean.
+     * or it with 12 bits of the width and height, 6 bits for variations and
+     * one more bit for the grayscale boolean.
      *
      * @param key The image key.
      * @param size The size of the image.
      * @param grayscale True if grayscale.
+     * @param variation The image variation.
      * @return A unique hash of these parameters.
      */
     public static long imageHash(final String key, final Dimension size,
-                                 final boolean grayscale) {
+                                 final boolean grayscale, final int variation) {
+        if (variation >= 64) {
+            throw new IllegalStateException("Update formula below in order to support more variations.");
+        }
+        if (size.width >= 4096) {
+            throw new IllegalStateException("Update formula below in order to support larger image width.");
+        }
+        if (size.height >= 4096) {
+            throw new IllegalStateException("Update formula below in order to support larger image heights.");
+        }
         return (key.hashCode() & 0xFFFFFFFFL)
             ^ ((size.width & 0x7FFFL) << 32)
-            ^ ((size.height & 0x7FFFL) << 47)
-            ^ ((grayscale) ? (0x1L << 62) : 0L);
+            ^ ((size.height & 0x7FFFL) << 44)
+            ^ (variation << 56)
+            ^ ((grayscale) ? (0x1L << 62) : 0L)
+            + variation;
     }
 
     /**
@@ -98,28 +124,90 @@ public class ImageCache {
      * where to maintain the image cache.
      *
      * @param ir The {@code ImageResource} to load from.
-     * @param key The name of the resource to return.
      * @param size The size of the requested image.
      *     Rescaling will be performed if necessary.
      * @param grayscale If true return a grayscale image.
+     * @param variation The image variation.
      * @return The image identified by {@code resource}.
      */
-    private BufferedImage getCachedImage(final ImageResource ir,
-                                         final String key,
+    public BufferedImage getCachedImage(final ImageResource ir,
                                          final Dimension size,
-                                         final boolean grayscale) {
+                                         final boolean grayscale,
+                                         final int variation) {
 
-        // TODO: add logging but probably in a branch for now
-        // until we understand the performance issue better
-        final long hashKey = imageHash(key, size, grayscale);
-        final BufferedImage cached = this.cache.get(hashKey);
-        if (cached != null) return cached;
+        final long cacheKey = imageHash(ir.getCachingKey(), size, grayscale, variation);
+        final BufferedImage cached = searchCaches(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
 
-        BufferedImage image = ir.getImage(size, grayscale);
-        if (image != null) this.cache.put(hashKey, image);
+        BufferedImage image = ir.getImage(variation, size, grayscale);
+        placeImageInCache(cacheKey, image);
         return image;
     }
+    
+    public BufferedImage getCachedImageOrGenerate(final String key,
+            final Dimension size,
+            final boolean grayscale,
+            final int variation,
+            Callable<BufferedImage> imageCreator) {
+        
+        final long cacheKey = imageHash(key, size, grayscale, variation);
+        final BufferedImage cached = searchCaches(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+        
+        try {
+            final BufferedImage image = imageCreator.call();
+            placeImageInLowPriorityCache(cacheKey, image);
+            return image;
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Exception while producing image", e);
+            return null;
+        }
+    }
+    
+    private BufferedImage searchCaches(long cacheKey) {
+        BufferedImage image = this.cache.get(cacheKey);
+        if (image != null) {
+            return image;
+        }
+        image = getFromLowPriorityCache(cacheKey);
+        if (image != null) {
+            return image;
+        }
+        return null;
+    }
+    
+    private BufferedImage getFromLowPriorityCache(long cacheKey) {
+        final SoftReference<BufferedImage> ref = this.lowPriorityCache.get(cacheKey);
+        return (ref != null) ? ref.get() : null;
+    }
+    
+    private void placeImageInCache(long hashKey, BufferedImage image) {
+        if (image != null) {
+            this.cache.put(hashKey, image);
+            cacheSize += image.getWidth() * image.getHeight() * 4;
+            debugPrintCacheSizes();
+        }
+    }
+    
+    private void placeImageInLowPriorityCache(long hashKey, BufferedImage image) {
+        if (image != null) {
+            final long size = image.getWidth() * image.getHeight() * 4;
+            final CacheSoftReference<Long, BufferedImage> ref = new CacheSoftReference<>(hashKey, size, image, lowPriorityCacheReferenceQueue);
+            this.lowPriorityCache.put(hashKey, ref);
+            lowPriorityCacheSize += size;
+            debugPrintCacheSizes();
+        }
+    }
 
+    private void debugPrintCacheSizes() {
+        if (DEBUG_PRINT_CACHE_SIZES_TO_STDOUT) {
+            System.out.format("Cache: %4sMB   Low priority cache: %4sMB\n", Math.round(cacheSize / (1024 * 1024)), Math.round(lowPriorityCacheSize / (1024 * 1024)));
+        }
+    }
 
     // Public interface
 
@@ -141,7 +229,7 @@ public class ImageCache {
 
         Dimension d = new Dimension(Math.round(image.getWidth() * scale),
                                     Math.round(image.getHeight() * scale));
-        return getCachedImage(ir, key, d, grayscale);
+        return getCachedImage(ir, d, grayscale, 0);
     }
 
     /**
@@ -181,10 +269,7 @@ public class ImageCache {
                                        final boolean grayscale,
                                        final int seed) {
         final ImageResource ir = getImageResource(key);
-        if (grayscale) {
-            return getCachedImage(ir, key, size, grayscale);
-        }
-        return ir.getVariation(seed).getImage(size, grayscale);
+        return getCachedImage(ir, size, grayscale, ir.getVariationNumberForSeed(seed));
     }
 
     /**
@@ -192,5 +277,50 @@ public class ImageCache {
      */
     public void clear() {
         this.cache.clear();
+        this.cacheSize = 0;
+        
+        clearLowPriorityCache();
+    }
+    
+    public void clearLowPriorityCache() {
+        this.lowPriorityCache.clear();
+        this.lowPriorityCacheSize = 0;
+    }
+    
+    private final class CacheCleanupThread extends Thread {
+        @Override
+        public void run() {
+            try {
+                while (true) {
+                    @SuppressWarnings("unchecked")
+                    final CacheSoftReference<Long,BufferedImage> ref = (CacheSoftReference<Long,BufferedImage>) lowPriorityCacheReferenceQueue.remove();
+                    if (ref == null) {
+                        continue;
+                    }
+                    lowPriorityCacheSize -= ref.getSize();
+                    lowPriorityCache.remove(ref.getKey());
+                }
+            } catch (InterruptedException e) {}
+        }
+    }
+    
+    private final class CacheSoftReference<K, V> extends SoftReference<V> {
+        
+        private final K key;
+        private final long size;
+        
+        public CacheSoftReference(K key, long size, V referent, ReferenceQueue<? super V> q) {
+            super(referent, q);
+            this.key = key;
+            this.size = size;
+        }
+        
+        public K getKey() {
+            return key;
+        }
+        
+        public long getSize() {
+            return size;
+        }
     }
 }

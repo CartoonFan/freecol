@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -25,6 +25,7 @@ import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.util.logging.Logger;
 
+import javax.swing.AbstractAction;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -33,9 +34,10 @@ import javax.swing.border.Border;
 import javax.swing.border.EmptyBorder;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.client.gui.panel.*;
+import net.sf.freecol.client.gui.panel.FreeColPanel;
+import net.sf.freecol.client.gui.panel.MigPanel;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.AbstractUnit;
 import net.sf.freecol.common.model.Europe;
@@ -73,7 +75,7 @@ public class ReportPanel extends FreeColPanel {
      */
     protected ReportPanel(FreeColClient freeColClient, String key) {
         super(freeColClient, "ReportPanelUI",
-              new MigLayout("wrap 1", "[fill]", "[]30[fill]30[]"));
+              new MigLayout("wrap 1", "[fill]", "[][fill][]"));
 
         header = Utility.localizedHeader(Messages.nameKey(key),
                                          Utility.FONTSPEC_TITLE);
@@ -86,11 +88,20 @@ public class ReportPanel extends FreeColPanel {
         scrollPane = new JScrollPane(reportPanel,
             JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
             JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.getVerticalScrollBar().setUnitIncrement( 16 );
         add(scrollPane, SCROLL_PANE_SIZE);
         add(okButton, "cell 0 2, tag ok");
+        
+        setEscapeAction(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                okButton.doClick();
+            }
+        });
 
-        getGUI().restoreSavedSize(this, new Dimension(1050, 725));
+        final int width = (int) (1050 * getImageLibrary().getScaleFactor());
+        final int height = (int) (725 * getImageLibrary().getScaleFactor());
+        
+        getGUI().restoreSavedSize(this, new Dimension(width, height));
     }
 
 

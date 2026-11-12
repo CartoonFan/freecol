@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -31,13 +31,11 @@ import javax.swing.JTextArea;
 import javax.swing.SwingConstants;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.ChoiceItem;
-import net.sf.freecol.client.gui.FontLibrary;
 import net.sf.freecol.client.gui.ImageLibrary;
-import net.sf.freecol.client.gui.panel.*;
-import net.sf.freecol.client.gui.Size;
+import net.sf.freecol.client.gui.panel.MigPanel;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Monarch.MonarchAction;
 import net.sf.freecol.common.model.StringTemplate;
@@ -51,7 +49,7 @@ import net.sf.freecol.common.model.StringTemplate;
  * there may not be a meaningful accept option in some cases.  This
  * prevents just extending FreeColConfirmDialog. 
  */
-public final class MonarchDialog extends FreeColDialog<Boolean> {
+public final class MonarchDialog extends DeprecatedFreeColDialog<Boolean> {
 
     /**
      * Creates a dialog to handle monarch interactions.
@@ -66,7 +64,6 @@ public final class MonarchDialog extends FreeColDialog<Boolean> {
             MonarchAction action, StringTemplate template, String monarchKey) {
         super(freeColClient, frame);
 
-        final ImageLibrary lib = getImageLibrary();
         final String messageId = action.getTextKey();
         if (!Messages.containsKey(messageId)) {
             throw new IllegalStateException("Unrecognized monarch action: "
@@ -110,6 +107,6 @@ public final class MonarchDialog extends FreeColDialog<Boolean> {
             .cancelOption().defaultOption());
 
         initializeDialog(frame, DialogType.QUESTION, false, panel,
-                         new ImageIcon(lib.getMonarchImage(monarchKey)), c);
+            new ImageIcon(ImageLibrary.getMonarchImage(monarchKey)), c);
     }
 }

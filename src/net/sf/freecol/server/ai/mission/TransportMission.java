@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,33 +19,38 @@
 
 package net.sf.freecol.server.ai.mission;
 
+import static net.sf.freecol.common.model.Constants.INFINITY;
+import static net.sf.freecol.common.util.CollectionUtils.find;
+import static net.sf.freecol.common.util.CollectionUtils.getPermutations;
+import static net.sf.freecol.common.util.CollectionUtils.removeInPlace;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
 
 import javax.xml.stream.XMLStreamException;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import net.sf.freecol.common.FreeColException;
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
 import net.sf.freecol.common.model.AbstractGoods;
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.CombatModel;
-import static net.sf.freecol.common.model.Constants.*;
+import net.sf.freecol.common.model.Direction;
 import net.sf.freecol.common.model.Europe;
 import net.sf.freecol.common.model.Goods;
 import net.sf.freecol.common.model.GoodsType;
 import net.sf.freecol.common.model.Locatable;
 import net.sf.freecol.common.model.Location;
 import net.sf.freecol.common.model.Map;
-import net.sf.freecol.common.model.Direction;
 import net.sf.freecol.common.model.PathNode;
 import net.sf.freecol.common.model.Tile;
 import net.sf.freecol.common.model.Unit;
 import net.sf.freecol.common.model.pathfinding.CostDecider;
 import net.sf.freecol.common.model.pathfinding.CostDeciders;
 import net.sf.freecol.common.util.LogBuilder;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.server.ai.AIColony;
 import net.sf.freecol.server.ai.AIGoods;
 import net.sf.freecol.server.ai.AIMain;
@@ -54,8 +59,6 @@ import net.sf.freecol.server.ai.AIUnit;
 import net.sf.freecol.server.ai.Cargo;
 import net.sf.freecol.server.ai.EuropeanAIPlayer;
 import net.sf.freecol.server.ai.TransportableAIObject;
-
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 
 /**
@@ -84,8 +87,6 @@ public final class TransportMission extends Mission {
      * on the distinct destination locations to visit.
      */
     private static final int DESTINATION_UPPER_BOUND = 4;
-
-    private static final int MINIMUM_GOLD_TO_STAY_IN_EUROPE = 600;
 
     /** A list of {@code Cargo}s to work on. */
     private final List<Cargo> cargoes = new ArrayList<>();
@@ -880,6 +881,18 @@ public final class TransportMission extends Mission {
             case ALREADY_PRESENT:
                 break;
             case CAPACITY_EXCEEDED:
+                if (l instanceof Goods) {
+                    final Goods g = (Goods) l;
+                    final int loadableAmount = carrier.getLoadableAmount(g.getType());
+                    if (loadableAmount > 0) {
+                        g.setAmount(loadableAmount);
+                        if (!t.joinTransport(carrier, d)) {
+                            lb.add(", ", t, " NO-JOIN-PARTIAL");
+                            return CargoResult.TFAIL;
+                        }
+                        break;
+                    }
+                }
                 lb.add(", ", t, " NO-ROOM on ", carrier);
                 return CargoResult.TFAIL;
             default:
@@ -924,7 +937,6 @@ public final class TransportMission extends Mission {
             // Fall through
         case UNLOAD:
             if (isCarrying(t) && !t.leaveTransport(d)) {
-                //lb.add(", ", t, " NO-LEAVE");
                 PathNode pn = t.getDeliveryPath(carrier, t.getTransportDestination());
                 lb.add(", ", t, " NO-LEAVE(", here, "~", cargo.getLeaveDirection(), "~", t.getTransportDestination(), " ", ((pn == null) ? "no-path" : pn.fullPathToString()));
                 return CargoResult.TRETRY;
@@ -961,6 +973,9 @@ public final class TransportMission extends Mission {
      */
     private void doTransport(LogBuilder lb) {
         final Unit unit = getUnit();
+        if (tSize() == 0) {
+            queueMoreCargo(lb, unit);
+        }
         if (tSize() > 0) {
             // Arrived at a target.  Deliver what can be delivered.
             // Check other deliveries, we might be in port so this is
@@ -1051,16 +1066,26 @@ public final class TransportMission extends Mission {
             optimizeCargoes(lb);
         }
 
+        queueEasilyTransportedCargo(unit);
+        queueMoreCargo(lb, unit);
+    }
+
+    private void queueMoreCargo(LogBuilder lb, final Unit unit) {
         // Replenish cargoes up to available destination capacity
         // and 50% above maximum cargoes (FIXME: longer?)
         final EuropeanAIPlayer euaip = getEuropeanAIPlayer();
-        while (destinationCapacity() > 0
-            && tSize() < unit.getCargoCapacity() * 3 / 2) {
-            Cargo cargo = getBestCargo(unit);
-            if (cargo == null) break;
-            if (!queueCargo(cargo, false, lb)) break;
+        while (destinationCapacity() > 0 && tSize() < unit.getCargoCapacity() * 3 / 2) {
+            final Cargo cargo = getBestCargo(unit);
+            if (cargo == null) {
+                break;
+            }
+            if (!queueCargo(cargo, false, lb)) {
+                break;
+            }
             euaip.claimTransportable(cargo.getTransportable());
         }
+        
+        queueEasilyTransportedCargo(unit);
     }
 
     /**
@@ -1154,7 +1179,7 @@ public final class TransportMission extends Mission {
         final EuropeanAIPlayer euaip = getEuropeanAIPlayer();
         Cargo bestDirect = null, bestFallback = null;
         float bestDirectValue = 0.0f, bestFallbackValue = 0.0f;
-        for (TransportableAIObject t : euaip.getUrgentTransportables()) {
+        for (TransportableAIObject t : euaip.getTransportables()) {
             if (t.isDisposed() || !t.carriableBy(carrier)) continue;
             Cargo cargo;
             try {
@@ -1164,6 +1189,7 @@ public final class TransportMission extends Mission {
             }
             if (cargo == null) continue;
             float value = t.getTransportPriority() / (cargo.getTurns() + 1.0f);
+            
             if (cargo.isFallback()) {
                 if (bestFallbackValue < value) {
                     bestFallbackValue = value;
@@ -1179,6 +1205,66 @@ public final class TransportMission extends Mission {
         return (bestDirect != null) ? bestDirect
             : (bestFallback != null) ? bestFallback
             : null;
+    }
+    
+    /**
+     * Queues extra transportables at the carrier's current location
+     * that shares a destination with cargo already on the transport list.
+     * 
+     * These transportables can be added to the transport list without
+     * adding extra stops.
+     * 
+     * @param carrier The carrier.
+     */
+    private void queueEasilyTransportedCargo(Unit carrier) {
+        final EuropeanAIPlayer euaip = getEuropeanAIPlayer();
+        final List<Cargo> ts = tCopy();
+
+        final Location nextDestination = ts.stream()
+                .filter(c -> c.getCarrierTarget() != null && c.getCarrierTarget().getTile() != null)
+                .map(c -> c.getCarrierTarget())
+                .findFirst()
+                .orElse(null);
+
+        if (nextDestination == null) {
+            return;
+        }
+        
+        for (TransportableAIObject t : euaip.getTransportables()) {
+            if (t.isDisposed() || !t.carriableBy(carrier)) {
+                continue;
+            }
+            if (!Map.isSameLocation(t.getTransportSource(), carrier.getLocation())) {
+                continue;
+            }
+            if (Map.isSameLocation(nextDestination, t.getTransportDestination())) {
+                continue;
+            }
+            
+            Cargo cargo;
+            try {
+                cargo = Cargo.newCargo(t, carrier);
+            } catch (FreeColException fce) {
+                cargo = null;
+            }
+            if (cargo == null) {
+                continue;
+            }
+            
+            final int spaceAvailable = carrier.getCargoCapacity() - carrier.getCargoSpaceTaken();
+            if (spaceAvailable < cargo.getNewSpace()) {
+                continue;
+            }
+            
+            if (!t.joinTransport(carrier, null)) {
+                logger.warning("Failed to add cargo there should be room for.");
+            }
+            cargo.update();
+            if (!addCargo(cargo, 0, new LogBuilder(0))) {
+                logger.warning("Failed to add cargo already on the transport.");
+            }
+            euaip.claimTransportable(t);
+        }
     }
 
     /**

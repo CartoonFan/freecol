@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,8 +19,14 @@
 
 package net.sf.freecol.client.gui.panel.colopedia;
 
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.forEach;
+import static net.sf.freecol.common.util.CollectionUtils.forEachMapEntry;
+import static net.sf.freecol.common.util.CollectionUtils.iterable;
+
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -39,13 +45,10 @@ import javax.swing.text.StyledDocument;
 import javax.swing.tree.DefaultMutableTreeNode;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.client.gui.FontLibrary;
-import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.client.gui.action.ColopediaAction.PanelType;
-import net.sf.freecol.client.gui.panel.*;
-import net.sf.freecol.client.gui.Size;
+import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Ability;
 import net.sf.freecol.common.model.AbstractGoods;
@@ -53,7 +56,7 @@ import net.sf.freecol.common.model.BuildingType;
 import net.sf.freecol.common.model.ProductionType;
 import net.sf.freecol.common.model.StringTemplate;
 import net.sf.freecol.common.model.UnitType;
-import static net.sf.freecol.common.util.CollectionUtils.*;
+import net.sf.freecol.common.util.ImageUtils;
 
 
 /**
@@ -92,12 +95,14 @@ public class BuildingDetailPanel
                  : getSpecification().getBuildingTypeList()) {
             if (buildingType.getUpgradesFrom() == null) {
                 String name = Messages.getName(buildingType);
+                final Dimension listItemIconSize = getListItemIconSize();
+                final BufferedImage buildingTypeImage = getImageLibrary().getBuildingTypeImage(buildingType, new Dimension(-1, listItemIconSize.height));
+                final BufferedImage centeredImage = ImageUtils.createCenteredImage(buildingTypeImage, listItemIconSize);
+                
                 DefaultMutableTreeNode item =
                     new DefaultMutableTreeNode(new ColopediaTreeItem(
                         this, buildingType.getId(), name,
-                        new ImageIcon(getImageLibrary()
-                            .getBuildingTypeImage(buildingType,
-                                new Dimension(-1, ImageLibrary.ICON_SIZE.height)))));
+                        new ImageIcon(centeredImage)));
                 buildingHash.put(buildingType, item);
                 parent.add(item);
             } else {
@@ -106,18 +111,21 @@ public class BuildingDetailPanel
         }
 
         while (!buildingTypes.isEmpty()) {
-            Iterator<BuildingType> iterator = buildingTypes.iterator();
+            final Iterator<BuildingType> iterator = buildingTypes.iterator();
             while (iterator.hasNext()) {
-                BuildingType buildingType = iterator.next();
-                DefaultMutableTreeNode node = buildingHash.get(buildingType.getUpgradesFrom());
+                final BuildingType buildingType = iterator.next();
+                final DefaultMutableTreeNode node = buildingHash.get(buildingType.getUpgradesFrom());
                 if (node != null) {
                     String name = Messages.getName(buildingType);
-                    DefaultMutableTreeNode item =
+                    final Dimension listItemIconSize = getListItemIconSize();
+                    final BufferedImage buildingTypeImage = getImageLibrary().getBuildingTypeImage(buildingType, new Dimension(-1, listItemIconSize.height));
+                    final BufferedImage centeredImage = ImageUtils.createCenteredImage(buildingTypeImage, listItemIconSize);
+                    
+                    final DefaultMutableTreeNode item =
                         new DefaultMutableTreeNode(new ColopediaTreeItem(
                             this, buildingType.getId(), name,
-                            new ImageIcon(getImageLibrary()
-                                .getBuildingTypeImage(buildingType,
-                                    new Dimension(-1, ImageLibrary.ICON_SIZE.height)))));
+                            new ImageIcon(centeredImage)));
+                        
                     node.add(item);
                     buildingHash.put(buildingType, item);
                     iterator.remove();
@@ -211,7 +219,7 @@ public class BuildingDetailPanel
                 if (input != null) {
                     panel.add(getGoodsButton(input), "span, split 3");
                     JLabel arrow = new JLabel("\u2192");
-                    Font font = FontLibrary.getUnscaledFont("simple-bold-small");
+                    Font font = FontLibrary.getScaledFont("simple-bold-small");
                     arrow.setFont(font);
                     panel.add(arrow);
                 }

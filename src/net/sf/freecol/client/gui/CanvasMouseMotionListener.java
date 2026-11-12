@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,35 +19,29 @@
 
 package net.sf.freecol.client.gui;
 
-import java.awt.Point;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionListener;
-import java.util.logging.Logger;
 
 import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.common.model.PathNode;
-import net.sf.freecol.common.model.Tile;
-import net.sf.freecol.common.model.Unit;
+import net.sf.freecol.client.control.FreeColClientHolder;
 
 
 /**
  * Listens to the mouse being moved at the level of the Canvas.
  */
-public final class CanvasMouseMotionListener extends AbstractCanvasListener
-    implements MouseMotionListener {
-
-    private static final Logger logger = Logger.getLogger(CanvasMouseMotionListener.class.getName());
-
+public final class CanvasMouseMotionListener extends FreeColClientHolder implements MouseMotionListener {
+    
+    private final Scrolling scrolling;
 
     /**
      * Creates a new listener for mouse movement.
      *
      * @param freeColClient The {@code FreeColClient} for the game.
-     * @param canvas The {@code Canvas} to listen on.
      */
-    public CanvasMouseMotionListener(FreeColClient freeColClient,
-                                     Canvas canvas) {
+    public CanvasMouseMotionListener(FreeColClient freeColClient, Scrolling scrolling) {
         super(freeColClient);
+        
+        this.scrolling = scrolling;
     }
 
 
@@ -58,7 +52,7 @@ public final class CanvasMouseMotionListener extends AbstractCanvasListener
      */
     @Override
     public void mouseMoved(MouseEvent me) {
-        performAutoScrollIfActive(me, true);
+        scrolling.performAutoScrollIfActive(me);
 
         getGUI().updateGoto(me.getX(), me.getY(), false);
     }
@@ -69,9 +63,11 @@ public final class CanvasMouseMotionListener extends AbstractCanvasListener
     @Override
     public void mouseDragged(MouseEvent me) {
         // getButton does not work here, TODO: find out why
-        if ((me.getModifiersEx() & MouseEvent.BUTTON1_DOWN_MASK)
-            != MouseEvent.BUTTON1_DOWN_MASK) return;
-        performDragScrollIfActive(me);
+        if ((me.getModifiersEx() & MouseEvent.BUTTON1_DOWN_MASK) != MouseEvent.BUTTON1_DOWN_MASK) {
+            return;
+        }
+        
+        scrolling.performDragScrollIfActive(me);
 
         getGUI().updateGoto(me.getX(), me.getY(), true);
     }

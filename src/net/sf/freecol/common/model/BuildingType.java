@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,8 +19,16 @@
 
 package net.sf.freecol.common.model;
 
+import static net.sf.freecol.common.model.Constants.INFINITY;
+import static net.sf.freecol.common.model.Constants.UNDEFINED;
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.map;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.swing.JList;
 import javax.swing.ListModel;
@@ -29,10 +37,9 @@ import javax.xml.stream.XMLStreamException;
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
 import net.sf.freecol.common.model.Colony.NoBuildReason;
-import static net.sf.freecol.common.model.Constants.*;
 import net.sf.freecol.common.model.UnitLocation.NoAddReason;
-import net.sf.freecol.common.option.GameOptions;
-import static net.sf.freecol.common.util.CollectionUtils.*;
+import net.sf.freecol.common.model.production.BuildingProductionCalculator;
+import net.sf.freecol.common.model.production.WorkerAssignment;
 
 
 /**
@@ -341,6 +348,9 @@ public final class BuildingType extends BuildableType
     /**
      * Get the amount of goods of a given goods type the given unit
      * type could produce on a tile of this tile type.
+     * 
+     * No production bonuses, like rebel colony bonus, is added.
+     * Sufficient input goods are assumed.
      *
      * @param goodsType The {@code GoodsType} to produce.
      * @param unitType An optional {@code UnitType} that is to do
@@ -349,12 +359,32 @@ public final class BuildingType extends BuildableType
      */
     public int getPotentialProduction(GoodsType goodsType,
                                       UnitType unitType) {
-        if (goodsType == null) return 0;
-        int amount = getBaseProduction(null, goodsType, unitType);
-        amount = (int)apply(amount, null, goodsType.getId(), unitType);
-        return (amount < 0) ? 0 : amount;
+        final BuildingProductionCalculator bpc = new BuildingProductionCalculator(null, new FeatureContainer(), 0);
+        final ProductionType productionType = ProductionType.getBestProductionType(goodsType, getAvailableProductionTypes(unitType == null));
+        
+        final int MORE_THAN_ENOUGH_INPUT_GOODS = 1000;
+        final int MORE_THAN_ENOUGH_WAREHOUSE_CAPACITY = 10000;
+        final List<AbstractGoods> inputGoods = productionType.getInputList().stream()
+                .map(ag -> new AbstractGoods(ag.getType(), MORE_THAN_ENOUGH_INPUT_GOODS))
+                .collect(Collectors.toList());
+        
+        // Allows tests to be run without having a game started:
+        final Turn turn = (getGame() != null && getGame().getTurn() != null) ? getGame().getTurn() : new Turn(1);
+        
+        final ProductionInfo pi = bpc.getAdjustedProductionInfo(this,
+                turn,
+                List.of(new WorkerAssignment(unitType, productionType)),
+                inputGoods,
+                List.of(),
+                MORE_THAN_ENOUGH_WAREHOUSE_CAPACITY);
+        
+        return pi.getProduction().stream()
+                .filter(a -> a.getType().equals(goodsType))
+                .map(AbstractGoods::getAmount)
+                .findFirst()
+                .orElse(0);
     }
-
+        
     /**
      * {@inheritDoc}
      */
@@ -448,6 +478,32 @@ public final class BuildingType extends BuildableType
         return buildQueueLastPos;
     }
 
+    /**
+     * Gets the production modifiers for the given type of goods and
+     * unit type.
+     *
+     * We use UnitType.getModifiers but modify this according to the
+     * competence factor of this building type.  Note that we do not modify
+     * *multiplicative* modifiers, as this would capture the master blacksmith
+     * doubling.
+     *
+     * @param id The String identifier
+     * @param turn The turn number of type {@link Turn}
+     * @param unitType The optional {@code UnitType} to produce them.
+     * @return A stream of the applicable modifiers.
+     */
+    public Stream<Modifier> getCompetenceModifiers(String id,
+        UnitType unitType, Turn turn) {
+        final float competence = getCompetenceFactor();
+        return (competence == 1.0f) // Floating comparison OK!
+            ? unitType.getModifiers(id, getType(), turn)
+            : map(unitType.getModifiers(id, getType(), turn),
+                m -> {
+                    return (m.getType() == Modifier.ModifierType.ADDITIVE)
+                        ? Modifier.makeModifier(m).setValue(m.getValue() * competence)
+                        : m;
+                });
+    }
 
     // Override FreeColObject
 
@@ -569,7 +625,7 @@ public final class BuildingType extends BuildableType
 
         final Specification spec = getSpecification();
 
-        BuildingType parent = xr.getType(spec, EXTENDS_TAG,
+        BuildingType parent = xr.getAlreadyInitializedType(spec, EXTENDS_TAG,
                 BuildingType.class, this);
 
         // @compat 0.11.3

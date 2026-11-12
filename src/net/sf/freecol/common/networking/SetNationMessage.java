@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -18,6 +18,8 @@
  */
 
 package net.sf.freecol.common.networking;
+
+import java.util.List;
 
 import javax.xml.stream.XMLStreamException;
 
@@ -86,6 +88,10 @@ public class SetNationMessage extends AttributeMessage {
 
         if (player != null && nation != null) {
             player.setNation(nation);
+            
+            if (!freeColClient.isInGame()) {
+                pgc(freeColClient).addPlayerHandler(List.of(player));
+            }
         }
     }
 

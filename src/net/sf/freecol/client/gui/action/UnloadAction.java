@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -52,7 +52,6 @@ public class UnloadAction extends MapboardAction {
      *
      * @param freeColClient The {@code FreeColClient} for the game.
      * @param unit The {@code Unit} to unload.
-     * @see net.sf.freecol.client.gui.MapViewer#getActiveUnit()
      */
     public UnloadAction(FreeColClient freeColClient, Unit unit) {
         super(freeColClient, id);

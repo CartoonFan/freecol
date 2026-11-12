@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,6 +19,11 @@
 
 package net.sf.freecol.server.control;
 
+import static net.sf.freecol.common.util.CollectionUtils.alwaysTrue;
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.toList;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,10 +34,10 @@ import net.sf.freecol.common.model.AbstractUnit;
 import net.sf.freecol.common.model.Building;
 import net.sf.freecol.common.model.BuildingType;
 import net.sf.freecol.common.model.Colony;
-import net.sf.freecol.common.model.CombatModel.CombatResult;
+import net.sf.freecol.common.model.CombatModel.CombatEffectType;
 import net.sf.freecol.common.model.Direction;
-import net.sf.freecol.common.model.Event;
 import net.sf.freecol.common.model.Europe;
+import net.sf.freecol.common.model.Event;
 import net.sf.freecol.common.model.FoundingFather;
 import net.sf.freecol.common.model.FoundingFather.FoundingFatherType;
 import net.sf.freecol.common.model.Game;
@@ -45,12 +50,10 @@ import net.sf.freecol.common.model.Modifier.ModifierType;
 import net.sf.freecol.common.model.Nation;
 import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.Player.PlayerType;
-import net.sf.freecol.common.model.Stance;
 import net.sf.freecol.common.model.Role;
 import net.sf.freecol.common.model.Scope;
-import net.sf.freecol.common.model.SimpleCombatModel;
 import net.sf.freecol.common.model.Specification;
-import net.sf.freecol.common.model.StanceTradeItem;
+import net.sf.freecol.common.model.Stance;
 import net.sf.freecol.common.model.Tension;
 import net.sf.freecol.common.model.Tension.Level;
 import net.sf.freecol.common.model.Tile;
@@ -58,10 +61,8 @@ import net.sf.freecol.common.model.TileImprovementType;
 import net.sf.freecol.common.model.TileType;
 import net.sf.freecol.common.model.Unit;
 import net.sf.freecol.common.model.UnitChangeType;
-import net.sf.freecol.common.model.UnitTypeChange;
 import net.sf.freecol.common.model.UnitType;
 import net.sf.freecol.common.model.WorkLocation;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.server.ServerTestHelper;
 import net.sf.freecol.server.model.ServerBuilding;
 import net.sf.freecol.server.model.ServerColony;
@@ -74,145 +75,68 @@ import net.sf.freecol.util.test.FreeColTestUtils;
 
 public class InGameControllerTest extends FreeColTestCase {
 
-    private static BuildingType carpenterHouse
-        = spec().getBuildingType("model.building.carpenterHouse");
-    private static BuildingType press
-        = spec().getBuildingType("model.building.printingPress");
-    private static final BuildingType schoolHouseType
-        = spec().getBuildingType("model.building.schoolhouse");
-    private static final BuildingType stockadeType
-        = spec().getBuildingType("model.building.stockade");
+    private static BuildingType carpenterHouse = spec().getBuildingType("model.building.carpenterHouse");
+    private static BuildingType press = spec().getBuildingType("model.building.printingPress");
+    private static final BuildingType schoolHouseType = spec().getBuildingType("model.building.schoolhouse");
+    private static final BuildingType stockadeType = spec().getBuildingType("model.building.stockade");
 
-    private static final GoodsType bellsType
-        = spec().getGoodsType("model.goods.bells");
-    private static final GoodsType cottonType
-        = spec().getGoodsType("model.goods.cotton");
-    private static final GoodsType foodType
-        = spec().getPrimaryFoodType();
-    private static final GoodsType grainType
-        = spec().getGoodsType("model.goods.grain");
-    private static final GoodsType hammersType
-        = spec().getGoodsType("model.goods.hammers");
-    private static final GoodsType horsesType
-        = spec().getGoodsType("model.goods.horses");
-    private static final GoodsType lumberType
-        = spec().getGoodsType("model.goods.lumber");
-    private static final GoodsType musketsType
-        = spec().getGoodsType("model.goods.muskets");
-    private static final GoodsType toolsType
-        = spec().getGoodsType("model.goods.tools");
+    private static final GoodsType bellsType = spec().getGoodsType("model.goods.bells");
+    private static final GoodsType cottonType = spec().getGoodsType("model.goods.cotton");
+    private static final GoodsType grainType = spec().getGoodsType("model.goods.grain");
+    private static final GoodsType hammersType = spec().getGoodsType("model.goods.hammers");
+    private static final GoodsType horsesType = spec().getGoodsType("model.goods.horses");
+    private static final GoodsType lumberType = spec().getGoodsType("model.goods.lumber");
+    private static final GoodsType musketsType = spec().getGoodsType("model.goods.muskets");
 
-    private static final Role scoutRole
-        = spec().getRole("model.role.scout");
-    private static final Role soldierRole
-        = spec().getRole("model.role.soldier");
-    private static final Role dragoonRole
-        = spec().getRole("model.role.dragoon");
-    private static final Role pioneerRole
-        = spec().getRole("model.role.pioneer");
-    private static final Role missionaryRole
-        = spec().getRole("model.role.missionary");
-    private static final Role infantryRole
-        = spec().getRole("model.role.infantry");
-    private static final Role cavalryRole
-        = spec().getRole("model.role.cavalry");
-    private static final Role armedBraveRole
-        = spec().getRole("model.role.armedBrave");
-    private static final Role mountedBraveRole
-        = spec().getRole("model.role.mountedBrave");
-    private static final Role nativeDragoonRole
-        = spec().getRole("model.role.nativeDragoon");
+    private static final Role scoutRole = spec().getRole("model.role.scout");
+    private static final Role soldierRole = spec().getRole("model.role.soldier");
+    private static final Role dragoonRole = spec().getRole("model.role.dragoon");
+    private static final Role pioneerRole = spec().getRole("model.role.pioneer");
+    private static final Role armedBraveRole = spec().getRole("model.role.armedBrave");
+    private static final Role mountedBraveRole = spec().getRole("model.role.mountedBrave");
+    private static final Role nativeDragoonRole = spec().getRole("model.role.nativeDragoon");
 
-    private static final TileImprovementType clear
-        = spec().getTileImprovementType("model.improvement.clearForest");
-    private static final TileImprovementType plow
-        = spec().getTileImprovementType("model.improvement.plow");
-    private static final TileImprovementType road
-        = spec().getTileImprovementType("model.improvement.road");
+    private static final TileImprovementType clear = spec().getTileImprovementType("model.improvement.clearForest");
+    private static final TileImprovementType plow = spec().getTileImprovementType("model.improvement.plow");
+    private static final TileImprovementType road = spec().getTileImprovementType("model.improvement.road");
 
-    private static final TileType arctic
-        = spec().getTileType("model.tile.arctic");
-    private static final TileType desert
-        = spec().getTileType("model.tile.desert");
-    private static final TileType desertForest
-        = spec().getTileType("model.tile.scrubForest");
-    private static final TileType grassland
-        = spec().getTileType("model.tile.grassland");
-    private static final TileType grasslandForest
-        = spec().getTileType("model.tile.coniferForest");
-    private static final TileType hills
-        = spec().getTileType("model.tile.hills");
-    private static final TileType marsh
-        = spec().getTileType("model.tile.marsh");
-    private static final TileType marshForest
-        = spec().getTileType("model.tile.wetlandForest");
-    private static final TileType mountains
-        = spec().getTileType("model.tile.mountains");
-    private static final TileType ocean
-        = spec().getTileType("model.tile.ocean");
-    private static final TileType plains
-        = spec().getTileType("model.tile.plains");
-    private static final TileType plainsForest
-        = spec().getTileType("model.tile.mixedForest");
-    private static final TileType prairie
-        = spec().getTileType("model.tile.prairie");
-    private static final TileType prairieForest
-        = spec().getTileType("model.tile.broadleafForest");
-    private static final TileType savannah
-        = spec().getTileType("model.tile.savannah");
-    private static final TileType savannahForest
-        = spec().getTileType("model.tile.tropicalForest");
-    private static final TileType swamp
-        = spec().getTileType("model.tile.swamp");
-    private static final TileType swampForest
-        = spec().getTileType("model.tile.rainForest");
-    private static final TileType tundra
-        = spec().getTileType("model.tile.tundra");
-    private static final TileType tundraForest
-        = spec().getTileType("model.tile.borealForest");
+    private static final TileType desert = spec().getTileType("model.tile.desert");
+    private static final TileType desertForest = spec().getTileType("model.tile.scrubForest");
+    private static final TileType hills = spec().getTileType("model.tile.hills");
+    private static final TileType marsh = spec().getTileType("model.tile.marsh");
+    private static final TileType marshForest = spec().getTileType("model.tile.wetlandForest");
+    private static final TileType mountains = spec().getTileType("model.tile.mountains");
+    private static final TileType ocean = spec().getTileType("model.tile.ocean");
+    private static final TileType plains = spec().getTileType("model.tile.plains");
+    private static final TileType plainsForest = spec().getTileType("model.tile.mixedForest");
+    private static final TileType savannah = spec().getTileType("model.tile.savannah");
+    private static final TileType savannahForest = spec().getTileType("model.tile.tropicalForest");
+    private static final TileType swamp = spec().getTileType("model.tile.swamp");
+    private static final TileType swampForest = spec().getTileType("model.tile.rainForest");
+    private static final TileType tundra = spec().getTileType("model.tile.tundra");
+    private static final TileType tundraForest = spec().getTileType("model.tile.borealForest");
 
-    private static final UnitType braveType
-        = spec().getUnitType("model.unit.brave");
-    private static final UnitType colonistType
-        = spec().getUnitType("model.unit.freeColonist");
-    private static final UnitType farmerType
-        = spec().getUnitType("model.unit.expertFarmer");
-    private static final UnitType colonialType
-        = spec().getUnitType("model.unit.colonialRegular");
-    private static final UnitType veteranType
-        = spec().getUnitType("model.unit.veteranSoldier");
-    private static final UnitType pettyCriminalType
-        = spec().getUnitType("model.unit.pettyCriminal");
-    private static final UnitType indenturedServantType
-        = spec().getUnitType("model.unit.indenturedServant");
-    private static final UnitType kingsRegularType
-        = spec().getUnitType("model.unit.kingsRegular");
-    private static final UnitType indianConvertType
-        = spec().getUnitType("model.unit.indianConvert");
-    private static final UnitType hardyPioneerType
-        = spec().getUnitType("model.unit.hardyPioneer");
-    private static final UnitType statesmanType
-        = spec().getUnitType("model.unit.elderStatesman");
-    private static final UnitType wagonTrainType
-        = spec().getUnitType("model.unit.wagonTrain");
-    private static final UnitType caravelType
-        = spec().getUnitType("model.unit.caravel");
-    private static final UnitType galleonType
-        = spec().getUnitType("model.unit.galleon");
-    private static final UnitType privateerType
-        = spec().getUnitType("model.unit.privateer");
-    private static final UnitType missionaryType
-        = spec().getUnitType("model.unit.jesuitMissionary");
-    private static final UnitType artilleryType
-        = spec().getUnitType("model.unit.artillery");
-    private static final UnitType damagedArtilleryType
-        = spec().getUnitType("model.unit.damagedArtillery");
-    private static final UnitType treasureTrainType
-        = spec().getUnitType("model.unit.treasureTrain");
+    private static final UnitType braveType = spec().getUnitType("model.unit.brave");
+    private static final UnitType colonistType = spec().getUnitType("model.unit.freeColonist");
+    private static final UnitType farmerType = spec().getUnitType("model.unit.expertFarmer");
+    private static final UnitType colonialType = spec().getUnitType("model.unit.colonialRegular");
+    private static final UnitType veteranType = spec().getUnitType("model.unit.veteranSoldier");
+    private static final UnitType pettyCriminalType = spec().getUnitType("model.unit.pettyCriminal");
+    private static final UnitType indenturedServantType = spec().getUnitType("model.unit.indenturedServant");
+    private static final UnitType kingsRegularType = spec().getUnitType("model.unit.kingsRegular");
+    private static final UnitType indianConvertType = spec().getUnitType("model.unit.indianConvert");
+    private static final UnitType hardyPioneerType = spec().getUnitType("model.unit.hardyPioneer");
+    private static final UnitType statesmanType = spec().getUnitType("model.unit.elderStatesman");
+    private static final UnitType wagonTrainType = spec().getUnitType("model.unit.wagonTrain");
+    private static final UnitType caravelType = spec().getUnitType("model.unit.caravel");
+    private static final UnitType galleonType = spec().getUnitType("model.unit.galleon");
+    private static final UnitType privateerType = spec().getUnitType("model.unit.privateer");
+    private static final UnitType missionaryType = spec().getUnitType("model.unit.jesuitMissionary");
+    private static final UnitType artilleryType = spec().getUnitType("model.unit.artillery");
+    private static final UnitType damagedArtilleryType = spec().getUnitType("model.unit.damagedArtillery");
+    private static final UnitType treasureTrainType = spec().getUnitType("model.unit.treasureTrain");
 
-    private SimpleCombatModel combatModel = new SimpleCombatModel();
-
-
+    
     @Override
     public void tearDown() throws Exception {
         ServerTestHelper.stopServerGame();
@@ -370,7 +294,7 @@ public class InGameControllerTest extends FreeColTestCase {
         // Fail from a port while galleon exists, then succeed
         treasure = new ServerUnit(game, tile, dutch, treasureTrainType);
         treasure.setTreasureAmount(100);
-        Colony port = getStandardColony(1, 9, 4);
+        Colony port = createStandardColony(1, 9, 4);
         assertFalse("Standard colony is not landlocked",
                     port.isLandLocked());
         assertTrue("Standard colony is connected to Europe",
@@ -383,7 +307,7 @@ public class InGameControllerTest extends FreeColTestCase {
                    treasure.canCashInTreasureTrain());
 
         // Fail from a landlocked colony
-        Colony inland = getStandardColony(1, 7, 7);
+        Colony inland = createStandardColony(1, 7, 7);
         assertTrue("Inland colony is landlocked",
                    inland.isLandLocked());
         assertFalse("Inland colony is not connected to Europe",
@@ -394,7 +318,7 @@ public class InGameControllerTest extends FreeColTestCase {
 
         // Fail from a colony with a port but no connection to Europe
         map.getTile(5, 5).setType(spec().getTileType("model.tile.lake"));
-        Colony lake = getStandardColony(1, 4, 5);
+        Colony lake = createStandardColony(1, 4, 5);
         assertFalse("Lake colony is not landlocked",
                     lake.isLandLocked());
         assertFalse("Lake colony is not connected to Europe",
@@ -462,7 +386,7 @@ public class InGameControllerTest extends FreeColTestCase {
                     unit.getType() != hardyPioneerType);
 
         // Can not clear speciality while teaching
-        Colony colony = getStandardColony();
+        Colony colony = createStandardColony();
         Building school = new ServerBuilding(game, colony, schoolHouseType);
         colony.addBuilding(school);
 
@@ -513,7 +437,7 @@ public class InGameControllerTest extends FreeColTestCase {
         assertEquals("Galleon should be loaded", 1,
                      galleon.getGoodsSpaceTaken());
         assertFalse("Galleon should not be repairing",
-                    galleon.isDamaged());
+                    galleon.isDamagedAndUnderForcedRepair());
         galleon.setDestination(tile3);
         assertEquals("Wrong destination for Galleon",
                      tile3, galleon.getDestination());
@@ -522,15 +446,15 @@ public class InGameControllerTest extends FreeColTestCase {
             dutch.getEurope(), galleon.getRepairLocation());
 
         // Privateer should win, loot and damage the galleon
-        List<CombatResult> crs
-            = fakeAttackResult(CombatResult.WIN, privateer, galleon);
+        List<CombatEffectType> crs
+            = fakeAttackResult(CombatEffectType.WIN, privateer, galleon);
         checkCombat("Privateer v galleon", crs,
-                    CombatResult.WIN, CombatResult.LOOT_SHIP,
-                    CombatResult.DAMAGE_SHIP_ATTACK);
+                    CombatEffectType.WIN, CombatEffectType.LOOT_SHIP,
+                    CombatEffectType.DAMAGE_SHIP_ATTACK);
         igc.combat(dutch, privateer, galleon, crs);
 
         assertTrue("Galleon should be in Europe repairing",
-                   galleon.isDamaged());
+                   galleon.isDamagedAndUnderForcedRepair());
         assertEquals("Galleon should be empty", 0,
                      galleon.getGoodsSpaceTaken());
         assertNull("Galleon should no longer have a destination",
@@ -583,19 +507,19 @@ public class InGameControllerTest extends FreeColTestCase {
                      colonial.getMoveType(tile2));
 
         // Veteran attacks and demotes the Colonial Regular
-        List<CombatResult> crs
-            = fakeAttackResult(CombatResult.WIN, soldier, colonial);
+        List<CombatEffectType> crs
+            = fakeAttackResult(CombatEffectType.WIN, soldier, colonial);
         checkCombat("Soldier v Colonial (1)", crs,
-            CombatResult.WIN, CombatResult.LOSE_EQUIP, CombatResult.DEMOTE_UNIT);
+            CombatEffectType.WIN, CombatEffectType.LOSE_EQUIP, CombatEffectType.DEMOTE_UNIT);
         igc.combat(french, soldier, colonial, crs);
 
         assertEquals("Colonial Regular is demoted",
                      veteranType, colonial.getType());
 
         // Veteran attacks and captures the Colonial Regular
-        crs = fakeAttackResult(CombatResult.WIN, soldier, colonial);
+        crs = fakeAttackResult(CombatEffectType.WIN, soldier, colonial);
         checkCombat("Soldier v Colonial (2)", crs,
-            CombatResult.WIN, CombatResult.CAPTURE_UNIT);
+            CombatEffectType.WIN, CombatEffectType.CAPTURE_UNIT);
         igc.combat(french, soldier, colonial, crs);
 
         assertEquals("Colonial Regular is demoted",
@@ -614,7 +538,7 @@ public class InGameControllerTest extends FreeColTestCase {
         ServerPlayer dutch = getServerPlayer(game, "model.nation.dutch");
         ServerPlayer french = getServerPlayer(game, "model.nation.french");
         igc.changeStance(french, Stance.WAR, dutch, true);
-        Colony colony = getStandardColony();
+        Colony colony = createStandardColony();
 
         Tile tile2 = map.getTile(4, 8);
         tile2.setExplored(dutch, true);
@@ -632,10 +556,10 @@ public class InGameControllerTest extends FreeColTestCase {
                      defender, colony.getTile().getDefendingUnit(attacker));
 
         // Attacker wins and defender loses horses
-        List<CombatResult> crs
-            = fakeAttackResult(CombatResult.WIN, attacker, defender);
+        List<CombatEffectType> crs
+            = fakeAttackResult(CombatEffectType.WIN, attacker, defender);
         checkCombat("Veteran v Colony (1)", crs,
-            CombatResult.WIN, CombatResult.LOSE_EQUIP);
+            CombatEffectType.WIN, CombatEffectType.LOSE_EQUIP);
         igc.combat(french, attacker, defender, crs);
 
         assertTrue("Attacker should be mounted",
@@ -654,9 +578,9 @@ public class InGameControllerTest extends FreeColTestCase {
                      defender, colony.getTile().getDefendingUnit(attacker));
 
         // Attacker loses and loses horses
-        crs = fakeAttackResult(CombatResult.LOSE, attacker, defender);
+        crs = fakeAttackResult(CombatEffectType.LOSE, attacker, defender);
         checkCombat("Veteran v Colony (2) ", crs,
-            CombatResult.LOSE, CombatResult.LOSE_EQUIP);
+            CombatEffectType.LOSE, CombatEffectType.LOSE_EQUIP);
         igc.combat(french, attacker, defender, crs);
 
         assertFalse("Attacker should not be mounted",
@@ -675,9 +599,9 @@ public class InGameControllerTest extends FreeColTestCase {
                      defender, colony.getTile().getDefendingUnit(attacker));
 
         // Attacker wins and defender loses muskets
-        crs = fakeAttackResult(CombatResult.WIN, attacker, defender);
+        crs = fakeAttackResult(CombatEffectType.WIN, attacker, defender);
         checkCombat("Veteran v Colony (3)", crs,
-            CombatResult.WIN, CombatResult.LOSE_EQUIP);
+            CombatEffectType.WIN, CombatEffectType.LOSE_EQUIP);
         igc.combat(french, attacker, defender, crs);
 
         assertFalse("Attacker should not be mounted",
@@ -696,9 +620,9 @@ public class InGameControllerTest extends FreeColTestCase {
                     defender.isDefensiveUnit());
 
         // Attacker wins and captures the settlement
-        crs = fakeAttackResult(CombatResult.WIN, attacker, defender);
+        crs = fakeAttackResult(CombatEffectType.WIN, attacker, defender);
         checkCombat("Veteran v Colony (4)", crs,
-            CombatResult.WIN, CombatResult.CAPTURE_COLONY);
+            CombatEffectType.WIN, CombatEffectType.CAPTURE_COLONY);
         igc.combat(french, attacker, defender, crs);
 
         assertFalse("Attacker should not be mounted",
@@ -731,11 +655,10 @@ public class InGameControllerTest extends FreeColTestCase {
         ServerPlayer dutch = getServerPlayer(game, "model.nation.dutch");
         ServerPlayer inca = getServerPlayer(game, "model.nation.inca");
         igc.changeStance(dutch, Stance.WAR, inca, true);
-        Colony colony = getStandardColony(1, 5, 8);
+        Colony colony = createStandardColony(1, 5, 8);
 
         Tile tile2 = map.getTile(4, 8);
         tile2.setExplored(dutch, true);
-        Unit colonist = first(colony.getUnits());
         Unit defender = new ServerUnit(getGame(), colony.getTile(), dutch,
                                        veteranType, dragoonRole);
         Unit attacker = new ServerUnit(getGame(), tile2, inca, braveType,
@@ -750,10 +673,10 @@ public class InGameControllerTest extends FreeColTestCase {
                      defender, colony.getTile().getDefendingUnit(attacker));
 
         // Attacker wins and defender loses horses
-        List<CombatResult> crs
-            = fakeAttackResult(CombatResult.WIN, attacker, defender);
+        List<CombatEffectType> crs
+            = fakeAttackResult(CombatEffectType.WIN, attacker, defender);
         checkCombat("Brave v Colony (1)", crs,
-            CombatResult.WIN, CombatResult.LOSE_EQUIP);
+            CombatEffectType.WIN, CombatEffectType.LOSE_EQUIP);
         igc.combat(inca, attacker, defender, crs);
 
         assertEquals("Colony size should be 1",
@@ -776,9 +699,9 @@ public class InGameControllerTest extends FreeColTestCase {
                      defender, colony.getTile().getDefendingUnit(attacker));
 
         // Attacker wins and defender loses muskets
-        crs = fakeAttackResult(CombatResult.WIN, attacker, defender);
+        crs = fakeAttackResult(CombatEffectType.WIN, attacker, defender);
         checkCombat("Brave v Colony (2)", crs,
-            CombatResult.WIN, CombatResult.LOSE_EQUIP);
+            CombatEffectType.WIN, CombatEffectType.LOSE_EQUIP);
         igc.combat(inca, attacker, defender, crs);
 
         assertEquals("Colony size should be 1",
@@ -805,9 +728,9 @@ public class InGameControllerTest extends FreeColTestCase {
                     colony.canBePillaged(attacker));
 
         // Attacker wins and slaughters the defender.
-        crs = fakeAttackResult(CombatResult.WIN, attacker, defender);
+        crs = fakeAttackResult(CombatEffectType.WIN, attacker, defender);
         checkCombat("Brave v Colony (3)", crs,
-            CombatResult.WIN, CombatResult.SLAUGHTER_UNIT);
+            CombatEffectType.WIN, CombatEffectType.SLAUGHTER_UNIT);
         igc.combat(inca, attacker, defender, crs);
 
         assertEquals("Colony size should be 1",
@@ -831,9 +754,9 @@ public class InGameControllerTest extends FreeColTestCase {
         colony.addBuilding(school);
         assertTrue("Colony has school, should be pillageable",
                    colony.canBePillaged(attacker));
-        crs = fakeAttackResult(CombatResult.WIN, attacker, defender);
+        crs = fakeAttackResult(CombatEffectType.WIN, attacker, defender);
         checkCombat("Brave v Colony (4)", crs,
-            CombatResult.WIN, CombatResult.PILLAGE_COLONY);
+            CombatEffectType.WIN, CombatEffectType.PILLAGE_COLONY);
         igc.combat(inca, attacker, defender, crs);
 
         assertTrue("Attacker should be mounted",
@@ -855,9 +778,9 @@ public class InGameControllerTest extends FreeColTestCase {
         colony.getTile().setHighSeasCount(-1); // no repair possible
         assertTrue("Colony has ship, should be pillageable",
                    colony.canBePillaged(attacker));
-        crs = fakeAttackResult(CombatResult.WIN, attacker, defender);
+        crs = fakeAttackResult(CombatEffectType.WIN, attacker, defender);
         checkCombat("Brave v Colony (5)", crs,
-            CombatResult.WIN, CombatResult.PILLAGE_COLONY);
+            CombatEffectType.WIN, CombatEffectType.PILLAGE_COLONY);
         igc.combat(inca, attacker, defender, crs);
 
         assertTrue("Attacker should be mounted",
@@ -869,7 +792,7 @@ public class InGameControllerTest extends FreeColTestCase {
         assertTrue("Colony should not be disposed",
                    !colony.isDisposed());
         assertTrue("Privateer should be under repair",
-                   privateer.isDamaged());
+                   privateer.isDamagedAndUnderForcedRepair());
         assertEquals("Privateer should be in Europe", dutch.getEurope(),
                      privateer.getLocation());
 
@@ -879,9 +802,9 @@ public class InGameControllerTest extends FreeColTestCase {
         colony.addGoods(cottonType, 100);
         assertTrue("Colony has goods, should be pillageable",
                    colony.canBePillaged(attacker));
-        crs = fakeAttackResult(CombatResult.WIN, attacker, defender);
+        crs = fakeAttackResult(CombatEffectType.WIN, attacker, defender);
         checkCombat("Brave v Colony (6)", crs,
-            CombatResult.WIN, CombatResult.PILLAGE_COLONY);
+            CombatEffectType.WIN, CombatEffectType.PILLAGE_COLONY);
         igc.combat(inca, attacker, defender, crs);
 
         assertTrue("Attacker should be mounted",
@@ -902,9 +825,9 @@ public class InGameControllerTest extends FreeColTestCase {
         dutch.setGold(100);
         assertTrue("Dutch have gold, colony should be pillageable",
                    colony.canBePillaged(attacker));
-        crs = fakeAttackResult(CombatResult.WIN, attacker, defender);
+        crs = fakeAttackResult(CombatEffectType.WIN, attacker, defender);
         checkCombat("Brave v Colony (7)", crs,
-            CombatResult.WIN, CombatResult.PILLAGE_COLONY);
+            CombatEffectType.WIN, CombatEffectType.PILLAGE_COLONY);
         igc.combat(inca, attacker, defender, crs);
 
         assertTrue("Attacker should be mounted",
@@ -922,9 +845,9 @@ public class InGameControllerTest extends FreeColTestCase {
                     colony.canBePillaged(attacker));
 
         // Attacker wins and destroys the colony
-        crs = fakeAttackResult(CombatResult.WIN, attacker, defender);
+        crs = fakeAttackResult(CombatEffectType.WIN, attacker, defender);
         checkCombat("Brave v Colony (8)", crs,
-            CombatResult.WIN, CombatResult.SLAUGHTER_UNIT, CombatResult.DESTROY_COLONY);
+            CombatEffectType.WIN, CombatEffectType.SLAUGHTER_UNIT, CombatEffectType.DESTROY_COLONY);
         igc.combat(inca, attacker, defender, crs);
 
         assertTrue("Attacker should be mounted",
@@ -947,7 +870,7 @@ public class InGameControllerTest extends FreeColTestCase {
         ServerPlayer dutch = getServerPlayer(game, "model.nation.dutch");
         ServerPlayer inca = getServerPlayer(game, "model.nation.inca");
         igc.changeStance(dutch, Stance.WAR, inca, true);
-        Colony colony = getStandardColony();
+        Colony colony = createStandardColony();
 
         dutch.setStance(inca, Stance.WAR);
         inca.setStance(dutch, Stance.WAR);
@@ -967,11 +890,11 @@ public class InGameControllerTest extends FreeColTestCase {
         }
 
         // Attacker wins, defender autoequips, but loses the muskets
-        List<CombatResult> crs
-            = fakeAttackResult(CombatResult.WIN, attacker, colonist);
+        List<CombatEffectType> crs
+            = fakeAttackResult(CombatEffectType.WIN, attacker, colonist);
         checkCombat("Inca v Colony", crs,
-                    CombatResult.WIN, CombatResult.AUTOEQUIP_UNIT,
-                    CombatResult.LOSE_AUTOEQUIP);
+                    CombatEffectType.WIN, CombatEffectType.AUTOEQUIP_UNIT,
+                    CombatEffectType.LOSE_AUTOEQUIP);
         igc.combat(inca, attacker, colonist, crs);
 
         assertFalse("Colonist should not be disposed",
@@ -1004,10 +927,10 @@ public class InGameControllerTest extends FreeColTestCase {
         soldier.setMovesLeft(1);
 
         // Soldier wins and kills the pioneer
-        List<CombatResult> crs
-            = fakeAttackResult(CombatResult.WIN, soldier, pioneer);
+        List<CombatEffectType> crs
+            = fakeAttackResult(CombatEffectType.WIN, soldier, pioneer);
         checkCombat("Soldier v Pioneer", crs,
-                    CombatResult.WIN, CombatResult.SLAUGHTER_UNIT);
+                    CombatEffectType.WIN, CombatEffectType.SLAUGHTER_UNIT);
         igc.combat(french, soldier, pioneer, crs);
 
         assertTrue("Pioneer should be dead",
@@ -1036,10 +959,10 @@ public class InGameControllerTest extends FreeColTestCase {
         scout.setMovesLeft(1);
 
         // Soldier wins and kills the scout
-        List<CombatResult> crs
-            = fakeAttackResult(CombatResult.WIN, soldier, scout);
+        List<CombatEffectType> crs
+            = fakeAttackResult(CombatEffectType.WIN, soldier, scout);
         checkCombat("Soldier v scout", crs,
-                    CombatResult.WIN, CombatResult.SLAUGHTER_UNIT);
+                    CombatEffectType.WIN, CombatEffectType.SLAUGHTER_UNIT);
         igc.combat(french, soldier, scout, crs);
 
         assertTrue("Scout should be dead",
@@ -1100,11 +1023,11 @@ public class InGameControllerTest extends FreeColTestCase {
         dutch.addAbility(new Ability(Ability.AUTOMATIC_PROMOTION));
 
         // Criminal -> Servant
-        List<CombatResult> crs
-            = fakeAttackResult(CombatResult.WIN, unit, soldier);
+        List<CombatEffectType> crs
+            = fakeAttackResult(CombatEffectType.WIN, unit, soldier);
         checkCombat("Criminal promotion", crs,
-                    CombatResult.WIN, CombatResult.LOSE_EQUIP,
-                    CombatResult.PROMOTE_UNIT);
+                    CombatEffectType.WIN, CombatEffectType.LOSE_EQUIP,
+                    CombatEffectType.PROMOTE_UNIT);
         igc.combat(dutch, unit, soldier, crs);
 
         assertEquals("Criminal should be promoted to servant",
@@ -1112,10 +1035,10 @@ public class InGameControllerTest extends FreeColTestCase {
 
         // Servant -> Colonist
         soldier.changeRole(soldierRole, 1);
-        crs = fakeAttackResult(CombatResult.WIN, unit, soldier);
+        crs = fakeAttackResult(CombatEffectType.WIN, unit, soldier);
         checkCombat("Servant promotion", crs,
-                    CombatResult.WIN, CombatResult.LOSE_EQUIP,
-                    CombatResult.PROMOTE_UNIT);
+                    CombatEffectType.WIN, CombatEffectType.LOSE_EQUIP,
+                    CombatEffectType.PROMOTE_UNIT);
         igc.combat(dutch, unit, soldier, crs);
 
         assertEquals("Servant should be promoted to colonist",
@@ -1123,10 +1046,10 @@ public class InGameControllerTest extends FreeColTestCase {
 
         // Colonist -> Veteran
         soldier.changeRole(soldierRole, 1);
-        crs = fakeAttackResult(CombatResult.WIN, unit, soldier);
+        crs = fakeAttackResult(CombatEffectType.WIN, unit, soldier);
         checkCombat("Colonist promotion failed", crs,
-                    CombatResult.WIN, CombatResult.LOSE_EQUIP,
-                    CombatResult.PROMOTE_UNIT);
+                    CombatEffectType.WIN, CombatEffectType.LOSE_EQUIP,
+                    CombatEffectType.PROMOTE_UNIT);
         igc.combat(dutch, unit, soldier, crs);
 
         assertEquals("Colonist should be promoted to Veteran",
@@ -1148,10 +1071,10 @@ public class InGameControllerTest extends FreeColTestCase {
 
         // Veteran -> Colonial Regular
         soldier.changeRole(soldierRole, 1);
-        crs = fakeAttackResult(CombatResult.WIN, unit, soldier);
+        crs = fakeAttackResult(CombatEffectType.WIN, unit, soldier);
         checkCombat("Veteran promotion", crs,
-                    CombatResult.WIN, CombatResult.LOSE_EQUIP,
-                    CombatResult.PROMOTE_UNIT);
+                    CombatEffectType.WIN, CombatEffectType.LOSE_EQUIP,
+                    CombatEffectType.PROMOTE_UNIT);
         igc.combat(dutch, unit, soldier, crs);
 
         assertEquals("Veteran should be promoted to Colonial Regular",
@@ -1159,9 +1082,9 @@ public class InGameControllerTest extends FreeColTestCase {
 
         // No further promotion should work
         soldier.changeRole(soldierRole, 1);
-        crs = fakeAttackResult(CombatResult.WIN, unit, soldier);
+        crs = fakeAttackResult(CombatEffectType.WIN, unit, soldier);
         checkCombat("Colonial Regular over-promotion failed", crs,
-                    CombatResult.WIN, CombatResult.LOSE_EQUIP);
+                    CombatEffectType.WIN, CombatEffectType.LOSE_EQUIP);
         igc.combat(dutch, unit, soldier, crs);
 
         assertEquals("Colonial Regular should still be Colonial Regular",
@@ -1195,10 +1118,10 @@ public class InGameControllerTest extends FreeColTestCase {
                     soldier.hasAbility(Ability.CAN_BE_CAPTURED));
 
         // Colonist loses and is captured
-        List<CombatResult> crs
-            = fakeAttackResult(CombatResult.LOSE, colonist, soldier);
+        List<CombatEffectType> crs
+            = fakeAttackResult(CombatEffectType.LOSE, colonist, soldier);
         checkCombat("Colonist v Soldier", crs,
-                    CombatResult.LOSE, CombatResult.CAPTURE_UNIT);
+                    CombatEffectType.LOSE, CombatEffectType.CAPTURE_UNIT);
         igc.combat(dutch, colonist, soldier, crs);
 
         assertEquals("Colonist should still be a colonist",
@@ -1230,10 +1153,10 @@ public class InGameControllerTest extends FreeColTestCase {
                                        colonistType, soldierRole);
 
         // Soldier loses and loses muskets
-        List<CombatResult> crs
-            = fakeAttackResult(CombatResult.LOSE, soldier1, soldier2);
+        List<CombatEffectType> crs
+            = fakeAttackResult(CombatEffectType.LOSE, soldier1, soldier2);
         checkCombat("Soldier should lose equipment", crs,
-                    CombatResult.LOSE, CombatResult.LOSE_EQUIP);
+                    CombatEffectType.LOSE, CombatEffectType.LOSE_EQUIP);
         igc.combat(dutch, soldier1, soldier2, crs);
 
         assertEquals("Soldier should be a colonist",
@@ -1246,9 +1169,9 @@ public class InGameControllerTest extends FreeColTestCase {
                    soldier1.hasDefaultRole());
 
         // Soldier loses and is captured
-        crs = fakeAttackResult(CombatResult.LOSE, soldier1, soldier2);
+        crs = fakeAttackResult(CombatEffectType.LOSE, soldier1, soldier2);
         checkCombat("Soldier v soldier", crs,
-                    CombatResult.LOSE, CombatResult.CAPTURE_UNIT);
+                    CombatEffectType.LOSE, CombatEffectType.CAPTURE_UNIT);
         igc.combat(dutch, soldier1, soldier2, crs);
 
         assertEquals("Soldier should be a colonist",
@@ -1286,10 +1209,10 @@ public class InGameControllerTest extends FreeColTestCase {
                                       colonistType, soldierRole);
 
         // Dragoon loses and loses horses
-        List<CombatResult> crs
-            = fakeAttackResult(CombatResult.LOSE, dragoon, soldier);
+        List<CombatEffectType> crs
+            = fakeAttackResult(CombatEffectType.LOSE, dragoon, soldier);
         checkCombat("Dragoon v soldier (1)", crs,
-            CombatResult.LOSE, CombatResult.LOSE_EQUIP);
+            CombatEffectType.LOSE, CombatEffectType.LOSE_EQUIP);
         igc.combat(dutch, dragoon, soldier, crs);
 
         assertEquals("Attacker should be a colonist", colonistType,
@@ -1309,9 +1232,9 @@ public class InGameControllerTest extends FreeColTestCase {
         assertEquals("Attacker has 0 moves left", 0,
                      dragoon.getMovesLeft());
 
-        crs = fakeAttackResult(CombatResult.LOSE, dragoon, soldier);
+        crs = fakeAttackResult(CombatEffectType.LOSE, dragoon, soldier);
         checkCombat("Dragoon v soldier (2)", crs,
-            CombatResult.LOSE, CombatResult.LOSE_EQUIP);
+            CombatEffectType.LOSE, CombatEffectType.LOSE_EQUIP);
         igc.combat(dutch, dragoon, soldier, crs);
 
         assertEquals("Attacker should be a colonist", colonistType,
@@ -1323,9 +1246,9 @@ public class InGameControllerTest extends FreeColTestCase {
         assertTrue("Attacker should have default role",
                    dragoon.hasDefaultRole());
 
-        crs = fakeAttackResult(CombatResult.WIN, soldier, dragoon);
+        crs = fakeAttackResult(CombatEffectType.WIN, soldier, dragoon);
         checkCombat("Soldier v ex-dragoon", crs,
-                    CombatResult.WIN, CombatResult.CAPTURE_UNIT);
+                    CombatEffectType.WIN, CombatEffectType.CAPTURE_UNIT);
         igc.combat(french, soldier, dragoon, crs);
 
         assertEquals("Defender should be a colonist", colonistType,
@@ -1366,10 +1289,10 @@ public class InGameControllerTest extends FreeColTestCase {
         brave.changeHomeIndianSettlement(settlement1);
 
         // Dragoon loses and brave captures its horses
-        List<CombatResult> crs
-            = fakeAttackResult(CombatResult.LOSE, dragoon, brave);
+        List<CombatEffectType> crs
+            = fakeAttackResult(CombatEffectType.LOSE, dragoon, brave);
         checkCombat("Dragoon v Brave (1)", crs,
-                    CombatResult.LOSE, CombatResult.CAPTURE_EQUIP);
+                    CombatEffectType.LOSE, CombatEffectType.CAPTURE_EQUIP);
         igc.combat(dutch, dragoon, brave, crs);
 
         assertEquals("Dragoon should be a colonist",
@@ -1388,9 +1311,9 @@ public class InGameControllerTest extends FreeColTestCase {
                      0, settlement2.getGoodsCount(horsesType));
 
         // Dragoon loses and brave captures its muskets
-        crs = fakeAttackResult(CombatResult.LOSE, dragoon, brave);
+        crs = fakeAttackResult(CombatEffectType.LOSE, dragoon, brave);
         checkCombat("Dragoon v Brave (2)", crs,
-                    CombatResult.LOSE, CombatResult.CAPTURE_EQUIP);
+                    CombatEffectType.LOSE, CombatEffectType.CAPTURE_EQUIP);
         igc.combat(dutch, dragoon, brave, crs);
 
         assertEquals("Attacker should be a colonist",
@@ -1409,9 +1332,9 @@ public class InGameControllerTest extends FreeColTestCase {
                      0, settlement2.getGoodsCount(musketsType));
 
         // Dragoon loses and is slaughtered
-        crs = fakeAttackResult(CombatResult.LOSE, dragoon, brave);
+        crs = fakeAttackResult(CombatEffectType.LOSE, dragoon, brave);
         checkCombat("Dragoon v Brave (3)", crs,
-                    CombatResult.LOSE, CombatResult.SLAUGHTER_UNIT);
+                    CombatEffectType.LOSE, CombatEffectType.SLAUGHTER_UNIT);
         igc.combat(dutch, dragoon, brave, crs);
 
         assertTrue("Dragoon should be disposed",
@@ -1439,10 +1362,10 @@ public class InGameControllerTest extends FreeColTestCase {
                                       soldierRole);
 
         // Scout loses and is slaughtered
-        List<CombatResult> crs
-            = fakeAttackResult(CombatResult.LOSE, scout, soldier);
+        List<CombatEffectType> crs
+            = fakeAttackResult(CombatEffectType.LOSE, scout, soldier);
         checkCombat("Scout v Soldier", crs,
-                    CombatResult.LOSE, CombatResult.SLAUGHTER_UNIT);
+                    CombatEffectType.LOSE, CombatEffectType.SLAUGHTER_UNIT);
         igc.combat(dutch, scout, soldier, crs);
 
         assertTrue("Scout should be disposed",
@@ -1475,10 +1398,10 @@ public class InGameControllerTest extends FreeColTestCase {
                                           veteranType).to);
  
         // Soldier loses and loses equipment
-        List<CombatResult> crs
-            = fakeAttackResult(CombatResult.LOSE, soldier1, soldier2);
+        List<CombatEffectType> crs
+            = fakeAttackResult(CombatEffectType.LOSE, soldier1, soldier2);
         checkCombat("Soldier v Soldier", crs,
-            CombatResult.LOSE, CombatResult.LOSE_EQUIP);
+            CombatEffectType.LOSE, CombatEffectType.LOSE_EQUIP);
         igc.combat(dutch, soldier1, soldier2, crs);
 
         assertEquals("Soldier1 should be a Veteran", veteranType,
@@ -1491,9 +1414,9 @@ public class InGameControllerTest extends FreeColTestCase {
                    soldier1.hasDefaultRole());
 
         // Soldier1 loses and is captured
-        crs = fakeAttackResult(CombatResult.LOSE, soldier1, soldier2);
+        crs = fakeAttackResult(CombatEffectType.LOSE, soldier1, soldier2);
         checkCombat("Soldier1 v Soldier2", crs,
-            CombatResult.LOSE, CombatResult.CAPTURE_UNIT);
+            CombatEffectType.LOSE, CombatEffectType.CAPTURE_UNIT);
         igc.combat(dutch, soldier1, soldier2, crs);
 
         assertEquals("Soldier1 should be a colonist", colonistType,
@@ -1526,10 +1449,10 @@ public class InGameControllerTest extends FreeColTestCase {
                      artillery.getUnitChange(UnitChangeType.DEMOTION).to);
 
         // Artillery loses and is demoted
-        List<CombatResult> crs
-            = fakeAttackResult(CombatResult.LOSE, artillery, soldier);
+        List<CombatEffectType> crs
+            = fakeAttackResult(CombatEffectType.LOSE, artillery, soldier);
         checkCombat("Artillery v Soldier (1)", crs,
-            CombatResult.LOSE, CombatResult.DEMOTE_UNIT);
+            CombatEffectType.LOSE, CombatEffectType.DEMOTE_UNIT);
         igc.combat(dutch, artillery, soldier, crs);
 
         assertEquals("Artillery should be damaged artillery",
@@ -1540,9 +1463,9 @@ public class InGameControllerTest extends FreeColTestCase {
                      tile1, artillery.getTile());
 
         // Artillery loses and is slaughtered
-        crs = fakeAttackResult(CombatResult.LOSE, artillery, soldier);
+        crs = fakeAttackResult(CombatEffectType.LOSE, artillery, soldier);
         checkCombat("Artillery v Soldier (2)", crs,
-            CombatResult.LOSE, CombatResult.SLAUGHTER_UNIT);
+            CombatEffectType.LOSE, CombatEffectType.SLAUGHTER_UNIT);
         igc.combat(dutch, artillery, soldier, crs);
 
         assertTrue("Artillery should be disposed",
@@ -1646,8 +1569,6 @@ public class InGameControllerTest extends FreeColTestCase {
 
         int dutchInitialTension = dutch.getTension(french).getValue();
         int frenchInitialTension = french.getTension(dutch).getValue();
-        StanceTradeItem peaceTreaty
-            = new StanceTradeItem(game, dutch, french, newStance);
 
         // Execute peace treaty
         igc.changeStance(dutch, newStance, french, true);
@@ -1730,12 +1651,10 @@ public class InGameControllerTest extends FreeColTestCase {
 
     public void testEquipIndian() {
         final Game game = ServerTestHelper.startServerGame(getTestMap());
-        final InGameController igc = ServerTestHelper.getInGameController();
 
         FreeColTestCase.IndianSettlementBuilder builder
             = new FreeColTestCase.IndianSettlementBuilder(game);
         IndianSettlement camp = builder.build();
-        ServerPlayer indian = (ServerPlayer)camp.getOwner();
         List<AbstractGoods> required = nativeDragoonRole.getRequiredGoodsList();
         int horsesReqPerUnit = AbstractGoods.getCount(horsesType, required);
         int musketsReqPerUnit = AbstractGoods.getCount(musketsType, required);
@@ -1781,7 +1700,6 @@ public class InGameControllerTest extends FreeColTestCase {
 
     public void testEquipIndianNotEnoughReqGoods() {
         final Game game = ServerTestHelper.startServerGame(getTestMap());
-        final InGameController igc = ServerTestHelper.getInGameController();
 
         FreeColTestCase.IndianSettlementBuilder builder
             = new FreeColTestCase.IndianSettlementBuilder(game);
@@ -1848,11 +1766,11 @@ public class InGameControllerTest extends FreeColTestCase {
     }
 
     public void testAddFatherBuildingEvent() {
-        final Game game = ServerTestHelper.startServerGame(getTestMap());
+        ServerTestHelper.startServerGame(getTestMap());
         final InGameController igc = ServerTestHelper.getInGameController();
 
         BuildingType press = spec().getBuildingType("model.building.printingPress");
-        Colony colony = getStandardColony(4);
+        Colony colony = createStandardColony(4);
         assertEquals(null, colony.getBuilding(press));
 
         FoundingFather father = new FoundingFather("father", spec());
@@ -1872,7 +1790,7 @@ public class InGameControllerTest extends FreeColTestCase {
         final Map map = game.getMap();
         final InGameController igc = ServerTestHelper.getInGameController();
 
-        Colony colony = getStandardColony(4);
+        Colony colony = createStandardColony(4);
         ServerPlayer player = (ServerPlayer)colony.getOwner();
         FreeColTestCase.IndianSettlementBuilder builder
             = new FreeColTestCase.IndianSettlementBuilder(game)
@@ -1895,10 +1813,10 @@ public class InGameControllerTest extends FreeColTestCase {
     }
 
     public void testLaSalle() {
-        final Game game = ServerTestHelper.startServerGame(getTestMap());
+        ServerTestHelper.startServerGame(getTestMap());
         final InGameController igc = ServerTestHelper.getInGameController();
 
-        Colony colony = getStandardColony(2);
+        Colony colony = createStandardColony(2);
         ServerPlayer player = (ServerPlayer)colony.getOwner();
         assertEquals(2, colony.getUnitCount());
 
@@ -1947,7 +1865,7 @@ public class InGameControllerTest extends FreeColTestCase {
         father.addModifier(priceBonus);
         igc.addFoundingFather(dutch, father);
 
-        Colony colony = getStandardColony(4);
+        Colony colony = createStandardColony(4);
         ServerTestHelper.newTurn();
         assertTrue(colony.getBuilding(press) != null);
     }
@@ -1958,7 +1876,7 @@ public class InGameControllerTest extends FreeColTestCase {
         final InGameController igc = ServerTestHelper.getInGameController();
 
         ServerPlayer dutch = getServerPlayer(game, "model.nation.dutch");
-        Colony colony = getStandardColony(1);
+        Colony colony = createStandardColony(1);
         Unit colonist = new ServerUnit(game, map.getTile(6, 8), dutch,
                                        colonistType);
         colonist.changeWorkType(grainType);
@@ -2086,7 +2004,7 @@ public class InGameControllerTest extends FreeColTestCase {
         final InGameController igc = ServerTestHelper.getInGameController();
 
         ServerPlayer dutch = getServerPlayer(game, "model.nation.dutch");
-        Colony colony = getStandardColony();
+        Colony colony = createStandardColony();
 
         UnitType gardenerType = new UnitType("gardener", spec());
         gardenerType.setSkill(0);
@@ -2111,7 +2029,7 @@ public class InGameControllerTest extends FreeColTestCase {
         final Game game = ServerTestHelper.startServerGame(getTestMap(true));
         final InGameController igc = ServerTestHelper.getInGameController();
 
-        ServerColony colony = (ServerColony)getStandardColony(2);
+        ServerColony colony = (ServerColony)createStandardColony(2);
         colony.addGoods(lumberType, 100);
         Unit unit = colony.getUnitList().get(0);
         Building building = colony.getBuilding(carpenterHouse);
@@ -2142,9 +2060,8 @@ public class InGameControllerTest extends FreeColTestCase {
 
     public void testAttrition() {
         final Game game = ServerTestHelper.startServerGame(getTestMap());
-        final InGameController igc = ServerTestHelper.getInGameController();
 
-        Colony colony = getStandardColony();
+        Colony colony = createStandardColony();
         ServerPlayer player = (ServerPlayer)colony.getOwner();
         Unit unit = new ServerUnit(game, colony.getTile(), player,
                                    indianConvertType);

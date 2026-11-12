@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -160,8 +160,7 @@ public class ModOption extends AbstractOption<FreeColModFile> {
         if (this == o) return true;
         if (o instanceof ModOption) {
             ModOption other = (ModOption)o;
-            return this.value == other.value
-                && super.equals(other);
+            return this.getId().equals(other.getId());
         }
         return false;
     }
@@ -172,7 +171,7 @@ public class ModOption extends AbstractOption<FreeColModFile> {
     @Override
     public int hashCode() {
         int hash = super.hashCode();
-        return 31 * hash + Utils.hashCode(this.value);
+        return 31 * hash + Utils.hashCode(getId());
     }
 
     /**

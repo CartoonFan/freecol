@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -164,6 +164,15 @@ public class TileTypeChange extends FreeColSpecObjectType {
 
         to = xr.getType(spec, TO_TAG, TileType.class, (TileType)null);
     }
+    
+    /**
+    * {@inheritDoc}
+    */
+    @Override
+    protected void clearContainers(FreeColXMLReader xr) throws XMLStreamException {
+        super.clearContainers(xr);
+        this.production = null;
+    }
 
     /**
      * {@inheritDoc}
@@ -171,12 +180,6 @@ public class TileTypeChange extends FreeColSpecObjectType {
     @Override
     protected void readChildren(FreeColXMLReader xr) throws XMLStreamException {
         final Specification spec = getSpecification();
-
-        // Clear containers.
-        if (xr.shouldClearContainers()) {
-            this.production = null;
-        }
-    
         while (xr.moreTags()) {
             final String tag = xr.getLocalName();
 

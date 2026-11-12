@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021  The FreeCol Team
+ *  Copyright (C) 2002-2024  The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,76 +19,50 @@
 
 package net.sf.freecol.common.model;
 
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.forEach;
+import static net.sf.freecol.common.util.CollectionUtils.toList;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
-import net.sf.freecol.common.model.CombatModel;
-import net.sf.freecol.common.model.CombatModel.CombatResult;
+import net.sf.freecol.common.model.CombatModel.CombatEffectType;
 import net.sf.freecol.common.model.Unit.MoveType;
 import net.sf.freecol.common.networking.ChangeSet;
 import net.sf.freecol.common.option.GameOptions;
-import net.sf.freecol.common.option.IntegerOption;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.server.ServerTestHelper;
 import net.sf.freecol.server.control.InGameController;
 import net.sf.freecol.server.model.ServerPlayer;
 import net.sf.freecol.server.model.ServerUnit;
-import net.sf.freecol.util.test.MockPseudoRandom;
 import net.sf.freecol.util.test.FreeColTestCase;
+import net.sf.freecol.util.test.MockPseudoRandom;
 
 
 public class CombatTest extends FreeColTestCase {
 
-    private static final Role armedBraveRole
-        = spec().getRole("model.role.armedBrave");
-    private static final Role cavalryRole
-        = spec().getRole("model.role.cavalry");
-    private static final Role dragoonRole
-        = spec().getRole("model.role.dragoon");
-    private static final Role infantryRole
-        = spec().getRole("model.role.infantry");
-    private static final Role missionaryRole
-        = spec().getRole("model.role.missionary");
-    private static final Role nativeDragoonRole
-        = spec().getRole("model.role.nativeDragoon");
-    private static final Role soldierRole
-        = spec().getRole("model.role.soldier");
+    private static final Role armedBraveRole = spec().getRole("model.role.armedBrave");
+    private static final Role cavalryRole = spec().getRole("model.role.cavalry");
+    private static final Role dragoonRole = spec().getRole("model.role.dragoon");
+    private static final Role infantryRole = spec().getRole("model.role.infantry");
+    private static final Role missionaryRole = spec().getRole("model.role.missionary");
+    private static final Role nativeDragoonRole = spec().getRole("model.role.nativeDragoon");
+    private static final Role soldierRole = spec().getRole("model.role.soldier");
 
-    private static final TileType hills
-        = spec().getTileType("model.tile.hills");
-    private static final TileType ocean
-        = spec().getTileType("model.tile.ocean");
-    private static final TileType plains
-        = spec().getTileType("model.tile.plains");
+    private static final TileType hills = spec().getTileType("model.tile.hills");
+    private static final TileType ocean = spec().getTileType("model.tile.ocean");
+    private static final TileType plains = spec().getTileType("model.tile.plains");
 
-    private static final UnitType artilleryType
-        = spec().getUnitType("model.unit.artillery");
-    private static final UnitType braveType
-        = spec().getUnitType("model.unit.brave");
-    private static final UnitType colonialRegularType
-        = spec().getUnitType("model.unit.colonialRegular");
-    private static final UnitType colonistType
-        = spec().getUnitType("model.unit.freeColonist");
-    private static final UnitType damagedArtilleryType
-        = spec().getUnitType("model.unit.damagedArtillery");
-    private static final UnitType galleonType
-        = spec().getUnitType("model.unit.galleon");
-    private static final UnitType indenturedServantType
-        = spec().getUnitType("model.unit.indenturedServant");
-    private static final UnitType indianConvertType
-        = spec().getUnitType("model.unit.indianConvert");
-    private static final UnitType jesuitMissionaryType
-        = spec().getUnitType("model.unit.jesuitMissionary");
-    private static final UnitType kingsRegularType
-        = spec().getUnitType("model.unit.kingsRegular");
-    private static final UnitType pettyCriminalType
-        = spec().getUnitType("model.unit.pettyCriminal");
-    private static final UnitType privateerType
-        = spec().getUnitType("model.unit.privateer");
-    private static final UnitType veteranType
-        = spec().getUnitType("model.unit.veteranSoldier");
+    private static final UnitType braveType = spec().getUnitType("model.unit.brave");
+    private static final UnitType colonialRegularType = spec().getUnitType("model.unit.colonialRegular");
+    private static final UnitType colonistType = spec().getUnitType("model.unit.freeColonist");
+    private static final UnitType galleonType = spec().getUnitType("model.unit.galleon");
+    private static final UnitType indianConvertType = spec().getUnitType("model.unit.indianConvert");
+    private static final UnitType jesuitMissionaryType = spec().getUnitType("model.unit.jesuitMissionary");
+    private static final UnitType kingsRegularType = spec().getUnitType("model.unit.kingsRegular");
+    private static final UnitType privateerType = spec().getUnitType("model.unit.privateer");
+    private static final UnitType veteranType = spec().getUnitType("model.unit.veteranSoldier");
 
 
     public void testColonistAttackedByVeteran() throws Exception {
@@ -264,7 +238,7 @@ public class CombatTest extends FreeColTestCase {
         Map map = getTestMap(true);
         game.changeMap(map);
 
-        Colony colony = getStandardColony();
+        Colony colony = createStandardColony();
         Player dutch = game.getPlayerByNationId("model.nation.dutch");
         Player inca = game.getPlayerByNationId("model.nation.inca");
 
@@ -293,7 +267,7 @@ public class CombatTest extends FreeColTestCase {
         final SimpleCombatModel combatModel = new SimpleCombatModel();
         Player dutch = game.getPlayerByNationId("model.nation.dutch");
         Player inca = game.getPlayerByNationId("model.nation.inca");
-        Colony colony = getStandardColony();
+        Colony colony = createStandardColony();
         Tile tile2 = map.getTile(4, 8);
         tile2.setExplored(dutch, true);
         Unit colonist = first(colony.getUnitList());
@@ -445,7 +419,7 @@ public class CombatTest extends FreeColTestCase {
 
         Player spanish = game.getPlayerByNationId("model.nation.spanish");
         Player tupi = game.getPlayerByNationId("model.nation.tupi");
-        SimpleCombatModel combatModel = new SimpleCombatModel();
+
         Tile tile1 = map.getTile(5, 8);
         Tile tile2 = map.getTile(4, 8);
 
@@ -506,10 +480,10 @@ public class CombatTest extends FreeColTestCase {
         double defence = 0 + 3 + 3;
         assertEquals(defence, combatModel.getDefencePower(regular, colonial));
 
-        List<CombatResult> crs
-            = combatModel.generateAttackResult(loseRandom, regular, colonial);
+        List<CombatEffectType> crs
+            = combatModel.generateAttackResult(loseRandom, regular, colonial).getEffects();
         checkCombat("Regular v Colonial", crs,
-            CombatResult.LOSE, CombatResult.LOSE_EQUIP);
+            CombatEffectType.LOSE, CombatEffectType.LOSE_EQUIP);
         refPlayer.csCombat(regular, colonial, crs, loseRandom, new ChangeSet());
         assertEquals(infantryRole, regular.getRole());
 
@@ -518,30 +492,30 @@ public class CombatTest extends FreeColTestCase {
         assertEquals(offence, combatModel.getOffencePower(regular, colonial));
 
         // slaughter King's Regular
-        crs = combatModel.generateAttackResult(winRandom, colonial, regular);
+        crs = combatModel.generateAttackResult(winRandom, colonial, regular).getEffects();
         checkCombat("Regular should be slaughtered upon losing all equipment",
-            crs, CombatResult.WIN, CombatResult.SLAUGHTER_UNIT);
+            crs, CombatEffectType.WIN, CombatEffectType.SLAUGHTER_UNIT);
 
         regular = new ServerUnit(game, tile2, french, kingsRegularType,
                                  cavalryRole);
 
-        crs = combatModel.generateAttackResult(winRandom, regular, colonial);
+        crs = combatModel.generateAttackResult(winRandom, regular, colonial).getEffects();
         checkCombat("Regular v Colonial (2)", crs,
-            CombatResult.WIN, CombatResult.LOSE_EQUIP);
+            CombatEffectType.WIN, CombatEffectType.LOSE_EQUIP);
         refPlayer.csCombat(regular, colonial, crs, winRandom, new ChangeSet());
         assertEquals(soldierRole, colonial.getRole());
 
-        crs = combatModel.generateAttackResult(winRandom, regular, colonial);
+        crs = combatModel.generateAttackResult(winRandom, regular, colonial).getEffects();
         checkCombat("Regular v Colonial (3)", crs,
-            CombatResult.WIN, CombatResult.LOSE_EQUIP, CombatResult.DEMOTE_UNIT);
+            CombatEffectType.WIN, CombatEffectType.LOSE_EQUIP, CombatEffectType.DEMOTE_UNIT);
         refPlayer.csCombat(regular, colonial, crs, winRandom, new ChangeSet());
         assertFalse(colonial.isArmed());
         assertEquals(veteranType, colonial.getType());
         assertEquals(spec().getDefaultRole(), colonial.getRole());
 
-        crs = combatModel.generateAttackResult(winRandom, regular, colonial);
+        crs = combatModel.generateAttackResult(winRandom, regular, colonial).getEffects();
         checkCombat("Regular v Colonial (4)", crs,
-            CombatResult.WIN, CombatResult.CAPTURE_UNIT);
+            CombatEffectType.WIN, CombatEffectType.CAPTURE_UNIT);
         refPlayer.csCombat(regular, colonial, crs, winRandom, new ChangeSet());
     }
 
@@ -549,7 +523,6 @@ public class CombatTest extends FreeColTestCase {
         Map map = getTestMap(plains, true);
         Game game = ServerTestHelper.startServerGame(map);
         CombatModel combatModel = game.getCombatModel();
-        InGameController igc = ServerTestHelper.getInGameController();
 
         ServerPlayer dutch = getServerPlayer(game, "model.nation.dutch");
         ServerPlayer inca = getServerPlayer(game, "model.nation.inca");
@@ -581,11 +554,11 @@ public class CombatTest extends FreeColTestCase {
         il.add(0);
         random.setNextNumbers(il, true);
 
-        List<CombatResult> crs = combatModel.generateAttackResult(random,
-            soldier, defender);
+        List<CombatEffectType> crs = combatModel.generateAttackResult(random,
+            soldier, defender).getEffects();
         checkCombat("Capture convert", crs,
-                    CombatResult.WIN, CombatResult.SLAUGHTER_UNIT,
-                    CombatResult.CAPTURE_CONVERT);
+                    CombatEffectType.WIN, CombatEffectType.SLAUGHTER_UNIT,
+                    CombatEffectType.CAPTURE_CONVERT);
         assertEquals("One unit on tile", 1, tile2.getUnitList().size());
         dutch.csCombat(soldier, defender, crs, new Random(),
                        new ChangeSet());

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,7 +21,6 @@ package net.sf.freecol.client.gui;
 
 import javax.swing.ImageIcon;
 
-import net.sf.freecol.client.gui.dialog.*;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.AbstractGoods;
 import net.sf.freecol.common.model.AbstractUnit;
@@ -39,7 +38,7 @@ public class ChoiceItem<T> implements Comparable<ChoiceItem<T>> {
     private String text;
     private final T object;
     private ImageIcon icon;
-    private final boolean enabled;
+    private boolean enabled;
     private boolean optionOK = false;
     private boolean optionCancel = false;
     private boolean optionDefault = false;
@@ -119,6 +118,18 @@ public class ChoiceItem<T> implements Comparable<ChoiceItem<T>> {
      */
     public boolean isEnabled() {
         return this.enabled;
+    }
+
+    /**
+     * Set the enable state of this choice.
+     *
+     * @param enable The new enable state.
+     * @return The old enable state.
+     */
+    public boolean setEnabled(boolean enable) {
+        boolean ret = this.enabled;
+        this.enabled = enable;
+        return ret;
     }
 
     /**
@@ -219,7 +230,7 @@ public class ChoiceItem<T> implements Comparable<ChoiceItem<T>> {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o instanceof ChoiceItem) {
-            ChoiceItem other = (ChoiceItem)o;
+            ChoiceItem<?> other = (ChoiceItem<?>) o;
             return Utils.equals(this.text, other.toString())
                 && Utils.equals(this.getObject(), other.getObject());
         }

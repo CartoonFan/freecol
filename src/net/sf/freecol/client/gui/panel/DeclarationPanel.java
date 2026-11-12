@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,7 +21,6 @@ package net.sf.freecol.client.gui.panel;
 
 import static net.sf.freecol.common.util.StringUtils.join;
 
-import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
@@ -34,6 +33,7 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.logging.Logger;
 
@@ -41,9 +41,9 @@ import javax.swing.JPanel;
 import javax.swing.Timer;
 
 import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.client.gui.ImageLibrary;
 import net.sf.freecol.common.resources.FAFile;
 import net.sf.freecol.common.resources.ResourceManager;
+import net.sf.freecol.common.util.ImageUtils;
 
 
 /**
@@ -59,11 +59,12 @@ public final class DeclarationPanel extends FreeColPanel {
     private final String ANIMATION_STOPPED = "AnimationStopped";
 
     private final int START_DELAY = 2000; // 2s before signing
-    private final int ANIMATION_DELAY = 50; // 50ms between signature steps
+    private final int ANIMATION_DELAY = 15; // 50ms between signature steps
     private final int FINISH_DELAY = 5000; // 5s before closing
     
     private final Runnable afterClosing;
     private boolean closed = false;
+    private final Image image;
 
 
     /**
@@ -78,7 +79,7 @@ public final class DeclarationPanel extends FreeColPanel {
         this.afterClosing = afterClosing;
         
         setLayout(null);
-        Image image = ImageLibrary.getUnscaledImage("image.flavor.Declaration");
+        image = getImageLibrary().getScaledImage("image.flavor.Declaration");
         setSize(image.getWidth(null), image.getHeight(null));
         setOpaque(false);
         setBorder(null);
@@ -95,10 +96,12 @@ public final class DeclarationPanel extends FreeColPanel {
                 }
             });
 
+        final int scaledSignatureY = (int) (SIGNATURE_Y * getImageLibrary().getScaleFactor());
+        
         final SignaturePanel signaturePanel = new SignaturePanel();
         signaturePanel.initialize(getMyPlayer().getName());
         signaturePanel.setLocation((getWidth()-signaturePanel.getWidth()) / 2,
-            (getHeight() + SIGNATURE_Y - signaturePanel.getHeight()) / 2 - 15);
+            (getHeight() + scaledSignatureY - signaturePanel.getHeight()) / 2 - 15);
         signaturePanel.addActionListener(this);
 
         add(signaturePanel);
@@ -147,7 +150,6 @@ public final class DeclarationPanel extends FreeColPanel {
      */
     @Override
     public void paintComponent(Graphics g) {
-        Image image = ImageLibrary.getUnscaledImage("image.flavor.Declaration");
         g.drawImage(image, 0, 0, null);
     }
 
@@ -168,6 +170,8 @@ public final class DeclarationPanel extends FreeColPanel {
         private Point[] points = null;
 
         private int counter = 0;
+        
+        private BufferedImage imageBuffer;
 
 
         SignaturePanel() {
@@ -224,8 +228,10 @@ public final class DeclarationPanel extends FreeColPanel {
          *     fully displayed.
          */
         private boolean isTooLarge(String name) {
-            Dimension d = faFile.getDimension(name);
-            return (d.width > DeclarationPanel.this.getWidth() - 10);
+            final Dimension d = faFile.getDimension(name);
+            final int scaledMargin = (int) (10 * getImageLibrary().getScaleFactor());
+            final int  scaledSignatureWidth = (int) (d.width * getImageLibrary().getScaleFactor());
+            return (scaledSignatureWidth > DeclarationPanel.this.getWidth() - scaledMargin);
         }
 
         /**
@@ -234,11 +240,16 @@ public final class DeclarationPanel extends FreeColPanel {
          * @param name The name to be used when making the signature.
          */
         public void initialize(String name) {
+            name = faFile.onlyValidCharacters(name);
             name = getAbbreviatedName(name);
 
             points = faFile.getPoints(name);
             counter = 0;
-            setSize(faFile.getDimension(name));
+            
+            final Dimension originalSize = faFile.getDimension(name);
+            final Dimension size = getImageLibrary().scale(originalSize);
+            imageBuffer = ImageUtils.createBufferedImage(size.width, size.height);
+            setSize(size);
         }
 
         /**
@@ -271,19 +282,36 @@ public final class DeclarationPanel extends FreeColPanel {
          */
         public void startAnimation() {
             ActionListener taskPerformer = (ActionEvent ae) -> {
-                if (counter < points.length - 1) {
-                    counter += 20;
-                    if (counter > points.length) {
-                        counter = points.length - 1;
-                        ((Timer)ae.getSource()).stop();
-                        notifyStopped();
-                    }
-                    validate();
-                    repaint();
-                } else {
+                if (counter >= points.length - 1) {
                     ((Timer)ae.getSource()).stop();
                     notifyStopped();
                 }
+                
+                final int fromIndex = counter;
+                counter += 3;
+                if (counter > points.length) {
+                    counter = points.length;
+                    ((Timer)ae.getSource()).stop();
+                    notifyStopped();
+                }
+                
+                final float scaleFactor = getImageLibrary().getScaleFactor();
+                final Graphics2D g2d = imageBuffer.createGraphics();
+                g2d.setColor(Color.BLACK);
+                
+                final int brushSize = (scaleFactor <= 1 ? 1 : 2);
+                
+                for (int i = fromIndex; i < counter; i++) {
+                    Point p = points[i];
+
+                    g2d.fillRect(scaleToInt(p.getX(), scaleFactor), scaleToInt(p.getY(), scaleFactor), brushSize, brushSize);
+                    g2d.fillRect(scaleToInt(p.getX(), scaleFactor) - 1, scaleToInt(p.getY(), scaleFactor) + 1, brushSize, brushSize);
+                }
+                
+                g2d.dispose();
+                
+                validate();
+                repaint();
             };
             new Timer(ANIMATION_DELAY, taskPerformer).start();
         }
@@ -302,17 +330,13 @@ public final class DeclarationPanel extends FreeColPanel {
             if (isOpaque()) {
                 super.paintComponent(g);
             }
-
-            g.setColor(Color.BLACK);
-            ((Graphics2D)g).setComposite(AlphaComposite
-                .getInstance(AlphaComposite.SRC_OVER, 0.75f));
-
-            for (int i = 0; i < counter-1; i++) {
-                Point p1 = points[i];
-                Point p2 = points[i+1];
-                g.drawLine((int) p1.getX(), (int) p1.getY(),
-                    (int) p2.getX(), (int) p2.getY());
-            }
+            
+            final Graphics2D g2d = (Graphics2D) g;
+            g2d.drawImage(imageBuffer, 0, 0, null);
+        }
+        
+        private int scaleToInt(double d, float scaleFactor) {
+            return (int) (d * scaleFactor);
         }
     }
 }

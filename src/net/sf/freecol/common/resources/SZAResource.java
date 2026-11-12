@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -47,11 +47,12 @@ public class SZAResource extends Resource {
     /**
      * Do not use directly.
      *
+     * @param cachingKey The caching key.
      * @param resourceLocator The {@code URI} used when loading this
      *     resource.
      */
-    public SZAResource(URI resourceLocator) {
-        super(resourceLocator);
+    public SZAResource(String cachingKey, URI resourceLocator) {
+        super(cachingKey, resourceLocator);
     }
 
     /**

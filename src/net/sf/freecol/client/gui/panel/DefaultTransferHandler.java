@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -18,6 +18,11 @@
  */
 
 package net.sf.freecol.client.gui.panel;
+
+import static net.sf.freecol.common.util.CollectionUtils.any;
+import static net.sf.freecol.common.util.CollectionUtils.matchKeyEquals;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+import static net.sf.freecol.common.util.ImageUtils.createResizedImage;
 
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -38,7 +43,6 @@ import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.List;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.swing.ImageIcon;
@@ -48,14 +52,13 @@ import javax.swing.JPanel;
 import javax.swing.TransferHandler;
 
 import net.sf.freecol.client.FreeColClient;
-import net.sf.freecol.client.gui.ImageLibrary;
-import net.sf.freecol.client.gui.GUI;
 import net.sf.freecol.client.gui.label.AbstractGoodsLabel;
 import net.sf.freecol.client.gui.label.Draggable;
 import net.sf.freecol.client.gui.label.GoodsLabel;
 import net.sf.freecol.client.gui.label.GoodsTypeLabel;
 import net.sf.freecol.client.gui.label.MarketLabel;
 import net.sf.freecol.client.gui.label.UnitLabel;
+import net.sf.freecol.client.gui.label.AbstractGoodsLabel.AmountType;
 import net.sf.freecol.common.model.Ability;
 import net.sf.freecol.common.model.AbstractGoods;
 import net.sf.freecol.common.model.Goods;
@@ -64,8 +67,6 @@ import net.sf.freecol.common.model.GoodsLocation;
 import net.sf.freecol.common.model.GoodsType;
 import net.sf.freecol.common.model.Role;
 import net.sf.freecol.common.model.Unit;
-import static net.sf.freecol.common.util.CollectionUtils.*;
-import static net.sf.freecol.common.util.ImageUtils.*;
 
 
 /**
@@ -76,6 +77,7 @@ import static net.sf.freecol.common.util.ImageUtils.*;
 public final class DefaultTransferHandler extends TransferHandler {
 
     private static final Logger logger = Logger.getLogger(DefaultTransferHandler.class.getName());
+    
 
     /**
      * This is the default drag handler for drag and drop operations that
@@ -89,7 +91,9 @@ public final class DefaultTransferHandler extends TransferHandler {
 
         private void updatePartialChosen(JComponent comp, boolean partial) {
             if (comp instanceof AbstractGoodsLabel) {
-                ((AbstractGoodsLabel)comp).setPartialChosen(partial);
+                if (partial) {
+                    ((AbstractGoodsLabel)comp).setAmountType(AmountType.PARTIAL);
+                }
             }
         }
 
@@ -363,6 +367,10 @@ public final class DefaultTransferHandler extends TransferHandler {
     private boolean importGoods(JComponent comp, GoodsLabel label,
                                 UnitLabel oldSelectedUnit) {
         Goods goods = label.getGoods();
+        
+        if (!(comp instanceof UnitLabel) && !(comp instanceof DropTarget)) {
+            return importFail(comp, "goods");
+        }
 
         // Special handling for goods amount.
         if (label.isSuperFullChosen()) {
@@ -398,8 +406,18 @@ public final class DefaultTransferHandler extends TransferHandler {
                 int alt = ((DropTarget)comp).suggested(goods.getType());
                 if (alt >= 0 && alt < defaultAmount) defaultAmount = alt;
             }
-            int amount = getAmount(goods.getType(), goods.getAmount(),
-                                   defaultAmount, false);
+            
+            if (comp instanceof DropTarget) {
+                // Verifies that goods can be imported before showing the dialog.
+                final int origAmount = goods.getAmount();
+                DropTarget target = (DropTarget) comp;
+                goods.setAmount(defaultAmount);
+                if (defaultAmount <= 0 || !target.accepts(goods)) {
+                    return importFail(comp, "unacceptable goods pre dialog (" + goods + ")");
+                }
+                goods.setAmount(origAmount);
+            }
+            final int amount = getAmount(goods.getType(), goods.getAmount(), defaultAmount, false);
             if (amount <= 0) {
                 return importFail(comp, "weird goods amount (" + amount + ")");
             }
@@ -412,7 +430,6 @@ public final class DefaultTransferHandler extends TransferHandler {
 
         if (comp instanceof UnitLabel) {
             return equipUnitIfPossible((UnitLabel)comp, goods);
-
         } else if (comp instanceof DropTarget) {
             DropTarget target = (DropTarget)comp;
             if (!target.accepts(goods)) {
@@ -434,7 +451,22 @@ public final class DefaultTransferHandler extends TransferHandler {
      * @return True if the import succeeds.
      */
     private boolean importMarket(JComponent comp, MarketLabel label) {
+        if (!(comp instanceof UnitLabel) && !(comp instanceof CargoPanel)) {
+            return false;
+        }
+        
         if (label.isPartialChosen()) {
+            if (comp instanceof CargoPanel) {
+                // Verifies that goods can be imported before showing the dialog.
+                final CargoPanel cargoPanel = (CargoPanel) comp;
+                if (cargoPanel.getCarrier() == null) {
+                    return false;
+                }
+                if (cargoPanel.getCarrier().getLoadableAmount(label.getType()) <= 0) {
+                    return false;
+                }
+            }
+            
             int amount = getAmount(label.getType(), label.getAmount(), -1, true);
             if (amount <= 0) return false;
             label.setAmount(amount);

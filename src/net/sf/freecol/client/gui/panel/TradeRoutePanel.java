@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
+import javax.swing.AbstractAction;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
@@ -38,7 +39,6 @@ import javax.swing.JScrollPane;
 import javax.swing.event.ListSelectionEvent;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
 import net.sf.freecol.common.i18n.Messages;
 import net.sf.freecol.common.model.Location;
@@ -101,7 +101,7 @@ public final class TradeRoutePanel extends FreeColPanel {
             });
         this.tradeRoutes.setCellRenderer(new DefaultListCellRenderer() {
                 @Override
-                public Component getListCellRendererComponent(JList list,
+                public Component getListCellRendererComponent(JList<?> list,
                     Object value, int index, boolean selected, boolean focus) {
                     Component ret = super.getListCellRendererComponent(list,
                         value, index, selected, focus);
@@ -173,7 +173,6 @@ public final class TradeRoutePanel extends FreeColPanel {
         JButton cancelButton = Utility.localizedButton("cancel");
         cancelButton.addActionListener((ae) ->
             getGUI().removeTradeRoutePanel(this));
-        setCancelComponent(cancelButton);
 
         updateButtons();
         updateList((this.unit == null
@@ -199,6 +198,13 @@ public final class TradeRoutePanel extends FreeColPanel {
         add(this.deassignRouteButton);
         add(okButton, "newline 20, span, split 2, tag ok");
         add(cancelButton, "tag cancel");
+        
+        setEscapeAction(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                cancelButton.doClick();
+            }
+        });
 
         getGUI().restoreSavedSize(this, getPreferredSize());
     }

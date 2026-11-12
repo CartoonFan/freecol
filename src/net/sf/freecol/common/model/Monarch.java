@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,9 +19,16 @@
 
 package net.sf.freecol.common.model;
 
+import static net.sf.freecol.common.model.Constants.INFINITY;
+import static net.sf.freecol.common.util.CollectionUtils.first;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+import static net.sf.freecol.common.util.RandomUtils.getRandomMember;
+import static net.sf.freecol.common.util.RandomUtils.randomDouble;
+import static net.sf.freecol.common.util.RandomUtils.randomInt;
+import static net.sf.freecol.common.util.StringUtils.getEnumKey;
+
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.logging.Logger;
@@ -30,15 +37,9 @@ import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
-import static net.sf.freecol.common.model.Constants.*;
-import net.sf.freecol.common.model.Force;
 import net.sf.freecol.common.model.Player.PlayerType;
 import net.sf.freecol.common.option.GameOptions;
-import net.sf.freecol.common.option.UnitListOption;
 import net.sf.freecol.common.util.RandomChoice;
-import static net.sf.freecol.common.util.CollectionUtils.*;
-import static net.sf.freecol.common.util.RandomUtils.*;
-import static net.sf.freecol.common.util.StringUtils.*;
 
 
 /**
@@ -482,7 +483,7 @@ public final class Monarch extends FreeColGameObject implements Named {
         int turn = getGame().getTurn().getNumber();
         int oldTax = player.getTax();
         int adjust = Math.max(1, (6 - taxAdjustment) * 10); // 20-60
-        adjust = 1 + randomInt(logger, "Tax rise", random, 5 + turn/adjust);
+        adjust = 1 + randomInt(logger, "Tax rise", random, 3 + turn/adjust);
         return Math.min(oldTax + adjust, taxMaximum());
     }
 
@@ -851,9 +852,6 @@ public final class Monarch extends FreeColGameObject implements Named {
     private static final String INTERVENTION_FORCE_TAG = "interventionForce";
     private static final String PLAYER_TAG = "player";
     private static final String SUPPORT_SEA_TAG = "supportSea";
-    // @compat 0.11.1
-    private static final String NAME_TAG = "name";
-    // end @compat 0.11.1
     // @compat 0.11.5
     private static final String MERCENARY_FORCE_TAG = "mercenaryForce";
     // end @compat 0.11.5

@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,11 +19,18 @@
 
 package net.sf.freecol.server;
 
+import static net.sf.freecol.common.util.CollectionUtils.count;
+import static net.sf.freecol.common.util.CollectionUtils.matchKeyEquals;
+import static net.sf.freecol.common.util.CollectionUtils.transform;
+import static net.sf.freecol.common.util.Utils.delay;
+import static net.sf.freecol.common.util.Utils.deleteFile;
+import static net.sf.freecol.common.util.Utils.garbageCollect;
+import static net.sf.freecol.common.util.Utils.getRandomState;
+import static net.sf.freecol.common.util.Utils.restoreRandomState;
+
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.BindException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
@@ -33,7 +40,6 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Random;
-import java.util.Timer;
 import java.util.function.Predicate;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
@@ -53,19 +59,16 @@ import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
 import net.sf.freecol.common.metaserver.MetaServerUtils;
 import net.sf.freecol.common.metaserver.ServerInfo;
-import static net.sf.freecol.common.model.Constants.*;
-import net.sf.freecol.common.model.FreeColObject;
+import net.sf.freecol.common.model.Constants.IntegrityType;
 import net.sf.freecol.common.model.Game;
 import net.sf.freecol.common.model.Game.LogoutReason;
 import net.sf.freecol.common.model.IndianSettlement;
 import net.sf.freecol.common.model.Map;
 import net.sf.freecol.common.model.Nation;
-import net.sf.freecol.common.model.NationOptions;
 import net.sf.freecol.common.model.NationOptions.NationState;
 import net.sf.freecol.common.model.Player;
-import net.sf.freecol.common.model.Stance;
 import net.sf.freecol.common.model.Specification;
-import net.sf.freecol.common.model.StringTemplate;
+import net.sf.freecol.common.model.Stance;
 import net.sf.freecol.common.model.Tension;
 import net.sf.freecol.common.model.Unit;
 import net.sf.freecol.common.networking.ChangeSet;
@@ -76,13 +79,10 @@ import net.sf.freecol.common.networking.LogoutMessage;
 import net.sf.freecol.common.networking.Message;
 import net.sf.freecol.common.networking.TrivialMessage;
 import net.sf.freecol.common.networking.VacantPlayersMessage;
-import net.sf.freecol.common.option.BooleanOption;
 import net.sf.freecol.common.option.GameOptions;
 import net.sf.freecol.common.option.MapGeneratorOptions;
 import net.sf.freecol.common.option.OptionGroup;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 import net.sf.freecol.common.util.LogBuilder;
-import static net.sf.freecol.common.util.Utils.*;
 import net.sf.freecol.server.ai.AIInGameInputHandler;
 import net.sf.freecol.server.ai.AIMain;
 import net.sf.freecol.server.ai.AIPlayer;
@@ -93,9 +93,7 @@ import net.sf.freecol.server.control.ServerInputHandler;
 import net.sf.freecol.server.control.UserConnectionHandler;
 import net.sf.freecol.server.generator.MapGenerator;
 import net.sf.freecol.server.generator.SimpleMapGenerator;
-import net.sf.freecol.server.generator.TerrainGenerator;
 import net.sf.freecol.server.model.ServerGame;
-import net.sf.freecol.server.model.ServerIndianSettlement;
 import net.sf.freecol.server.model.ServerPlayer;
 import net.sf.freecol.server.model.Session;
 import net.sf.freecol.server.networking.DummyConnection;
@@ -168,7 +166,28 @@ public final class FreeColServer {
     public static final String DEFAULT_SPEC = "freecol";
 
     /** The server is either starting, loading, being played, or ending. */
-    public static enum ServerState { PRE_GAME, LOAD_GAME, IN_GAME, END_GAME }
+    public static enum ServerState {
+        PRE_GAME(0),
+        LOAD_GAME(0),
+        IN_GAME(1),
+        END_GAME(2);
+        
+        private int metaServerState;
+        
+        private ServerState(int metaServerState) {
+            this.metaServerState = metaServerState;
+        }
+        
+        /*
+         * XXX: Gets the number used for server state being
+         *      published to the meta server. Using these
+         *      numbers as they are already in the translation
+         *      files -- but we should use named keys instead. 
+         */
+        public int getMetaServerState() {
+            return metaServerState;
+        }
+     }
 
 
     // Serializable fundamentals
@@ -223,12 +242,13 @@ public final class FreeColServer {
      * saved-game constructors.
      *
      * @param name An optional name for the server.
+     * @param address The address to use for the public socket.
      * @param port The TCP port to use for the public socket.
      * @exception IOException on failure to open the port.
      */
-    private FreeColServer(String name, int port) throws IOException {
+    private FreeColServer(String name, InetAddress address, int port) throws IOException {
         this.name = name;
-        this.server = createServer(port); // Throws IOException
+        this.server = createServer(address, port); // Throws IOException
         this.server.start();
         this.userConnectionHandler = new UserConnectionHandler(this);
         this.preGameController = new PreGameController(this);
@@ -242,18 +262,24 @@ public final class FreeColServer {
      * If the port is specified, just try once.
      * If the port is unspecified (negative), try multiple times.
      *
+     * @param address The address to use for the public socket.
      * @param firstPort The port to start trying to connect at.
      * @return A started {@code Server}.
      * @exception IOException on failure to open the port.
      */
-    private Server createServer(int firstPort) throws IOException {
-        List<InetAddress> addresses = new ArrayList<>();
-        try {
-            addresses.add(InetAddress.getLocalHost());
-        } catch (UnknownHostException uhe) {
-            logger.warning("Could not resolve local host name");
+    private Server createServer(InetAddress address, int firstPort) throws IOException {
+        final List<InetAddress> addresses = new ArrayList<>();
+        if (address == null) {
+            addresses.add(InetAddress.getLoopbackAddress());
+            try {
+                addresses.add(InetAddress.getLocalHost());
+            } catch (UnknownHostException uhe) {
+                logger.warning("Could not resolve local host name");
+            }
+        } else {
+            addresses.add(address);
         }
-        addresses.add(InetAddress.getLoopbackAddress());
+        
         int tryMax = 1;
         if (firstPort < 0) {
             firstPort = FreeCol.getServerPort();
@@ -284,22 +310,22 @@ public final class FreeColServer {
      * @param publicServer If true, add to the meta-server.
      * @param singlePlayer True if this is a single player game.
      * @param specification The {@code Specification} to use in this game.
+     * @param address The address to use for the public socket.
      * @param port The TCP port to use for the public socket.
      * @param name An optional name for the server.
      * @exception IOException If the public socket cannot be created.
      */
     public FreeColServer(boolean publicServer, boolean singlePlayer,
-                         Specification specification, int port, String name)
+                         Specification specification, InetAddress address, int port, String name)
         throws IOException {
-        this(name, port);
+        this(name, address, port);
 
         this.setPublicServer(publicServer);
         this.singlePlayer = singlePlayer;
-        this.random = new Random(FreeColSeed.getFreeColSeed());
+        this.random = new Random();
         this.serverGame = new ServerGame(specification, random);
         this.inGameController.setRandom(this.random);
         this.mapGenerator = new SimpleMapGenerator(this.random);
-        registerWithMetaServer();
     }
 
     /**
@@ -311,16 +337,17 @@ public final class FreeColServer {
      *
      * @param savegame The file where the game data is located.
      * @param specification An optional {@code Specification} to use.
+     * @param address The address to use for the public socket.
      * @param port The TCP port to use for the public socket.
      * @param name An optional name for the server.
      * @exception IOException If save game can not be found.
      * @exception FreeColException If the savegame could not be loaded.
      * @exception XMLStreamException If the server comms fail.
      */
-    public FreeColServer(final FreeColSavegameFile savegame, 
-                         Specification specification, int port, String name)
+    public FreeColServer(final FreeColSavegameFile savegame, Specification specification,
+            InetAddress address, int port, String name)
         throws FreeColException, IOException, XMLStreamException {
-        this(name, port);
+        this(name, address, port);
 
         this.serverGame = loadGame(savegame, specification);
         // NationOptions will be read from the saved game.
@@ -334,7 +361,6 @@ public final class FreeColServer {
         this.inGameController.setRandom(this.random);
             
         this.mapGenerator = null;
-        registerWithMetaServer();
     }
 
 
@@ -631,8 +657,8 @@ public final class FreeColServer {
     public void addNewUserConnection(Socket socket)
         throws FreeColException, IOException, XMLStreamException {
         final String name = socket.getInetAddress() + ":" + socket.getPort();
-        Connection c = new Connection(socket, FreeCol.SERVER_THREAD + name)
-            .setMessageHandler(this.userConnectionHandler);
+        @SuppressWarnings("resource")
+        final Connection c = new Connection(socket, FreeCol.SERVER_THREAD + name).setMessageHandler(this.userConnectionHandler);
         getServer().addConnection(c);
         // Short delay here improves reliability
         c.startReceiving();
@@ -1174,7 +1200,7 @@ public final class FreeColServer {
 
         // Create the map.
         if (serverGame.getMap() == null) {
-            generateMap();
+            generateMap(true);
         
             // Initial stances and randomizations for all players.
             spec.generateDynamicOptions();
@@ -1224,9 +1250,10 @@ public final class FreeColServer {
     /**
      * Generate a new map in this server/game.
      *
+     * @param generateEuropeanPlayerUnits If {@code true}, then the european player units are generated.
      * @return The {@code Map} that was created.
      */
-    public Map generateMap() {
+    public Map generateMap(boolean generateEuropeanPlayerUnits) {
         ServerGame serverGame = getGame();
         LogBuilder lb = new LogBuilder(256);
         File importFile = serverGame.getMapGeneratorOptions()
@@ -1241,7 +1268,7 @@ public final class FreeColServer {
                     + importFile.getName(), ex);
             }
         }
-        Map ret = getMapGenerator().generateMap(serverGame, importMap, lb);
+        Map ret = getMapGenerator().generateMap(serverGame, importMap, generateEuropeanPlayerUnits, lb);
         lb.shrink("\n");
         lb.log(logger, Level.FINER);
         return ret;
@@ -1335,11 +1362,12 @@ public final class FreeColServer {
         int slots = count(getGame().getLiveEuropeanPlayers(), absentAI);
         int players = count(getGame().getLiveEuropeanPlayers(), liveHuman);
         return new ServerInfo(getName(),
-                              null, -1, // Missing these at this point
+                              getHost(),
+                              getPort(),
                               slots, players,
                               this.serverState == ServerState.IN_GAME,
                               FreeCol.getVersion(),
-                              getServerState().ordinal());
+                              getServerState().getMetaServerState());
     }
 
     /**
@@ -1348,10 +1376,8 @@ public final class FreeColServer {
      * @return True if the meta-server was updated.
      */
     public synchronized boolean registerWithMetaServer() {
-        if (!this.publicServer) return false;
-        boolean ret = MetaServerUtils.registerServer(getServerInfo());
-        if (!ret) this.publicServer = false;
-        return ret;
+        if (!this.publicServer) return true;
+        return MetaServerUtils.registerServer(getServerInfo());
     }
 
     /**
@@ -1362,7 +1388,6 @@ public final class FreeColServer {
     public synchronized boolean removeFromMetaServer() {
         if (!this.publicServer) return false;
         boolean ret = MetaServerUtils.removeServer(getServerInfo());
-        if (!ret) this.publicServer = false;
         return ret;
     }
 
@@ -1374,7 +1399,6 @@ public final class FreeColServer {
     public synchronized boolean updateMetaServer() {
         if (!this.publicServer) return false;
         boolean ret = MetaServerUtils.updateServer(getServerInfo());
-        if (!ret) this.publicServer = false;
         return ret;
     }
 }

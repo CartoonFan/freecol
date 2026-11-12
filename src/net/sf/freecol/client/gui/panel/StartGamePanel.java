@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,11 +19,14 @@
 
 package net.sf.freecol.client.gui.panel;
 
-import java.awt.Component;
-import java.awt.event.ActionListener;
-import java.io.File;
-import java.util.logging.Logger;
+import static net.sf.freecol.common.util.CollectionUtils.count;
 
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+import javax.swing.AbstractAction;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JScrollPane;
@@ -32,19 +35,17 @@ import javax.swing.JTextField;
 import javax.swing.ScrollPaneConstants;
 
 import net.miginfocom.swing.MigLayout;
-
 import net.sf.freecol.client.FreeColClient;
+import net.sf.freecol.client.gui.FontLibrary;
 import net.sf.freecol.client.gui.GUI;
+import net.sf.freecol.client.gui.panel.FreeColButton.ButtonStyle;
 import net.sf.freecol.common.i18n.Messages;
-import net.sf.freecol.common.io.FreeColDirectories;
+import net.sf.freecol.common.model.Game.LogoutReason;
 import net.sf.freecol.common.model.NationOptions;
 import net.sf.freecol.common.model.NationOptions.NationState;
 import net.sf.freecol.common.model.Specification;
-import net.sf.freecol.common.io.FreeColDirectories;
 import net.sf.freecol.common.option.GameOptions;
 import net.sf.freecol.common.option.MapGeneratorOptions;
-import net.sf.freecol.common.option.OptionGroup;
-import static net.sf.freecol.common.util.CollectionUtils.*;
 
 
 /**
@@ -52,8 +53,6 @@ import static net.sf.freecol.common.util.CollectionUtils.*;
  * shown.
  */
 public final class StartGamePanel extends FreeColPanel {
-
-    private static final Logger logger = Logger.getLogger(StartGamePanel.class.getName());
 
     private boolean singlePlayerGame;
 
@@ -83,7 +82,11 @@ public final class StartGamePanel extends FreeColPanel {
 
     private final ActionListener cancelCmd = ae -> {
         final GUI gui = getGUI();
-        getFreeColClient().getConnectController().newGame();
+        
+        if (getFreeColClient().isLoggedIn()) {
+            getFreeColClient().getConnectController().requestLogout(LogoutReason.NEW_GAME);
+        }
+        getFreeColClient().stopServer();
         gui.removeComponent(this);
         gui.showNewPanel();
     };
@@ -103,20 +106,22 @@ public final class StartGamePanel extends FreeColPanel {
 
     private final ActionListener gameOptionsCmd = ae -> {
         final FreeColClient fcc = getFreeColClient();
-        OptionGroup go = getGUI().showGameOptionsDialog(fcc.isAdmin());
-        if (go != null) {
-            fcc.getGame().setGameOptions(go);
-            fcc.getPreGameController().updateGameOptions();
-        }
+        getGUI().showGameOptionsDialog(fcc.isAdmin(), (gameOptions) -> {
+            if (gameOptions != null) {
+                fcc.getGame().setGameOptions(gameOptions);
+                fcc.getPreGameController().updateGameOptions();                
+            }
+        });
     };
 
     private final ActionListener mapGeneratorOptionsCmd = ae -> {
         final FreeColClient fcc = getFreeColClient();
-        OptionGroup mgo = getGUI().showMapGeneratorOptionsDialog(fcc.isAdmin());
-        if (mgo != null) {
-            fcc.getGame().setMapGeneratorOptions(mgo);
-            fcc.getPreGameController().updateMapGeneratorOptions();
-        }
+        getGUI().showMapGeneratorOptionsDialog(fcc.isAdmin(), mgo -> {
+            if (mgo != null) {
+                fcc.getGame().setMapGeneratorOptions(mgo);
+                fcc.getPreGameController().updateMapGeneratorOptions();
+            }
+        });
     };
 
     /**
@@ -125,7 +130,7 @@ public final class StartGamePanel extends FreeColPanel {
      * @param freeColClient The {@code FreeColClient} for the game.
      */
     public StartGamePanel(FreeColClient freeColClient) {
-        super(freeColClient, null, new MigLayout("fill, wrap 2"));
+        super(freeColClient, null, new MigLayout("fill", "", "[grow][][]"));
     }
 
 
@@ -138,16 +143,12 @@ public final class StartGamePanel extends FreeColPanel {
         }
 
         NationOptions nationOptions = getGame().getNationOptions();
-
         cancel = Utility.localizedButton("cancel");
-        setCancelComponent(cancel);
-
         JScrollPane chatScroll = null, tableScroll;
-
         table = new PlayersTable(getFreeColClient(), nationOptions,
                                  getMyPlayer());
 
-        start = Utility.localizedButton("startGame");
+        start = new FreeColButton(Messages.message("startGame")).withButtonStyle(ButtonStyle.IMPORTANT);
 
         gameOptions = Utility.localizedButton(Messages
             .nameKey(GameOptions.TAG));
@@ -173,20 +174,26 @@ public final class StartGamePanel extends FreeColPanel {
 
         refreshPlayersTable();
         tableScroll = new JScrollPane(table, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
-                                      ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+                                      ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER) {
+            @Override
+            public Dimension getPreferredSize() {
+                final int tableWidth = getImageLibrary().scaleInt(600);
+                final int tableHeight =  getImageLibrary().scaleInt(300);
+                return new Dimension(tableWidth, tableHeight);
+            }
+        };
         tableScroll.getViewport().setOpaque(false);
-
-        add(tableScroll, "width 600:, grow");
+        add(tableScroll, "grow");
+        tableScroll.setSize(getPreferredSize());
         if (!singlePlayerGame) {
-            add(chatScroll, "width 250:, grow");
+            final int chatHeight = (int) (FontLibrary.getFontScaling() * 100);
+            add(chatScroll, "newline, height " + chatHeight + "px:,growx");
+            add(chat, "newline, growx");
         }
         add(mapGeneratorOptions, "newline, split 2, growx, top, sg");
         add(gameOptions, "growx, top, sg");
-        if (!singlePlayerGame) {
-            add(chat, "grow, top");
-        }
-        add(readyBox, "newline");
-        add(start, "newline, span, split 2, tag ok");
+        add(readyBox, "newline, span, split 3, tag left, gaptop unrelated");
+        add(start, "tag ok");
         add(cancel, "tag cancel");
 
         if (!singlePlayerGame) {
@@ -203,6 +210,13 @@ public final class StartGamePanel extends FreeColPanel {
         gameOptions.addActionListener(gameOptionsCmd);
         mapGeneratorOptions.addActionListener(mapGeneratorOptionsCmd);
 
+        setEscapeAction(new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                cancel.doClick();
+            }
+        });
+        
         setEnabled(true);
     }
 

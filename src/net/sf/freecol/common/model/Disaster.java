@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -179,7 +179,7 @@ public class Disaster extends FreeColSpecObjectType {
 
         final Specification spec = getSpecification();
 
-        Disaster parent = xr.getType(spec, EXTENDS_TAG, Disaster.class, this);
+        Disaster parent = xr.getAlreadyInitializedType(spec, EXTENDS_TAG, Disaster.class, this);
 
         natural = xr.getAttribute(NATURAL_TAG, parent.natural);
 
@@ -187,19 +187,23 @@ public class Disaster extends FreeColSpecObjectType {
             ? xr.getAttribute(EFFECTS_TAG, Effects.class, Effects.ONE)
             : parent.numberOfEffects;
     }
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void clearContainers(FreeColXMLReader xr) throws XMLStreamException {
+        super.clearContainers(xr);
+        effects = null;
+    }
 
     /**
      * {@inheritDoc}
      */
     @Override
     protected void readChildren(FreeColXMLReader xr) throws XMLStreamException {
-        // Clear containers.
-        if (xr.shouldClearContainers()) {
-            effects = null;
-        }
-
         final Specification spec = getSpecification();
-        Disaster parent = xr.getType(spec, EXTENDS_TAG, Disaster.class, this);
+        Disaster parent = xr.getAlreadyInitializedType(spec, EXTENDS_TAG, Disaster.class, this);
 
         if (parent != this && !parent.getEffects().isEmpty()) {
             if (effects == null) effects = new ArrayList<>();

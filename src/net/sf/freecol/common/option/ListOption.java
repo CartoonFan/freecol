@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -26,7 +26,6 @@ import java.util.logging.Logger;
 
 import javax.xml.stream.XMLStreamException;
 
-import net.sf.freecol.common.io.FreeColModFile;
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
 import net.sf.freecol.common.model.Specification;
@@ -245,7 +244,7 @@ public abstract class ListOption<T> extends AbstractOption<List<AbstractOption<T
             xw.writeEndElement();
         }
 
-        for (AbstractOption option : value) {
+        for (AbstractOption<?> option : value) {
             option.toXML(xw);
         }
     }

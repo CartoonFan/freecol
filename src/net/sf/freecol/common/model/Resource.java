@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -350,7 +350,9 @@ public class Resource extends TileItem {
      */
     @Override
     public String toString() {
-        return (quantity == UNLIMITED) ? getType().getId()
-            : Integer.toString(quantity) + " " + getType().getId();
+        final ResourceType ty = getType();
+        final String id = (ty == null) ? "NOTYPE" : ty.getId();
+        return (quantity == UNLIMITED) ? id
+            : Integer.toString(quantity) + " " + id;
     }
 }

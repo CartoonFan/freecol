@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -102,9 +102,6 @@ public class HighSeas extends UnitLocation {
         if (destination != null) {
             if (!this.destinations.contains(destination)) {
                 this.destinations.add(destination);
-            } else {
-                logger.warning(getId() + " already included destination "
-                    + destination.getId());
             }
         } else {
             logger.warning("Tried to add null destination to " + getId());

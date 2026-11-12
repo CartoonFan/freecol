@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -21,6 +21,8 @@ package net.sf.freecol.client.gui.panel.colopedia;
 
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.image.BufferedImage;
+
 import javax.swing.ImageIcon;
 
 import javax.swing.JTree;
@@ -28,6 +30,7 @@ import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
 
 import net.sf.freecol.client.gui.ImageLibrary;
+import net.sf.freecol.common.util.ImageUtils;
 
 
 /**
@@ -36,10 +39,20 @@ import net.sf.freecol.client.gui.ImageLibrary;
  */
 public class ColopediaTreeCellRenderer extends DefaultTreeCellRenderer {
 
+    private final ColopediaPanel colopediaPanel;
+    private final ImageLibrary lib;
+    
+    
     /**
      * The constructor makes sure that the backgrounds are transparent.
+     *
+     * @param colopediaPanel The parent panel.
+     * @param lib The {@code ImageLibrary} to use.
      */
-    public ColopediaTreeCellRenderer() {
+    public ColopediaTreeCellRenderer(ColopediaPanel colopediaPanel, ImageLibrary lib) {
+        this.colopediaPanel = colopediaPanel;
+        this.lib = lib;
+        
         setBackgroundNonSelectionColor(new Color(0,0,0,1));
     }
 
@@ -58,9 +71,9 @@ public class ColopediaTreeCellRenderer extends DefaultTreeCellRenderer {
         ColopediaTreeItem nodeItem = (ColopediaTreeItem)node.getUserObject();
         if (nodeItem.getIcon() != null) {
             setIcon(nodeItem.getIcon());
-        } else {
-            setIcon(new ImageIcon(ImageLibrary
-                    .getColopediaCellImage(expanded)));
+        } else if (!leaf) {
+            final BufferedImage image = ImageUtils.createCenteredImage(lib.getColopediaCellImage(expanded), colopediaPanel.getListItemIconSize());
+            setIcon(new ImageIcon(image));
         }
         return this;
     }

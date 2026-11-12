@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -19,17 +19,15 @@
 
 package net.sf.freecol.server.ai.mission;
 
-import java.util.logging.Logger;
-
 import javax.xml.stream.XMLStreamException;
 
 import net.sf.freecol.common.io.FreeColXMLReader;
 import net.sf.freecol.common.io.FreeColXMLWriter;
 import net.sf.freecol.common.model.Colony;
 import net.sf.freecol.common.model.CombatModel;
+import net.sf.freecol.common.model.Direction;
 import net.sf.freecol.common.model.Europe;
 import net.sf.freecol.common.model.Location;
-import net.sf.freecol.common.model.Direction;
 import net.sf.freecol.common.model.PathNode;
 import net.sf.freecol.common.model.Player;
 import net.sf.freecol.common.model.Settlement;
@@ -47,8 +45,6 @@ import net.sf.freecol.server.ai.AIUnit;
  * A mission for a Privateer unit.
  */
 public final class PrivateerMission extends Mission {
-
-    private static final Logger logger = Logger.getLogger(PrivateerMission.class.getName());
 
     public static final String TAG = "privateerMission";
 
@@ -135,7 +131,7 @@ public final class PrivateerMission extends Mission {
         if (defender.isOffensiveUnit()) {
             CombatModel.CombatOdds co = attacker.getGame().getCombatModel()
                 .calculateCombatOdds(attacker, defender);
-            if (co != null) value += (co.win - 0.5) * 200;
+            if (co != null) value += (int)((co.win - 0.5) * 200);
         }
         return value;
     }

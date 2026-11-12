@@ -1,5 +1,5 @@
 /**
- *  Copyright (C) 2002-2021   The FreeCol Team
+ *  Copyright (C) 2002-2024   The FreeCol Team
  *
  *  This file is part of FreeCol.
  *
@@ -22,6 +22,7 @@ package net.sf.freecol.client.gui.menu;
 import java.awt.Graphics;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseMotionListener;
 import java.util.logging.Logger;
 
 import javax.swing.ButtonGroup;
@@ -38,7 +39,7 @@ import net.sf.freecol.client.gui.action.ActionManager;
 import net.sf.freecol.client.gui.action.ColopediaAction;
 import net.sf.freecol.client.gui.action.ColopediaAction.PanelType;
 import net.sf.freecol.client.gui.action.FreeColAction;
-import net.sf.freecol.client.gui.action.SelectableAction;
+import net.sf.freecol.client.gui.action.SelectableOptionAction;
 import net.sf.freecol.client.gui.panel.FreeColImageBorder;
 import net.sf.freecol.client.gui.panel.Utility;
 import net.sf.freecol.common.util.ImageUtils;
@@ -53,7 +54,7 @@ public abstract class FreeColMenuBar extends JMenuBar {
     private static final Logger logger = Logger.getLogger(FreeColMenuBar.class.getName());
 
     protected final FreeColClient freeColClient;
-
+    private final MouseMotionListener listener;
     protected final ActionManager am;
 
 
@@ -63,7 +64,7 @@ public abstract class FreeColMenuBar extends JMenuBar {
      *
      * @param f The main controller.
      */
-    protected FreeColMenuBar(FreeColClient f) {
+    protected FreeColMenuBar(FreeColClient f, MouseMotionListener listener) {
         // FIXME: FreeColClient should not have to be passed in to
         // this class.  This is only a menu bar, it doesn't need a
         // reference to the main controller. The only reason it has
@@ -84,12 +85,23 @@ public abstract class FreeColMenuBar extends JMenuBar {
         setOpaque(false);
 
         this.freeColClient = f;
+        this.listener = listener;
         
         this.am = f.getActionManager();
+        
+        // Add a mouse listener so that autoscrolling can happen here
+        this.addMouseMotionListener(listener);
 
-        setBorder(FreeColImageBorder.imageBorder);
+        setBorder(FreeColImageBorder.menuBarBorder);
     }
 
+    @Override
+    public JMenu add(JMenu c) {
+        // Add a mouse listener so that autoscrolling can happen here
+        c.addMouseMotionListener(listener);
+        
+        return super.add(c);
+    }
 
     /**
      * Resets this menu bar.
@@ -120,6 +132,9 @@ public abstract class FreeColMenuBar extends JMenuBar {
             if (action.getMnemonic() != null) {
                 rtn.addMenuKeyListener(action.getMenuKeyListener());
             }
+            
+            rtn.getInputMap().put(action.getAccelerator(), action.getId());
+            rtn.getActionMap().put(action.getId(), action);
         } else {
             logger.finest("Could not create menu item. [" + actionId
                 + "] not found.");
@@ -153,7 +168,6 @@ public abstract class FreeColMenuBar extends JMenuBar {
      * @return The menu item.
      */
     protected JCheckBoxMenuItem getCheckBoxMenuItem(String actionId) {
-
         JCheckBoxMenuItem rtn = null;
         FreeColAction action = am.getFreeColAction(actionId);
 
@@ -162,11 +176,11 @@ public abstract class FreeColMenuBar extends JMenuBar {
             rtn.setAction(action);
             rtn.setOpaque(false);
 
-            rtn.setSelected(((SelectableAction)am.getFreeColAction(actionId))
-                .isSelected());
-        } else
-            logger.finest("Could not create menu item. [" + actionId
-                + "] not found.");
+            rtn.getInputMap().put(action.getAccelerator(), action.getId());
+            rtn.getActionMap().put(action.getId(), action);
+        } else {
+            logger.finest("Could not create menu item. [" + actionId + "] not found.");
+        }
 
         return rtn;
     }
@@ -189,8 +203,11 @@ public abstract class FreeColMenuBar extends JMenuBar {
             rtn.setAction(action);
             rtn.setOpaque(false);
 
-            rtn.setSelected(((SelectableAction) am.getFreeColAction(actionId)).isSelected());
+            rtn.setSelected(((SelectableOptionAction) am.getFreeColAction(actionId)).isSelected());
             group.add(rtn);
+            
+            rtn.getInputMap().put(action.getAccelerator(), action.getId());
+            rtn.getActionMap().put(action.getId(), action);
         } else {
             logger.finest("Could not create menu item. [" + actionId
                 + "] not found.");
@@ -242,7 +259,7 @@ public abstract class FreeColMenuBar extends JMenuBar {
         if (isOpaque()) {
             super.paintComponent(g);
         } else {
-            ImageUtils.drawTiledImage(ImageLibrary.getMenuBackground(),
+            ImageUtils.drawTiledImage(ImageLibrary.getMenuBarBackground(),
                                       g, this, getInsets());
         }
     }
